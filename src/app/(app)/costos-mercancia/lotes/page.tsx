@@ -7,25 +7,28 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { TablaLotes, type FilaLote } from "./tabla-lotes";
 
-export const metadata = { title: "Lotes" };
+export const metadata = { title: "Histórico (Excel)" };
 
 export const dynamic = "force-dynamic";
 
 export default async function LotesPage() {
   await requireModulo("costos-mercancia");
   const supabase = createServiceClient();
-  const r = await traerTodasConError<Record<string, unknown>>((d, h) =>
-    supabase
-      .from("fin_costos_lotes")
-      .select("id, producto, producto_clave, linea, hoja, fecha_llegada, mes_texto, proveedor, cantidad, costo_unitario, comisiones, impuesto, envio, financiamiento, costo_total")
-      .order("fecha_llegada", { ascending: false, nullsFirst: false })
-      .order("id")
-      .range(d, h),
-  );
+  // Lo que no está en la hoja de Costos de producto (0992): el Excel histórico de María José. Sin la 0992, todo.
+  const leer = (soloHistorico: boolean) =>
+    traerTodasConError<Record<string, unknown>>((d, h) => {
+      let q = supabase
+        .from("fin_costos_lotes")
+        .select("id, producto, producto_clave, linea, hoja, fecha_llegada, mes_texto, proveedor, cantidad, costo_unitario, comisiones, impuesto, envio, financiamiento, costo_total");
+      if (soloHistorico) q = q.eq("en_hoja_costos", false);
+      return q.order("fecha_llegada", { ascending: false, nullsFirst: false }).order("id").range(d, h);
+    });
+  let r = await leer(true);
+  if (r.error) r = await leer(false);
   if (r.error) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
-        <EncabezadoAF4 titulo="Lotes" imprimir={false} />
+        <EncabezadoAF4 titulo="Histórico (Excel)" imprimir={false} />
         <EstadoVacioAF4 titulo="Faltan los costos de mercancía">Correr la migración 0908 en Supabase.</EstadoVacioAF4>
       </Pagina>
     );
@@ -47,7 +50,7 @@ export default async function LotesPage() {
   const ultima = filas.map((f) => f.llegada).filter(Boolean).sort().at(-1);
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoAF4 titulo="Lotes" datosHasta={ultima ? inicioDeMes(ultima) : null} imprimir={false} />
+      <EncabezadoAF4 titulo="Histórico (Excel)" datosHasta={ultima ? inicioDeMes(ultima) : null} imprimir={false} />
       <TablaLotes filas={filas} />
     </Pagina>
   );

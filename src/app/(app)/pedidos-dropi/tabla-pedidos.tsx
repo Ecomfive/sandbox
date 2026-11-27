@@ -32,6 +32,8 @@ export interface FilaPedido {
   estado: string;
   /** Liquidado en cartera pero todavía no marcado ENTREGADO en Dropi. */
   alerta: boolean;
+  /** Costo por unidad de la hoja de Costos de producto en la fecha del pedido (solo Panamá; null = sin costo). */
+  costoUnitario: number | null;
 }
 
 const NOMBRE_FILAS: NombreFilas = { singular: "orden", plural: "órdenes" };
@@ -46,7 +48,7 @@ const ICONOS: Record<string, IconoComp> = {
   monto: GastoIcon,
 };
 
-type ColumnaId = "fecha" | "fechaHora" | "orden" | "producto" | "cantidad" | "monto" | "estado";
+type ColumnaId = "fecha" | "fechaHora" | "orden" | "producto" | "cantidad" | "monto" | "costo" | "estado";
 
 const COLUMNAS: (ColumnaDef & { id: ColumnaId })[] = [
   { id: "fecha", label: "Fecha", ocultable: true },
@@ -55,6 +57,7 @@ const COLUMNAS: (ColumnaDef & { id: ColumnaId })[] = [
   { id: "producto", label: "Producto", ocultable: true },
   { id: "cantidad", label: "Cantidad", ocultable: true },
   { id: "monto", label: "Monto", ocultable: true },
+  { id: "costo", label: "Costo producto", ocultable: true },
   { id: "estado", label: "Estado", ocultable: true },
 ];
 const COLUMNAS_POR_ID = new Map(COLUMNAS.map((c) => [c.id, c]));
@@ -117,6 +120,14 @@ export function TablaPedidos({
         return p.cantidad;
       case "monto":
         return formatearMoneda(p.monto, codigoPais);
+      case "costo":
+        return p.costoUnitario === null ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <Tooltip texto={`${formatearMoneda(p.costoUnitario, codigoPais)} por unidad · Costos de producto`}>
+            <span tabIndex={0}>{formatearMoneda(p.costoUnitario * p.cantidad, codigoPais)}</span>
+          </Tooltip>
+        );
       case "estado":
         return <Badge tone={toneEstadoPedido(p.estado)}>{p.estado}</Badge>;
     }
@@ -126,7 +137,7 @@ export function TablaPedidos({
     <tr key={p.referencia} className="border-b border-border/60 last:border-0">
       {columnasVisibles.map((columna) => {
         const color = columna.id === "fechaHora" || columna.id === "producto" ? "text-muted-foreground" : "";
-        const tipo = columna.id === "orden" ? "font-medium" : columna.id === "cantidad" || columna.id === "monto" ? "tabular-nums" : "";
+        const tipo = columna.id === "orden" ? "font-medium" : columna.id === "cantidad" || columna.id === "monto" || columna.id === "costo" ? "tabular-nums" : "";
         return (
           <td key={columna.id} className={`${claseCeldaColumna} ${color} ${tipo}`}>
             {celda(columna.id, p)}

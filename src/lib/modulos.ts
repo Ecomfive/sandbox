@@ -24,7 +24,7 @@ export const MODULOS: Modulo[] = [
   { clave: "ventas-tiendas", etiqueta: "Ventas por tienda" },
   { clave: "clientes-marketing", etiqueta: "Clientes y marketing" },
   { clave: "conciliacion-bancaria", etiqueta: "Conciliación bancaria" },
-  { clave: "costos-mercancia", etiqueta: "Costos de mercancía" },
+  { clave: "costos-mercancia", etiqueta: "Costos de producto" },
   { clave: "bienes-de-uso", etiqueta: "Bienes de uso" },
   { clave: "balance-general", etiqueta: "Balance general" },
   { clave: "flujo-caja", etiqueta: "Flujo de caja" },

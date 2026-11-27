@@ -5,6 +5,8 @@ import { after } from "next/server";
 import { activarTareasDeLlegada } from "@/lib/crm/tareas-servidor";
 import { rutaPropia, rutaEnCarpeta } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
+import { hoyPanama } from "@/lib/af4/fecha";
+import { sincronizarCostosCompras } from "@/lib/finanzas/sincronizar-costos-compras";
 import { descontinuadoEn } from "@/lib/producto/descontinuado-pais";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { MENSAJE_ACCION_BLOQUEADA, requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
@@ -268,7 +270,11 @@ async function anotarEventos(compraId: string, antes: { etapa: string; estado: s
  * sola llegada. Otra etapa no hace nada.
  */
 async function avisarCambioDeEtapa(etapa: string, compraIds: string[]) {
-  if (!llegadaDeEtapa(etapa) || compraIds.length === 0) return;
+  if (compraIds.length === 0) return;
+  // La hoja de Costos de producto (0992) toma sola las compras de Panamá que pasan a En Bodega o Completado, y suelta las
+  // que salen de ahí. Después de responder: un fallo aquí nunca deshace el cambio de etapa.
+  after(() => sincronizarCostosCompras(createServiceClient(), hoyPanama()).catch(() => undefined));
+  if (!llegadaDeEtapa(etapa)) return;
   const usuario = await getUsuarioActual();
   const autor = { id: usuario?.id ?? null, nombre: usuario?.nombre || usuario?.email || null };
   after(() => avisarLlegada(createServiceClient(), { etapa, compraIds, autor }));

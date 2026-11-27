@@ -61,8 +61,8 @@ export function TablaLotes({ filas }: { filas: FilaLote[] }) {
       nombre={NOMBRE}
       claveFila={(f) => f.id}
       formatearTotal={(v) => dinero(v)}
-      ariaLabel="Lotes de mercancía"
-      vacio="Todavía no hay lotes. Cárgalos desde «Importar Excel»."
+      ariaLabel="Costos históricos del Excel"
+      vacio="No hay costos históricos del Excel."
     />
   );
 }

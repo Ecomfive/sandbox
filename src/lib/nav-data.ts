@@ -163,7 +163,7 @@ const AREAS: NavSection[] = [
       { label: "Cierre de mes", href: "/cierre-mes", grupo: "Contabilidad y cierre" },
       { label: "Libro de movimientos", href: "/libro-movimientos", grupo: "Contabilidad y cierre" },
       { label: "Balance general", href: "/balance-general", grupo: "Contabilidad y cierre" },
-      { label: "Costos de mercancía", href: "/costos-mercancia", grupo: "Contabilidad y cierre" },
+      { label: "Costos de producto", href: "/costos-mercancia", grupo: "Contabilidad y cierre" },
       { label: "Bienes de uso", href: "/bienes-de-uso", grupo: "Contabilidad y cierre" },
       { label: "Ventas por tienda", href: "/ventas-tiendas", grupo: "Comercial" },
       { label: "Clientes y marketing", href: "/clientes-marketing", grupo: "Comercial" },

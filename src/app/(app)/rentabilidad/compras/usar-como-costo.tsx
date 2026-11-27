@@ -20,7 +20,7 @@ export function UsarComoCosto() {
           const r = await usarComprasComoCosto().catch(() => ({ error: "Se cortó la conexión." }));
           if ("error" in r) mostrarToast(r.error, "destructive");
           else {
-            mostrarToast(`${r.lotes} lotes en Costos de mercancía${r.quitados ? ` · ${r.quitados} quitados` : ""}`);
+            mostrarToast(`${r.lotes} compras en Costos de producto${r.quitados ? ` · ${r.quitados} quitadas` : ""}`);
             router.refresh();
           }
         })

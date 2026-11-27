@@ -3,66 +3,53 @@ import { EstadoVacioAF4 } from "@/components/af4/estado-af4";
 import { FilaKpiAF4, KpiAF4 } from "@/components/af4/kpi-af4";
 import { Pagina } from "@/components/ui/pagina";
 import { fechaCorta, inicioDeMes } from "@/lib/af4/fecha";
-import { dinero, entero } from "@/lib/af4/formato";
+import { entero } from "@/lib/af4/formato";
 import { requireModulo } from "@/lib/auth";
-import { cargarCostosVigentes } from "@/lib/finanzas/cargar-costos";
+import { esAdministrador } from "@/lib/permisos/acceso";
+import { cargarHojaCostos } from "@/lib/finanzas/cargar-hoja-costos";
+import { VARIACION_AVISO } from "@/lib/finanzas/hoja-costos";
 import { createServiceClient } from "@/lib/supabase/server";
-import { TablaCostos } from "./tabla-costos";
-import { MetodoCosto } from "./metodo-costo";
+import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
+import { HojaCostos } from "./hoja-costos";
+import { TraerCompras } from "./traer-compras";
 
-export const metadata = { title: "Costos de mercancía" };
+export const metadata = { title: "Costos de producto" };
 
 export const dynamic = "force-dynamic";
 
-export default async function CostosMercanciaPage() {
+/**
+ * Costos de producto (0992): la hoja única de costos de Panamá. Una fila por compra que llegó (En Bodega o Completado),
+ * agrupada por el código único del producto; de aquí toman el costo la ficha de Inventario, la reportería de pedidos y
+ * Pedidos Dropi.
+ */
+export default async function CostosProductoPage() {
   const usuario = await requireModulo("costos-mercancia");
+  const puedeEscribir = !usuario.modulosSoloLectura.includes("costos-mercancia");
   const supabase = createServiceClient();
-  const [r, metodoFila] = await Promise.all([cargarCostosVigentes(supabase), supabase.from("fin_config").select("valor").eq("clave", "costo_metodo").maybeSingle()]);
-  // Sin la migración 0987 no hay método guardado: el costo vigente es el último lote (lo de siempre).
-  const metodo = metodoFila.data?.valor === "promedio" ? "promedio" : "ultimo";
-  const conMetodo = !metodoFila.error && !!metodoFila.data;
+  const [r, opciones] = await Promise.all([cargarHojaCostos(supabase), puedeEscribir ? obtenerOpcionesSkuMaestro(supabase) : Promise.resolve([])]);
   if ("error" in r) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
-        <EncabezadoAF4 titulo="Costos de mercancía" imprimir={false} />
-        <EstadoVacioAF4 titulo="No se pudieron leer los costos" accion={{ href: "/costos-mercancia/importar", etiqueta: "Importar Excel" }}>
-          {r.error}
-        </EstadoVacioAF4>
+        <EncabezadoAF4 titulo="Costos de producto" imprimir={false} />
+        <EstadoVacioAF4 titulo="No se pudo leer la hoja de costos">{r.error}</EstadoVacioAF4>
       </Pagina>
     );
   }
-  const { filas } = r;
-  const lotes = filas.reduce((a, f) => a + f.lotes, 0);
-  const subieron = filas.filter((f) => f.lotes > 1 && (f.variacion ?? 0) >= 10);
-  const ultima = filas.map((f) => f.llegada).filter(Boolean).sort().at(-1);
-  const conUnidades = filas.filter((f) => f.costoPromedio !== null && f.unidades);
-  const costoMedio = conUnidades.length ? conUnidades.reduce((a, f) => a + f.costoVigente, 0) / conUnidades.length : null;
+  const { filas, resumen, sinCosto, ultimoCerrado } = r;
+  const productos = resumen.size;
+  const subieron = [...resumen.values()].filter((p) => p.compras > 1 && (p.variacion ?? 0) >= VARIACION_AVISO).length;
+  const ultima = filas.map((f) => f.llegada).filter((x): x is string => !!x).sort().at(-1);
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoAF4
-        titulo="Costos de mercancía"
-        datosHasta={ultima ? inicioDeMes(ultima) : null}
-        filtros={conMetodo ? <MetodoCosto metodo={metodo} puedeEscribir={!usuario.modulosSoloLectura.includes("costos-mercancia")} /> : undefined}
-      />
-      {!filas.length ? (
-        <EstadoVacioAF4 titulo="Todavía no hay costos de mercancía" accion={{ href: "/costos-mercancia/importar", etiqueta: "Importar Excel" }} />
-      ) : (
-        <>
-          <FilaKpiAF4>
-            <KpiAF4 titulo="Productos con costo" valor={entero(filas.length)} />
-            <KpiAF4 titulo="Lotes cargados" valor={entero(lotes)} subtexto={ultima ? `Última llegada ${fechaCorta(ultima)}` : undefined} />
-            <KpiAF4
-              titulo="Último lote 10 % más caro"
-              tono={subieron.length ? "warning" : "neutral"}
-              valor={entero(subieron.length)}
-              subtexto="que su promedio"
-            />
-            {costoMedio !== null && <KpiAF4 titulo="Costo unitario medio" valor={dinero(costoMedio, "USD", { decimales: 2, decimalesMax: 4 })} subtexto="USD" />}
-          </FilaKpiAF4>
-          <TablaCostos filas={filas} />
-        </>
-      )}
+      <EncabezadoAF4 titulo="Costos de producto" datosHasta={ultima ? inicioDeMes(ultima) : null} filtros={puedeEscribir ? <TraerCompras /> : undefined} imprimir={false} />
+      <FilaKpiAF4>
+        <KpiAF4 titulo="Productos con costo" valor={entero(productos)} subtexto={ultimoCerrado ? `Panamá · cerrado hasta ${ultimoCerrado.slice(0, 7)}` : "Panamá"} />
+        <KpiAF4 titulo="Compras en la hoja" valor={entero(filas.length)} subtexto={ultima ? `Última llegada ${fechaCorta(ultima)}` : undefined} />
+        <KpiAF4 titulo="Con stock y sin costo" tono={sinCosto.length ? "destructive" : "neutral"} valor={entero(sinCosto.length)} subtexto="se marcan abajo" />
+        <KpiAF4 titulo={`Última compra ${VARIACION_AVISO} % más cara`} tono={subieron ? "warning" : "neutral"} valor={entero(subieron)} subtexto="que su promedio" />
+      </FilaKpiAF4>
+      <HojaCostos filas={filas} resumen={Object.fromEntries(resumen)} sinCosto={sinCosto} opciones={opciones} puedeEscribir={puedeEscribir} esAdmin={esAdministrador(usuario)} />
     </Pagina>
   );
 }

@@ -16,6 +16,7 @@ import { ResultadoTestProducto } from "./test-producto";
 import { formatearFecha } from "@/lib/formato";
 import { NotasProducto } from "../inventario/notas-producto";
 import { InventarioProductoBloque } from "./inventario-producto";
+import { SeccionCostoProducto } from "@/components/costos/costo-producto";
 import { cambiarClaseProducto, eliminarProducto } from "./actions";
 import { CodigoBarrasProducto } from "./codigo-barras-producto";
 import { VencimientoProducto } from "./vencimiento-producto";
@@ -281,6 +282,8 @@ export function FichaProducto({
                 <InventarioProductoBloque key={producto.id} id={producto.id} puedeVerInventario={puedeVerInventario} />
               )}
             </Seccion>
+            {/* Costos de producto (0992): el costo de la hoja de Finanzas, solo para ver; las compras que llegan entran solas. */}
+            {!esTest && <SeccionCostoProducto skuId={producto.id} />}
             <Seccion icono={ProductoIcon} titulo="Asociaciones">
               {/* Sus publicaciones de Dropi como proveedor (Gestión de IDs Dropi): cómo se llama allá, en qué país y con qué ID. */}
               {producto.nombresDropi.length > 0 && (

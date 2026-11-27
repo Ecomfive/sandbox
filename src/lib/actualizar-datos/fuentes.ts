@@ -39,7 +39,8 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
   const verDropi = tiene(u, "publicaciones-dropi") || tiene(u, "retiros");
   const verEffi = tiene(u, "publicaciones-effi") || tiene(u, "analisis-competencia");
   const verTareas = tiene(u, "deliverys") || tiene(u, "cierre-mes") || tiene(u, "panel-financiero") || tiene(u, "ventas-tiendas");
-  const archivos = ORDEN_CARGA.filter((m) => m !== "ventas-tiendas" && tiene(u, m));
+  // Los costos de mercancía ya no se suben en Excel: se cargan en la hoja de Costos de producto (0992).
+  const archivos = ORDEN_CARGA.filter((m) => m !== "ventas-tiendas" && m !== "costos-mercancia" && tiene(u, m));
   const vacio = Promise.resolve({ data: null });
 
   const [dropi, effi, tareas, matriz, matrizExcel, matrizPedido, siscore, saldo, meta, metaManual, tuwinner, importaciones, conteo, conexiones, competenciaDrop] = await Promise.all([
