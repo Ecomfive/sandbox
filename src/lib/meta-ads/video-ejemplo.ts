@@ -14,6 +14,8 @@ export interface VideoEjemplo {
   /** De cuántos días son ese CPA y esas compras. */
   dias: number;
   miniatura: string | null;
+  /** De qué producto es (cuando se buscó por el texto y puede no ser el de la recomendación). */
+  producto?: string | null;
 }
 
 /** Con menos compras que estas, un video no sirve de ejemplo (su CPA es casualidad). */
@@ -25,7 +27,7 @@ const redondear = (n: number) => Math.round(n * 100) / 100;
 export function ejemploDeAnuncio(a: { videoId?: string | null; nombre: string; numero?: string | null; angulo: string | null; miniatura?: string | null; r: Resultados } | null | undefined): VideoEjemplo | null {
   if (!a?.videoId) return null;
   const c = cpa(a.r);
-  return { id: a.videoId, nombre: a.numero ? `${a.numero} · ${a.nombre}` : a.nombre, angulo: a.angulo, cpa: c === null ? null : redondear(c), compras: a.r.compras, dias: 30, miniatura: a.miniatura ?? null };
+  return { id: a.videoId, nombre: a.numero && !a.nombre.startsWith(a.numero) ? `${a.numero} · ${a.nombre}` : a.nombre, angulo: a.angulo, cpa: c === null ? null : redondear(c), compras: a.r.compras, dias: 30, miniatura: a.miniatura ?? null };
 }
 
 /**
@@ -37,4 +39,50 @@ export function mejorVideoDeAngulo(videos: readonly { id: string; nombre: string
   const mejor = [...candidatos].sort((a, b) => cpa(a.r)! - cpa(b.r)! || b.r.compras - a.r.compras)[0];
   if (!mejor) return null;
   return { id: mejor.id, nombre: mejor.nombre, angulo: mejor.angulo, cpa: redondear(cpa(mejor.r)!), compras: mejor.r.compras, dias, miniatura: mejor.miniatura ?? null };
+}
+
+/** Un video que puede servir de ejemplo (de los últimos 30 días), para buscarlo por lo que dice una recomendación. */
+export interface VideoCandidato {
+  id: string;
+  nombre: string;
+  /** El ángulo como lo guarda el análisis y como se muestra (con su detalle). */
+  angulo: string | null;
+  anguloNombre: string | null;
+  /** Lo demás que tiene y que una recomendación puede nombrar como «lo que funcionó»: el tipo de gancho, el formato, el tipo de llamado a la acción. */
+  rasgos: string[];
+  /** La llave del producto y su nombre. */
+  productoClave: string;
+  producto: string | null;
+  cpa: number | null;
+  compras: number;
+  miniatura: string | null;
+}
+
+const normal = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
+
+/**
+ * El video de ejemplo de una recomendación por lo que dice (27 nov 2026, pedido de Hernán: en el «Qué hacer» de todas las pestañas, siempre que se mencione algo que funcionó). Busca lo que nombra entre comillas: un ángulo
+ * («Salud prostática», «Salud prostática (sobre todo …)»), un tipo de gancho, un formato, un tipo de llamado a la acción o el nombre de un video. Devuelve el video que lo tiene con el CPA más bajo y al menos 2 compras: primero
+ * del mismo producto; si no hay, de cualquiera. Null si no nombra nada con videos que sirvan.
+ */
+export function videoDelTexto(texto: string | null | undefined, candidatos: readonly VideoCandidato[], productoClave?: string | null): VideoEjemplo | null {
+  if (!texto || !candidatos.length) return null;
+  const citas = [...texto.matchAll(/«([^»]{2,120})»/g)].map((m) => normal(m[1].replace(/\s*\(sobre todo.*$/i, "")));
+  if (!citas.length) return null;
+  const sirven = candidatos.filter((v) => v.compras >= COMPRAS_PARA_EJEMPLO && v.cpa !== null);
+  for (const cita of citas) {
+    const delAngulo = sirven.filter(
+      (v) =>
+        normal(v.nombre) === cita ||
+        (v.angulo && normal(v.angulo) === cita) ||
+        (v.anguloNombre && (normal(v.anguloNombre) === cita || normal(v.anguloNombre).startsWith(`${cita} (`))) ||
+        v.rasgos.some((r) => normal(r) === cita),
+    );
+    if (!delAngulo.length) continue;
+    const mismos = productoClave ? delAngulo.filter((v) => v.productoClave === productoClave) : [];
+    const lista = mismos.length ? mismos : delAngulo;
+    const v = [...lista].sort((a, b) => a.cpa! - b.cpa! || b.compras - a.compras)[0];
+    return { id: v.id, nombre: v.nombre, angulo: v.anguloNombre ?? v.angulo, cpa: redondear(v.cpa!), compras: v.compras, dias: 30, miniatura: v.miniatura, producto: mismos.length ? null : v.producto };
+  }
+  return null;
 }

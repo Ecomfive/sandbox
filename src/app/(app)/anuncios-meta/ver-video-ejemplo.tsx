@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { Ventana } from "@/components/ui/ventana";
 import { dolares } from "@/lib/meta-ads/metricas";
-import type { VideoEjemplo } from "@/lib/meta-ads/video-ejemplo";
+import { claveDeProducto } from "@/lib/meta-ads/nombre";
+import { videoDelTexto, type VideoCandidato, type VideoEjemplo } from "@/lib/meta-ads/video-ejemplo";
 import { ReproductorVideo } from "./reproductor-video";
 
 /**
@@ -28,6 +29,7 @@ export function VerVideoEjemplo({ video, className = "" }: { video: VideoEjemplo
         </svg>
         <span className="min-w-0">
           Ver el video de ejemplo: <span className="break-words">«{video.nombre}»</span>
+          {video.producto && <span className="font-normal text-muted-foreground"> (de {video.producto})</span>}
           {cifra && <span className="font-normal text-muted-foreground"> · {cifra}</span>}
         </span>
       </button>
@@ -49,4 +51,26 @@ export function VerVideoEjemplo({ video, className = "" }: { video: VideoEjemplo
       </Ventana>
     </>
   );
+}
+
+/** Los videos de los últimos 30 días que pueden servir de ejemplo, para todas las tarjetas de una pantalla de Anuncios Meta. */
+const Ejemplos = createContext<readonly VideoCandidato[]>([]);
+
+export function ProveedorEjemplos({ candidatos, children }: { candidatos: readonly VideoCandidato[]; children: ReactNode }) {
+  return <Ejemplos.Provider value={candidatos}>{children}</Ejemplos.Provider>;
+}
+
+/**
+ * El video de ejemplo del «Qué hacer» (27 nov 2026, pedido de Hernán: «en todas las pestañas del módulo, según se mencione algo que funcionó, poner un ejemplo»). Usa el que trae la recomendación; si no trae, lo busca por lo
+ * que dice (el ángulo, el gancho, el formato o el video que nombra entre comillas), primero del mismo producto.
+ */
+export function VideoDeEjemplo({ video, texto, producto, className = "" }: { video?: VideoEjemplo | null; texto?: string | null; producto?: string | null; className?: string }) {
+  const candidatos = useContext(Ejemplos);
+  const elegido = useMemo(() => {
+    if (!video) return videoDelTexto(texto, candidatos, producto ? claveDeProducto(producto) : null);
+    // Un anuncio que se llama solo «V2»: se le suma el nombre de su video, si se conoce.
+    const delVideo = candidatos.find((c) => c.id === video.id);
+    return delVideo && video.nombre.length <= 6 ? { ...video, nombre: `${video.nombre} · ${delVideo.nombre}` } : video;
+  }, [video, texto, candidatos, producto]);
+  return <VerVideoEjemplo video={elegido} className={className} />;
 }

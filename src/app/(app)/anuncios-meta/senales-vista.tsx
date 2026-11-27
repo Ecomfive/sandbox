@@ -9,7 +9,7 @@ import { tieneSenales, type CausaCreativa, type SenalesCreativas, type VideoSena
 import { NOMBRE_MODULO_SENAL, type Gravedad, type SenalModulo } from "@/lib/meta-ads/senales-modulos";
 import { BarraProgreso } from "./graficas";
 import { SeccionPlegable } from "./plegable";
-import { VerVideoEjemplo } from "./ver-video-ejemplo";
+import { VideoDeEjemplo } from "./ver-video-ejemplo";
 import { AvisoRentable } from "./aviso-rentable";
 import type { VideoEjemplo } from "@/lib/meta-ads/video-ejemplo";
 
@@ -155,7 +155,7 @@ function Producto({ s }: { s: SenalesCreativas }) {
                     <span className="shrink-0 font-semibold text-success">Qué hacer</span>
                     <span>{f.accion}</span>
                   </p>
-                  <VerVideoEjemplo video={f.video} className="mt-1" />
+                  <VideoDeEjemplo video={f.video} texto={f.accion} producto={s.producto} className="mt-1" />
                   <BotonesDecidir clave={f.decision} titulo={`${s.producto}: ${f.titulo}`} accion={f.accion} className="mt-2" />
                 </div>
               </li>

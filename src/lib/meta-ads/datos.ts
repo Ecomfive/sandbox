@@ -10,7 +10,8 @@ import { guiaDeTope, textoDeGuia, zonaDe, type GuiaDeTope } from "./limite";
 import { calculadorDeTopes } from "./limite-datos";
 import { claveDeCostos, revisarCostos, sumarPedidos, tasasDe, COSTOS_DE_LA_HOJA } from "./costos-operacion";
 import { avisoRentabilidad, limitesDeProductos } from "./rentabilidad";
-import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
+import type { VideoCandidato } from "./video-ejemplo";
+import { cpa, CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
 import { nombreDeAngulo, temasDe } from "./angulo-detalle";
 import { calcularEnMarcha, campanaEnMarcha, enLaVista, hallazgosEnVista, productoEnMarcha, type EnMarcha, type VistaActividad } from "./en-marcha";
 import { pendienteDeProducto, pendientesPorCampana, pendientesPorVideo } from "./prioridad";
@@ -80,6 +81,8 @@ export interface TopeVista {
 }
 
 export interface DatosMeta {
+  /** Los videos de los últimos 30 días con ángulo y compras, para el video de ejemplo del «Qué hacer» (27 nov 2026). */
+  ejemplosVideo: VideoCandidato[];
   faltaMigracion: boolean;
   cuentas: CuentaVista[];
   cuentaId: string | null;
@@ -139,6 +142,7 @@ export interface DatosMeta {
 
 const vacios = (periodo: Periodo, hoy: string): DatosMeta => ({
   faltaMigracion: false, cuentas: [], cuentaId: null, periodo, desde: hoy, hasta: hoy, campanas: [], videos: [], anuncios: [], totales: sinResultados(), anteriores: sinResultados(), topes: [], productos: [], sugerencias: [], decididas: 0, topesProductos: {}, ocultas: [],
+  ejemplosVideo: [],
   grupos: { campana: { "Ángulo": [], Estructura: [], Puja: [], Producto: [], Etapa: [] }, anuncio: { Copy: [], Landing: [] } }, serie: [], gruposVideo: gruposDeVideos([]), interpretacion: null, analisisGeneradoEn: null, analisisPendiente: false, vigilancias: [], senales: [], rasgos: [], historial: null, productosVista: [], enMarcha: { productos: [], campanas: [] }, creadasPorDia: [], creadasHoy: 0, actividad: resumirEquipo([], [], hoy), ganchosSinTipo: 0, videosSinAnalizar: 0, videosSinAngulo: 0, iaConectada: false, actividadDisponible: false,
 });
 
@@ -461,6 +465,9 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     paginasPorCampana.set(a.campanaId, lista);
   }
   // En las sugerencias el ángulo va con su detalle, para que «antes y después» diga cuál.
+  const ejemplosVideo: VideoCandidato[] = videos30
+    .filter((v) => v.r.compras >= 2)
+    .map((v) => ({ id: v.id, nombre: v.nombre, angulo: v.angulo, anguloNombre: nombreDeAngulo(v.angulo, v.analisis?.anguloDetalle), rasgos: [v.analisis?.ganchoTipo, v.analisis?.formato, v.analisis?.ctaTipo].filter((x): x is string => !!x), productoClave: claveDeProducto(v.producto), producto: v.producto, cpa: cpa(v.r), compras: v.r.compras, miniatura: v.miniatura }));
   const videosEnMarcha = videos30.filter((v) => productoEnMarcha(enMarcha, v.producto)).map((v) => ({ ...v, angulo: nombreDeAngulo(v.angulo, v.analisis?.anguloDetalle) }));
   const delHistorial = hallazgosEnVista(hallazgosGuardados?.analisis.hallazgos ?? [], enMarcha, "activos");
   const todas = [...sugerir({ campanas: campanas7, anuncios: anunciosSugerencia, serie, videos: videosEnMarcha, hoy: o.hoy, paginasPorCampana, rentabilidad }), ...sugerenciasDeHallazgos([...delHistorial, ...vigilancias.map(hallazgoDeVigilancia).filter((h): h is NonNullable<typeof h> => h !== null)])];
@@ -506,7 +513,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const productos = [...new Set(camp.map((c) => (c.producto as string | null)?.trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
   return {
     ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, ocultas, topesProductos: Object.fromEntries(productos.map((p) => { const t = topeDe(claveDeProducto(p)); const guia = guiaDeTope(t); return [claveDeProducto(p), { tope: t.tope, texto: guia ? textoDeGuia(guia) : null, guia }]; })), grupos,
-    interpretacion, analisisGeneradoEn: hallazgosGuardados?.generadoEn ?? null, analisisPendiente: analisisViejo(hallazgosGuardados), vigilancias, senales, rasgos, historial: hallazgosGuardados ? seccionesDeAnalisis(hallazgosGuardados) : null,
+    ejemplosVideo, interpretacion, analisisGeneradoEn: hallazgosGuardados?.generadoEn ?? null, analisisPendiente: analisisViejo(hallazgosGuardados), vigilancias, senales, rasgos, historial: hallazgosGuardados ? seccionesDeAnalisis(hallazgosGuardados) : null,
     serie: serieGlobal, gruposVideo, productosVista, enMarcha, creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.venta + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, actividad, ganchosSinTipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
   };
 }
