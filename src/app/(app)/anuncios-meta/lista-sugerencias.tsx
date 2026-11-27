@@ -8,6 +8,8 @@ import { ChevronRightIcon } from "@/lib/nav-icons";
 import { GuiaEnLinea } from "./aviso-tope";
 import { BotonesDecidir } from "./decidir";
 import { CifrasEnLinea } from "./piezas";
+import { VideoDeEjemplo } from "./ver-video-ejemplo";
+import { AvisoRentable } from "./aviso-rentable";
 
 const TEXTO_SEVERIDAD = { alta: "Urgente", media: "Importante", info: "Para mirar" } as const;
 
@@ -83,10 +85,12 @@ function Tarjeta({ s }: { s: Sugerencia }) {
             <span className="font-medium">Qué hacer: </span>
             {s.accion}
           </p>
+          <AvisoRentable aviso={s.rentabilidad} className="mt-1.5" />
+          <VideoDeEjemplo video={s.video} texto={s.accion} className="mt-1" />
           {s.guia && <GuiaEnLinea guia={s.guia} className="mt-1.5" />}
           {s.anuncios && s.anuncios.length > 0 && <AnunciosPasados anuncios={s.anuncios} />}
         </div>
-        <BotonesDecidir clave={s.clave} titulo={s.titulo} className="w-full shrink-0 pl-4 @3xl:w-auto @3xl:max-w-[26rem] @3xl:justify-end @3xl:pl-0" />
+        <BotonesDecidir clave={s.clave} titulo={s.titulo} accion={s.accion} className="w-full shrink-0 pl-4 @3xl:w-auto @3xl:max-w-[26rem] @3xl:justify-end @3xl:pl-0" />
       </div>
     </li>
   );

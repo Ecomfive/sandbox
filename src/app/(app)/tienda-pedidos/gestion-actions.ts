@@ -8,6 +8,7 @@ import { puedeVerUnidad } from "@/lib/finanzas/tiendas-permitidas";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   anularEnShopify,
+  cambiarDireccionEnShopify,
   cambiarEtiquetasEnShopify,
   cargarGuiaEnShopify,
   liberarEsperaEnShopify,
@@ -16,7 +17,7 @@ import {
 } from "@/lib/tienda/escribir-shopify";
 import { guiaPorWhatsapp } from "@/lib/tienda/guia-cliente";
 import { textoCambio } from "@/lib/tienda/etiquetas-shopify";
-import { ETIQUETA_ACREDITADO, leerGuia, lineaCronologia, lineaPaso, planAtc, type AccionAtc, type PasoAtc } from "@/lib/tienda/gestion-atc";
+import { ETIQUETA_ACREDITADO, leerDireccion, leerGuia, lineaCronologia, lineaPaso, planAtc, type AccionAtc, type PasoAtc } from "@/lib/tienda/gestion-atc";
 import { etiquetasDe, mismaTiendaUnidad } from "@/lib/tienda/ordenes-finanzas";
 import { appDeTienda, type AppTienda } from "@/lib/tienda/shopify-app";
 
@@ -215,4 +216,32 @@ export async function resolverGuiaSinCargar(ordenId: string): Promise<ResultadoG
   const linea = `Guía ${guias.join(", ")} de Servientrega: resuelta a mano (no había entrado sola en Shopify o el aviso al cliente no había salido)`;
   await registrar(ctx, ctx.orden.etiquetas, linea, "guia_resuelta");
   return { ok: true, etiquetas: ctx.orden.etiquetas, texto: linea };
+}
+
+/**
+ * Cambia la dirección del pedido (26 nov 2026, aviso de atención al cliente: el bot todavía no entiende las direcciones enredadas que escribe el
+ * cliente). Primero en Shopify (así le sale a despacho en el ticket); si entró, en el sistema, con su línea en la cronología. No después de entregado.
+ */
+export async function editarDireccionPedido(ordenId: string, direccionCruda: unknown, corregimientoCrudo: unknown): Promise<{ ok: true; texto: string } | { error: string }> {
+  const leida = leerDireccion(direccionCruda, corregimientoCrudo);
+  if ("error" in leida) return leida;
+  const ctx = await cargarContexto(ordenId, MODULOS_ASESORA);
+  if ("error" in ctx) return ctx;
+  if (ctx.orden.estadoEntrega === "entregada") return { error: "El pedido ya se entregó: la dirección no se cambia." };
+  try {
+    await cambiarDireccionEnShopify(ctx.app, ctx.orden.numero, leida);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Shopify no cambió la dirección." };
+  }
+  const supabase = createServiceClient();
+  const { data: antes } = await supabase.from("ven_ordenes_clientes").select("direccion, corregimiento").eq("orden_id", ctx.orden.id).maybeSingle();
+  await supabase.from("ven_ordenes_clientes").update({ direccion: leida.direccion, corregimiento: leida.corregimiento || null }).eq("orden_id", ctx.orden.id);
+  const quien = (ctx.usuario.nombre || ctx.usuario.email || "Alguien").trim();
+  const texto = (d: string | null | undefined, c: string | null | undefined) => [c, d].map((x) => (x ?? "").trim()).filter(Boolean).join(" · ") || "sin dirección";
+  const linea = `Dirección cambiada: ${texto(leida.direccion, leida.corregimiento)} (antes: ${texto(antes?.direccion as string | null, antes?.corregimiento as string | null)})`.slice(0, 1000);
+  await supabase.from("ven_orden_notas").insert({ orden_id: ctx.orden.id, texto: linea, autor: quien });
+  // En la auditoría no va la dirección (es del cliente): solo que se cambió.
+  await registrarAuditoria({ accion: "atc_direccion", entidad: "ven_ordenes", entidadId: ctx.orden.id, detalle: `${ctx.tienda} ${ctx.orden.numero}: cambió la dirección de envío` });
+  for (const ruta of RUTAS) revalidatePath(ruta);
+  return { ok: true, texto: "Dirección cambiada en Shopify." };
 }

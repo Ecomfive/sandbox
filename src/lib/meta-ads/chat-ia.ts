@@ -6,6 +6,8 @@
 import { cualesParaIA } from "./angulo-detalle";
 import { CLAVES_FILTRO, DIMENSIONES, METRICAS } from "./analisis-pedido";
 import { NOMBRE_CATEGORIA, type AnalisisHistorico, type FilaVentas } from "./historico";
+import { COSTOS_DE_LA_HOJA, sumarPedidos, tasasDe } from "./costos-operacion";
+import { dejaCon, estadoRentable, limitesDeProductos } from "./rentabilidad";
 import { cortarEnPunto, recortarTexto, REGLA_ALCANCE_DE_CAMPANAS, REGLA_APRENDIZAJE, REGLA_RELEVANCIA, REGLA_TACTICAS } from "./interpretar-ia";
 
 export const LIMITES_CHAT = {
@@ -51,6 +53,21 @@ export function revisarPregunta(crudo: unknown): { pregunta: string } | { error:
 const r = (n: number | null) => (n === null ? null : Math.round(n * 100) / 100);
 
 /** Todas las estadísticas, en JSON compacto: lo único que la IA puede usar para contestar. */
+/** La rentabilidad de cada producto para el chat (27 nov 2026), con los costos de la calculadora de la hoja (envío $6.27, operativo $2.25) y su CPA de todo el historial. */
+function rentabilidadParaChat(a: AnalisisHistorico) {
+  const tienda = tasasDe(a.pedidosDeLaTienda ?? (a.entrega.length ? sumarPedidos(a.entrega) : null));
+  const porClave = new Map(a.entrega.map((f) => [f.clave, f]));
+  const limites = limitesDeProductos(a.economia ?? [], (clave) => {
+    const t = tasasDe(porClave.get(clave));
+    return { envio: t.envio ?? tienda.envio, entrega: t.entrega ?? tienda.entrega };
+  }, COSTOS_DE_LA_HOJA);
+  return [...limites].slice(0, 60).map(([clave, l]) => {
+    const f = porClave.get(clave);
+    const cpaHoy = f?.cpa ?? null;
+    return { producto: f?.nombre ?? clave, venta_usd: l.venta, producto_usd: l.producto, unidades_por_pedido: l.unidades, costo_de: l.fuente, cpa: r(cpaHoy), deja_por_venta_entregada: cpaHoy === null ? null : dejaCon(l, cpaHoy), cpa_para_no_perder: l.cpaParaNoPerder, cpa_tope: f?.tope ?? null, cuidado: cpaHoy === null ? null : estadoRentable(cpaHoy, f?.tope ?? 10, l) };
+  });
+}
+
 export function contextoDeChat(a: AnalisisHistorico, tiendas: readonly string[], hoy: string, investigaciones: readonly unknown[] = [], senales: readonly unknown[] = [], rasgos: readonly unknown[] = []): string {
   const datos = {
     hoy,
@@ -68,7 +85,7 @@ export function contextoDeChat(a: AnalisisHistorico, tiendas: readonly string[],
       porcentaje_que_funciono: r(a.resumen.tasaFuncionaron),
       tiendas_de_las_cuentas: tiendas,
     },
-    como_se_calcula: "«funcionó» = al menos $100 gastados, alguna compra y CPA dentro del CPA tope del producto. Tasa de entrega = entregados ÷ (entregados + devueltos) de los pedidos de 180 días. El «cpa_tope» de cada producto es el general ($10) o uno escrito a mano; el general baja cuando el producto envía o entrega peor que la tienda. cpa_por_compra_entregada = gasto ÷ (compras × tasa de envío × tasa de entrega).",
+    como_se_calcula: "«funcionó» = al menos $100 gastados, alguna compra y CPA dentro del CPA tope del producto. Tasa de entrega = entregados ÷ (entregados + devueltos) de los pedidos de 180 días. El «cpa_tope» de cada producto es el general ($10) o uno escrito a mano; el general baja cuando el producto envía o entrega peor que la tienda. cpa_por_compra_entregada = gasto ÷ (compras × tasa de envío × tasa de entrega). rentabilidad_por_producto: venta = lo cobrado por pedido entregado; producto = costo de Compras (o de la Matriz) × unidades (un 2x1 cuenta 2), sin flete ni IVA; deja_por_venta_entregada = lo que queda con su CPA; cpa_para_no_perder = el CPA de Meta más alto con el que no se pierde; cuidado = pierde, margen_fino (ya va en el 85 % del límite), sobre_tope_rentable o bien. Úsala para decir si algo es rentable y dónde hay que tener más cuidado.",
     ...(investigaciones.length ? { investigaciones_de_entrega: investigaciones } : {}),
     ...(senales.length ? { senales_de_creativos: senales } : {}),
     ...(rasgos.length ? { rasgos_de_ganadores: rasgos } : {}),
@@ -79,6 +96,7 @@ export function contextoDeChat(a: AnalisisHistorico, tiendas: readonly string[],
       .filter((t) => t.cambio.sentido !== "poca")
       .slice(0, 120)
       .map((t) => ({ nivel: t.nivel, nombre: t.nombre, ventana: t.ventana === "mes" ? "último mes contra el anterior" : "última semana contra las tres anteriores", sentido: t.cambio.sentido, gasto_reciente_usd: Math.round(t.gastoRec), compras_antes: t.comprasPrev, compras_ahora: t.comprasRec, cpa_antes: r(t.cambio.cpaPrev), cpa_ahora: r(t.cambio.cpaRec), motivo: t.cambio.motivo, ...(t.deQue ? { de_que_son: t.deQue } : {}) })),
+    ...(a.economia?.length ? { rentabilidad_por_producto: rentabilidadParaChat(a) } : {}),
     entrega_por_producto: a.entrega.slice(0, 40).map((f) => ({ producto: f.nombre, producto_en_la_tienda: f.enTienda, gasto_usd: Math.round(f.gasto), compras: f.compras, cpa: r(f.cpa), cpa_tope: f.tope, tope_sin_ajustar: f.topeBase ?? f.tope, ...(f.guia ? { vigilar_desde: f.guia.vigilar, apagar_desde: f.guia.apagar, tope_mas_bajo_porque: f.guia.motivo } : {}), tasa_envio: r(f.envio ?? null), tasa_entrega: r(f.tasa), pedidos_resueltos: f.cerradas, entregadas: f.entregadas, devueltas: f.devueltas, canceladas: f.canceladas, cpa_por_compra_entregada: r(f.cpaEntregado), veredicto: f.veredicto })),
     mas_ventas: Object.fromEntries((Object.entries(a.rankings) as [string, FilaVentas[]][]).map(([k, filas]) => [k, filas.map((f) => ({ nombre: f.nombre, ...(f.deQue ? { de_que_son: f.deQue } : {}), compras: f.compras, parte_del_total: r(f.parte), gasto_usd: Math.round(f.gasto), cpa: r(f.cpa), entregadas_estimadas: r(f.comprasEntregadas) }))])),
     bandas_de_metricas: a.bandas.map((b) => ({ metrica: b.titulo, porcentaje_base_que_funciono: r(b.tasaBase), bandas: b.filas.map((f) => ({ banda: f.etiqueta, campanas: f.campanas, funcionaron: f.funcionaron, cpa: r(f.cpa) })) })),

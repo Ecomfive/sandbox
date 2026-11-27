@@ -66,7 +66,7 @@ function FilaProducto({ p, columnas, alAbrir, entrega }: { p: ProductoVista; col
 /** La ficha de un producto: lo que sumó en el periodo con todas sus cifras, los ángulos que usa, sus campañas y sus videos. */
 function FichaProducto({ p, campanas, videos, alCerrar, entrega, costos }: { p: ProductoVista | undefined; campanas: CampanaVista[]; videos: VideoVista[]; alCerrar: () => void; entrega: EntregasMeta | null; costos: CostosOperacion }) {
   const e = p ? (entrega?.productos[p.clave] ?? null) : null;
-  const venta = p && entrega ? (filasDeCostos([{ clave: p.clave, nombre: p.nombre, gasto: p.r.gasto, compras: p.r.compras }], entrega.productos, entrega.tienda, costos)[0] ?? null) : null;
+  const venta = p && entrega ? (filasDeCostos([{ clave: p.clave, nombre: p.nombre, gasto: p.r.gasto, compras: p.r.compras }], entrega.productos, entrega.tienda, costos, entrega.economia)[0] ?? null) : null;
   const cpaMeta = p ? cpa(p.r) : null;
   const entregadas = p && e?.tasa != null ? p.r.compras * e.tasa : null;
   const delProducto = useMemo(() => (p ? campanas.filter((c) => claveDeProducto(c.producto) === p.clave).sort((a, b) => b.r.gasto - a.r.gasto) : []), [p, campanas]);
@@ -134,6 +134,17 @@ function FichaProducto({ p, campanas, videos, alCerrar, entrega, costos }: { p: 
               />
               <LeyendaDeCostos />
               {(venta.envioDeLaTienda || venta.entregaDeLaTienda) && <p className="m-0 text-xs text-muted-foreground">* Porcentaje de toda la tienda: este producto tiene pocos pedidos.</p>}
+              {venta.rentabilidad && (
+                <>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
+                    <Cifra titulo="Venta por pedido" valor={dolares(venta.rentabilidad.venta)} apoyo={venta.economia ? `${venta.economia.pedidos} pedidos entregados` : undefined} />
+                    <Cifra titulo="Producto" valor={dolares(venta.rentabilidad.producto)} apoyo={venta.economia?.fuente === "matriz" ? "costo de la Matriz" : `${venta.economia?.unidades ?? 1} ud. · costo de Compras`} />
+                    <Cifra titulo="Deja por venta entregada" valor={`${(venta.rentabilidad.ganancia ?? 0) < 0 ? "−" : ""}${venta.rentabilidad.ganancia === null ? "—" : dolares(Math.abs(venta.rentabilidad.ganancia))}`} nivel={venta.rentabilidad.pierde ? "malo" : "bueno"} apoyo="con el CPA de ahora" />
+                    <Cifra titulo="CPA para no perder" valor={dolares(venta.rentabilidad.cpaParaNoPerder)} nivel={venta.cpa !== null && venta.cpa > venta.rentabilidad.cpaParaNoPerder ? "malo" : undefined} apoyo={venta.cpa !== null ? `ahora ${dolares(venta.cpa)}` : undefined} />
+                  </div>
+                  <p className="m-0 text-xs text-muted-foreground">Con el costo de Compras (sin flete ni IVA). Solo informa: no cambia el CPA tope.</p>
+                </>
+              )}
             </Seccion>
           )}
 

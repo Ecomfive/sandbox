@@ -16,7 +16,6 @@ import { destinatariosDe } from "@/lib/compras/llegadas-servidor";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { cargarTiendas } from "@/lib/tienda/datos";
 import { geografiaDe } from "./geografia";
-import { tendenciaDeTienda, textoTendencia } from "./tendencias";
 import { motivoDeAdelanto, zonasDeAdelanto } from "./adelanto";
 import { combinar, etiquetaDeZona, faltaParaCliente, leerRespuesta, mensajePagoAdelantado, mensajePedirDetalle, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "./combinar";
 import { conversacionParaJuez, leerVeredictoChat, pedidoJuez, puedeEscribirseAlCliente, type TipoPedido, type VeredictoChat } from "./chat-previo";
@@ -264,7 +263,7 @@ async function pedirAlModelo(proveedor: ProveedorIA, entrada: ReturnType<typeof 
  */
 export async function evaluarDireccion(
   supabase: SupabaseClient,
-  d: { paisId: string; paisNombre: string; paisCodigo: string; tiendaId: string | null; numero: string | null; direccion: string; ciudad: string | null; config: ConfigConfirmacion; /** Sin la tendencia histórica de la tienda: mide el prompt y los ejemplos solos (la tendencia sale de los mismos pedidos con que se compara). */ sinTendencia?: boolean },
+  d: { paisId: string; paisNombre: string; paisCodigo: string; tiendaId: string | null; numero: string | null; direccion: string; ciudad: string | null; config: ConfigConfirmacion },
 ): Promise<{ combinado: Combinado; modelos: ResultadoModelo[]; coinc: ReglaZona[] }> {
   const { direccion, ciudad, config } = d;
   const reglas = await cargarReglas(supabase, d.paisId);
@@ -280,14 +279,8 @@ export async function evaluarDireccion(
     if (!proveedores.length) modelos = [{ proveedor: "openai", ok: false, error: "Falta conectar ChatGPT o Claude (las claves OPENAI_API_KEY o ANTHROPIC_API_KEY)." }];
     else {
       const ejemplos = await cargarEjemplos(supabase, d.paisId, d.tiendaId);
-      // La tendencia histórica de la tienda (solo Panamá, por ahora): en las zonas dudosas la IA etiqueta como lo viene haciendo esa tienda.
-      let tendencia: string | null = null;
-      if (config.distingueZona && d.paisCodigo.toUpperCase() === "PA" && d.tiendaId && !d.sinTendencia) {
-        const { data: tienda } = await supabase.from("tiendas").select("nombre").eq("id", d.tiendaId).maybeSingle();
-        const t = tendenciaDeTienda((tienda?.nombre as string | undefined) ?? null);
-        tendencia = t ? textoTendencia(t) : null;
-      }
-      const entrada = armarEntrada({ paisNombre: d.paisNombre, distingueZona: config.distingueZona, reglas, ejemplos, direccion, ciudad, coincidencias: coinc, instruccionesExtra: config.instrucciones, geografia: config.distingueZona ? geografiaDe(d.paisCodigo) : null, tendencia });
+      // Sin tendencia por tienda (27 nov 2026): todas las tiendas se etiquetan igual, con los mapas de despacho.
+      const entrada = armarEntrada({ paisNombre: d.paisNombre, distingueZona: config.distingueZona, reglas, ejemplos, direccion, ciudad, coincidencias: coinc, instruccionesExtra: config.instrucciones, geografia: config.distingueZona ? geografiaDe(d.paisCodigo) : null });
       modelos = await Promise.all(proveedores.map((p) => pedirAlModelo(p, entrada, d.numero, permiteAdelanto(d.paisCodigo))));
     }
   }
@@ -588,7 +581,7 @@ export async function listarMuestraHistorica(supabase: SupabaseClient, d: { pais
 }
 
 /** Analiza un pedido ya etiquetado con el mismo análisis del sistema y lo deja junto a su zona real. Null si el pedido no sirve (sin dirección, sin etiqueta de zona o de otro país). No guarda nada. */
-export async function probarPedidoHistorico(supabase: SupabaseClient, ordenId: string, paisId: string, config: ConfigConfirmacion, opciones: { sinTendencia: boolean }): Promise<ResultadoPrueba | null> {
+export async function probarPedidoHistorico(supabase: SupabaseClient, ordenId: string, paisId: string, config: ConfigConfirmacion): Promise<ResultadoPrueba | null> {
   const o = await cargarOrden(supabase, ordenId);
   if (!o || o.paisId !== paisId) return null;
   const zona = zonaDeEtiquetas(o.etiquetas);
@@ -600,7 +593,7 @@ export async function probarPedidoHistorico(supabase: SupabaseClient, ordenId: s
   const adelanto = zonasDeAdelanto(direccion, ciudad, await cargarReglas(supabase, o.paisId));
   const { combinado: c, modelos, coinc } = adelanto.length
     ? { combinado: { estado: "adelantado", zona: null, zonaPor: null, completa: null, falta: null, acuerdo: null, motivo: motivoDeAdelanto(adelanto) } as Combinado, modelos: [] as ResultadoModelo[], coinc: [] as ReglaZona[] }
-    : await evaluarDireccion(supabase, { paisId: o.paisId, paisNombre: o.paisNombre, paisCodigo: o.paisCodigo, tiendaId: o.tiendaId, numero: o.numero, direccion, ciudad, config, sinTendencia: opciones.sinTendencia });
+    : await evaluarDireccion(supabase, { paisId: o.paisId, paisNombre: o.paisNombre, paisCodigo: o.paisCodigo, tiendaId: o.tiendaId, numero: o.numero, direccion, ciudad, config });
   return {
     id: o.id,
     numero: o.numero,

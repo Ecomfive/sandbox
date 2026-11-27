@@ -635,7 +635,7 @@ export async function listarPedidosParaProbar(d: { tiendaId: string | null; dias
 }
 
 /** Analiza hasta 6 pedidos de la muestra con el mismo análisis del sistema y devuelve cada uno junto a su zona real. */
-export async function probarPedidosReales(ids: string[], opciones: { sinTendencia: boolean }): Promise<{ error: string } | { resultados: ResultadoPrueba[]; omitidos: number }> {
+export async function probarPedidosReales(ids: string[]): Promise<{ error: string } | { resultados: ResultadoPrueba[]; omitidos: number }> {
   const usuario = await requireModuloEscritura(MODULO);
   if (!esAdministrador(usuario)) return { error: SOLO_ADMIN_PRUEBA };
   const lista = (Array.isArray(ids) ? ids : []).filter((x) => UUID.test(String(x))).slice(0, 6);
@@ -644,7 +644,7 @@ export async function probarPedidosReales(ids: string[], opciones: { sinTendenci
   const pais = await getPaisActual(supabase);
   const { config, faltaMigracion } = await cargarConfig(supabase, pais.id);
   if (faltaMigracion) return { error: SIN_MIGRACION_CONFIRMACION };
-  const hechos = await Promise.all(lista.map((id) => probarPedidoHistorico(supabase, id, pais.id, config, { sinTendencia: !!opciones?.sinTendencia }).catch(() => null)));
+  const hechos = await Promise.all(lista.map((id) => probarPedidoHistorico(supabase, id, pais.id, config).catch(() => null)));
   const resultados = hechos.filter((r): r is ResultadoPrueba => r !== null);
   return { resultados, omitidos: lista.length - resultados.length };
 }

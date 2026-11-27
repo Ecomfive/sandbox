@@ -7,8 +7,11 @@ import { decisionesDeAnuncios, NOMBRE_DECISION, UMBRALES_ANUNCIO, type AnuncioPa
 import { diagnosticoDeLanding } from "./diagnostico-concreto";
 import { pesoDeHallazgo, type Hallazgo } from "./historico";
 import type { CampanaVista, VideoVista } from "./vistas";
+import { ejemploDeAnuncio, type VideoEjemplo } from "./video-ejemplo";
+import { avisoRentabilidad, type AvisoRentabilidad, type LimiteProducto } from "./rentabilidad";
+import { claveDeProducto } from "./nombre";
 
-export type TipoSugerencia = "sin_compras" | "apagar_campana" | "cpa_alto" | "sumar_videos" | "en_recuperacion" | "escalar" | "cpa_subiendo" | "testing_sin_cierre" | "anuncio_apagar" | "anuncio_rotar" | "anuncio_rebalancear" | "video_ganador" | "video_hook_bajo" | "landing_floja" | "etiquetas_faltan" | "hallazgo";
+export type TipoSugerencia = "sin_compras" | "apagar_campana" | "cpa_alto" | "sumar_videos" | "en_recuperacion" | "escalar" | "cpa_subiendo" | "testing_sin_cierre" | "anuncio_apagar" | "anuncio_rotar" | "anuncio_rebalancear" | "video_ganador" | "video_hook_bajo" | "landing_floja" | "etiquetas_faltan" | "hallazgo" | "pierde_plata" | "margen_fino";
 export type Severidad = "alta" | "media" | "info";
 /** En qué grupo de «Para decidir hoy» sale, de lo que no espera a lo que solo hay que mirar (25 nov 2026, pedido de Alcides: «los que necesitan más, primero; lo raro dentro del límite, de último»). */
 export type Prioridad = "apagar" | "actuar" | "oportunidad" | "observar" | "historial";
@@ -41,6 +44,10 @@ export interface Sugerencia {
   guia?: GuiaDeTope;
   /** Los anuncios de la campaña que ya pasaron del límite, con su cifra (para decir cuáles en vez de «los que pasaron»). */
   anuncios?: AnuncioEnSugerencia[];
+  /** El video que se nombra como ejemplo (el que vende o el del ángulo que hay que copiar), para verlo ahí mismo (27 nov 2026). */
+  video?: VideoEjemplo;
+  /** Cuánto deja cada venta entregada con el CPA de ahora y si hay que cuidarla (27 nov 2026). Solo informa. */
+  rentabilidad?: AvisoRentabilidad;
 }
 
 export interface AnuncioEnSugerencia {
@@ -52,6 +59,12 @@ export interface AnuncioEnSugerencia {
   /** «apagar»: la escalera de decisiones dice cortarlo; «vigilar»: su CPA pasa del límite pero todavía lleva poco gasto. */
   grupo: "apagar" | "vigilar";
 }
+
+/** El video de ejemplo de una sugerencia, si el anuncio tiene video (para sumarlo con `...`). */
+const conVideo = (a: Parameters<typeof ejemploDeAnuncio>[0]): { video?: VideoEjemplo } => {
+  const v = ejemploDeAnuncio(a);
+  return v ? { video: v } : {};
+};
 
 /** Los umbrales, en un solo lugar y a la vista. */
 export const UMBRALES = {
@@ -126,6 +139,9 @@ export interface AnuncioSugerencia extends AnuncioParaDecidir {
   numero: string | null;
   /** El ángulo de su video, según el análisis. */
   angulo: string | null;
+  /** Su video y su miniatura, para verlo de ejemplo (27 nov 2026). */
+  videoId?: string | null;
+  miniatura?: string | null;
   /** Lo de los últimos 7 días; sin esto se usa lo acumulado. */
   r7?: Resultados;
 }
@@ -143,6 +159,8 @@ export interface EntradaSugerencias {
   hoy: string;
   /** Las páginas de destino de cada campaña (la del anuncio con más gasto primero) con lo que se midió de ellas, para decir qué le falta a la landing en vez de «revísala». */
   paginasPorCampana?: Map<string, { url: string; rasgos: string[] }[]>;
+  /** La venta, el costo y la entrega de cada producto (por la llave de su nombre), para avisar cuándo una campaña pierde o deja poco (27 nov 2026). */
+  rentabilidad?: ReadonlyMap<string, LimiteProducto>;
 }
 
 const ORDEN: Record<Severidad, number> = { alta: 0, media: 1, info: 2 };
@@ -253,7 +271,7 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
           const accion = pasaYNoBaja
             ? `Apaga la campaña: su CPA de 7 días (${dolares(costo)}) pasa de ${dolares(limite)} y los últimos ${U.recuperandoDias} días no lo han bajado.${sinVida ? ` Además, ${quePasa}.` : ""}${rescatar}`
             : `Apaga la campaña y sustitúyela: ya no tiene vida. Su CPA de 7 días (${dolares(costo)}) pasa del tope y ${quePasa}; dejarla encendida es seguir gastando.${rescatar}`;
-          s.push({ ...base, clave: `apagar_campana:${c.id}`, tipo: "apagar_campana", severidad: "alta", prioridad: "apagar", titulo: `${c.nombre}: apagar la campaña (CPA ${dolares(costo)})`, detalle, accion });
+          s.push({ ...base, ...conVideo(ganador), clave: `apagar_campana:${c.id}`, tipo: "apagar_campana", severidad: "alta", prioridad: "apagar", titulo: `${c.nombre}: apagar la campaña (CPA ${dolares(costo)})`, detalle, accion });
         } else {
           conAnunciosListados.add(c.id);
           const porQue = costo > limite
@@ -262,7 +280,7 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
           const vende = vivo ? `, y ${nombreDe(vivo.anuncio)} todavía vende a ${dolares(vivo.cpa)} en 7 días` : "";
           const pasos = [marcados ? "apaga los anuncios marcados abajo" : "", vivo ? `agrega 2 o 3 videos ${conAngulo}` : ""].filter(Boolean).join(" y ");
           const hacer = pasos ? ` ${pasos[0].toUpperCase()}${pasos.slice(1)}.` : "";
-          s.push({ ...base, clave: `cpa_alto:${c.id}`, tipo: "cpa_alto", severidad: gasto >= 150 ? "alta" : "media", prioridad: "actuar", titulo: `${c.nombre}: CPA ${dolares(costo)}, sobre el tope de ${dolares(c.tope)}`, detalle, accion: `No la apagues todavía: ${porQue}${vende}.${hacer} La campaña se apaga si su CPA pasa de ${dolares(limite)} y no baja en ${U.recuperandoDias} días${vivo ? `, o si ${nombreDe(vivo.anuncio)} llega a ${dolares(cerca)}` : ""}.` });
+          s.push({ ...base, ...conVideo(vivo?.anuncio), clave: `cpa_alto:${c.id}`, tipo: "cpa_alto", severidad: gasto >= 150 ? "alta" : "media", prioridad: "actuar", titulo: `${c.nombre}: CPA ${dolares(costo)}, sobre el tope de ${dolares(c.tope)}`, detalle, accion: `No la apagues todavía: ${porQue}${vende}.${hacer} La campaña se apaga si su CPA pasa de ${dolares(limite)} y no baja en ${U.recuperandoDias} días${vivo ? `, o si ${nombreDe(vivo.anuncio)} llega a ${dolares(cerca)}` : ""}.` });
         }
       } else if (hayAnuncios && costoReciente !== null && costoReciente < cerca) {
         // Cerca del tope pero ya se está acomodando sola: tocarla ahora reiniciaría su aprendizaje.
@@ -277,7 +295,7 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
         const accion = vivo
           ? `Ya no está bajando sola: agrega 2 o 3 videos ${conAngulo} (${nombreDe(vivo.anuncio)} vende a ${dolares(vivo.cpa)} con ${vivo.compras} compras) antes de que la campaña pase de ${dolares(c.tope)}. Reinicia su aprendizaje, así que hazlo una sola vez.${apagarMarcados}`
           : `Prueba videos nuevos de otro ángulo ya: ${quePasa}.${apagarMarcados} Si pasa de ${dolares(c.tope)} sin un anuncio que venda más barato, apágala.`;
-        s.push({ ...base, clave: `sumar_videos:${c.id}`, tipo: "sumar_videos", severidad: subiendo || !vivo ? "alta" : "media", prioridad: "actuar", titulo: `${c.nombre}: ${vivo ? "cerca del tope, agrégale videos" : "cerca del tope y sin un anuncio que la sostenga"}`, detalle, accion });
+        s.push({ ...base, ...conVideo(vivo?.anuncio), clave: `sumar_videos:${c.id}`, tipo: "sumar_videos", severidad: subiendo || !vivo ? "alta" : "media", prioridad: "actuar", titulo: `${c.nombre}: ${vivo ? "cerca del tope, agrégale videos" : "cerca del tope y sin un anuncio que la sostenga"}`, detalle, accion });
       }
     }
     if (c.etapa === "testing" && costo !== null && c.r.compras >= U.escalarCompras && confiable(c.r) && costo <= c.tope * U.escalarFactor) {
@@ -334,6 +352,7 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
         ? ` y sustituirlo con anuncios ${ganador.angulo ? `del ángulo «${ganador.angulo}» ` : ""}como ${ganador.numero ?? ganador.nombre} (CPA ${dolares(cpa(ganador.r) ?? 0)})`
         : " y probar otro ángulo";
       s.push({
+        ...(campanaDentro ? {} : conVideo(ganador)),
         clave: `anuncio_apagar:${a.id}`, tipo: "anuncio_apagar", severidad: campanaDentro ? "media" : "alta", prioridad: "actuar", positiva: false,
         titulo: `${c.nombre}: apagar ${etiqueta} (${dolares(a.r.gasto)} gastados${a.r.compras === 0 ? " sin ventas" : ""})`,
         detalle: `${d.motivo}${campanaVaBien ? ` La campaña va bien (CPA ${dolares(costoCampana ?? 0)}, tope ${dolares(c.tope)}): este anuncio le está quitando presupuesto.` : ""}`,
@@ -361,6 +380,42 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
   const sinEtiqueta = e.campanas.filter((c) => c.activa && faltanEtiquetas(c).length > 0);
   if (sinEtiqueta.length)
     s.push({ clave: "etiquetas_faltan:cuenta", tipo: "etiquetas_faltan", severidad: "info", prioridad: "observar", positiva: false, titulo: `${sinEtiqueta.length} ${sinEtiqueta.length === 1 ? "campaña activa sin" : "campañas activas sin"} producto o etapa`, detalle: "Sin el producto no se sabe contra qué CPA tope se mide, y sin la etapa no entra al análisis de «Qué funciona». Salen solas si el nombre sigue la regla (PAÍS | Producto | CBO | Puja | T).", accion: "Completarlas en la ficha de cada campaña (se abren al pulsar).", objeto: { tipo: "cuenta", id: "todas" }, gasto: sinEtiqueta.reduce((t, c) => t + c.r.gasto, 0) });
+
+  // La rentabilidad (27 nov 2026, pedido de Hernán): cada sugerencia de una campaña dice cuánto deja cada venta entregada con su CPA de 7 días, y se avisa aparte cuando una campaña que va dentro del tope pierde
+  // plata o deja muy poco. Solo informa: no cambia el tope ni lo que se recomienda apagar.
+  if (e.rentabilidad?.size) {
+    const porCampana = new Map<string, Sugerencia[]>();
+    for (const x of s) if (x.objeto.tipo === "campana") porCampana.set(x.objeto.id, [...(porCampana.get(x.objeto.id) ?? []), x]);
+    for (const c of e.campanas.filter((x) => x.activa)) {
+      const l = e.rentabilidad.get(claveDeProducto(c.producto));
+      const costo = cpa(c.r);
+      if (!l || costo === null) continue;
+      const aviso = avisoRentabilidad(costo, c.tope, l);
+      const cifra: CifraSugerencia = { etiqueta: "Para no perder", valor: dolares(l.cpaParaNoPerder), tono: aviso.estado === "pierde" ? "malo" : aviso.estado === "margen_fino" ? "medio" : undefined };
+      const suyas = porCampana.get(c.id) ?? [];
+      for (const x of suyas) {
+        x.rentabilidad = aviso;
+        if (x.cifras) x.cifras = [...x.cifras.filter((k) => k.etiqueta !== cifra.etiqueta), cifra];
+      }
+      const suficiente = c.r.gasto >= U.cpaAltoGastoMinimo / 2 && c.r.compras >= 2;
+      const grave = suyas.some((x) => x.prioridad === "apagar" || x.prioridad === "actuar");
+      const cifras = [...cifrasDeCampana(costo, sinResultados(), sinResultados(), c.tope).filter((k) => k.etiqueta !== "Últimos 3 días" && k.etiqueta !== "Semana anterior"), cifra];
+      const detalle = `Se cobra ${dolares(l.venta)} por pedido y el producto cuesta ${dolares(l.producto)}${l.fuente === "matriz" ? " (Matriz)" : ""}; envía ${Math.round(l.envio * 100)} % y entrega ${Math.round(l.entrega * 100)} %.`;
+      if (aviso.estado === "pierde" && suficiente && !grave) {
+        s.push({ clave: `pierde_plata:${c.id}`, tipo: "pierde_plata", severidad: "alta", prioridad: "actuar", positiva: false, titulo: `${c.nombre}: pierde plata aunque va dentro del tope`, detalle, accion: `Cuidar el CPA para que baje de ${dolares(l.cpaParaNoPerder)}: no subas presupuesto y, si toca renovar, usa el ángulo que mejor le funcionó. Si se puede mejorar el envío (${Math.round(l.envio * 100)} %), la entrega o el precio, el límite sube.`, objeto: { tipo: "campana", id: c.id }, gasto: c.r.gasto, cifras, rentabilidad: aviso });
+      } else if (aviso.estado === "margen_fino" && suficiente && !suyas.length) {
+        s.push({ clave: `margen_fino:${c.id}`, tipo: "margen_fino", severidad: "info", prioridad: "observar", positiva: false, titulo: `${c.nombre}: margen fino`, detalle, accion: `No subas presupuesto todavía: vigila que el CPA no pase de ${dolares(l.cpaParaNoPerder)}. Si entrega poco (${Math.round(l.entrega * 100)} %), revisa por qué: cada pedido que no llega se paga igual.`, objeto: { tipo: "campana", id: c.id }, gasto: c.r.gasto, cifras, rentabilidad: aviso });
+      }
+    }
+    // Los videos: con su CPA de 30 días.
+    for (const x of s) {
+      if (x.objeto.tipo !== "video" || x.rentabilidad) continue;
+      const v = e.videos.find((y) => y.id === x.objeto.id);
+      const l = v ? e.rentabilidad.get(claveDeProducto(v.producto)) : undefined;
+      const costo = v ? cpa(v.r) : null;
+      if (v && l && costo !== null) x.rentabilidad = avisoRentabilidad(costo, v.tope, l, "30 días");
+    }
+  }
 
   // En lo de un producto con el tope más bajo se dice desde cuánto vigilarlo y apagarlo.
   const guiaDe = new Map(e.campanas.flatMap((c) => (c.guiaTope ? [[c.id, c.guiaTope] as const] : [])));

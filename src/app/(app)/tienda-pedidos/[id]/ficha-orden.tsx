@@ -17,6 +17,7 @@ import { etiquetasDe, zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
 import { NotasOrden } from "./notas-orden";
 import { EtiquetasPedido } from "./etiquetas-pedido";
 import { GestionPedido } from "./gestion-pedido";
+import { EditarDireccion } from "./editar-direccion";
 import { sugerenciaPermitida } from "@/lib/tienda/gestion-atc";
 import { cambiarEtiquetasPedido } from "../etiquetas-actions";
 import { ETIQUETA_CONFIRMADA, esConfirmada } from "@/lib/tienda/etiquetas-shopify";
@@ -361,6 +362,12 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
               <Campo etiqueta="Dirección exacta" campo="address1" valor={cliente?.direccion} />
               <Campo etiqueta="Nota del cliente" campo="note" valor={cliente?.notas} />
             </div>
+            {/* La asesora corrige la dirección que el bot no entendió (26 nov 2026): se cambia en Shopify. */}
+            {conGestionAtc && puedeEscribir && !esc.soloFinanzas && o.estado_entrega !== "entregada" && (
+              <div className="flex">
+                <EditarDireccion key={`${cliente?.direccion ?? ""}|${cliente?.corregimiento ?? ""}`} ordenId={orden.id} direccion={cliente?.direccion ?? null} corregimiento={cliente?.corregimiento ?? null} />
+              </div>
+            )}
             <p className="m-0 text-sm">
               <span className="text-muted-foreground">Pedidos anteriores del cliente: </span>
               {anteriores.length ? `${anteriores.length} · ${entregados} ${entregados === 1 ? "entregado" : "entregados"}${devueltos ? ` · ${devueltos} ${devueltos === 1 ? "devuelto" : "devueltos"}` : ""}` : "ninguno"}

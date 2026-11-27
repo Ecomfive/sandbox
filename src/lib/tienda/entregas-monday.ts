@@ -55,11 +55,34 @@ async function enTandas(ids: string[], consulta: (tanda: string[]) => PromiseLik
   return filas;
 }
 
+/**
+ * Las filas de Monday de esas órdenes: las unidas por `orden_id` y las de una fila con varios pedidos que las nombra en `otras_ordenes` (migración 0369,
+ * 26 nov 2026: el cliente pidió en dos tiendas y despacho los llevó en una sola fila), con `orden_id` puesto en esa orden. A esas no se les pasa el
+ * monto cobrado: es el de toda la fila. Sin la migración, solo las de `orden_id`.
+ */
+export async function filasMondayDe(
+  supabase: SupabaseClient,
+  ids: string[],
+  columnas: string,
+): Promise<{ data: Record<string, unknown>[] | null; error: { message: string } | null }> {
+  const r = await supabase.from("mon_despachos").select(columnas).in("orden_id", ids);
+  if (r.error) return { data: null, error: r.error };
+  const filas = [...((r.data ?? []) as unknown as Record<string, unknown>[])];
+  const o = await supabase.from("mon_despachos").select(`${columnas}, otras_ordenes`).overlaps("otras_ordenes", ids);
+  if (!o.error)
+    for (const x of (o.data ?? []) as unknown as Record<string, unknown>[]) {
+      const { otras_ordenes, ...resto } = x;
+      for (const id of (otras_ordenes as string[] | null) ?? [])
+        if (ids.includes(id)) filas.push({ ...resto, orden_id: id, ...("monto_cobrado" in resto ? { monto_cobrado: null } : {}) });
+    }
+  return { data: filas, error: null };
+}
+
 /** La entrega más reciente de cada orden (por el día del reparto y la última actualización en Monday). */
 export async function entregasDeOrdenes(supabase: SupabaseClient, ordenIds: string[]): Promise<Map<string, EntregaMonday>> {
   const mapa = new Map<string, EntregaMonday & { clave: string }>();
   const ids = [...new Set(ordenIds.filter(Boolean))];
-  const filas = await enTandas(ids, (t) => supabase.from("mon_despachos").select("orden_id, estado, estado_grupo, courier, fecha_despacho, fecha_entrega, causa_rechazo, actualizado_monday, estado_asesores, observaciones_asesores").in("orden_id", t));
+  const filas = await enTandas(ids, (t) => filasMondayDe(supabase, t, "orden_id, estado, estado_grupo, courier, fecha_despacho, fecha_entrega, causa_rechazo, actualizado_monday, estado_asesores, observaciones_asesores"));
   if (!filas) return new Map();
   for (const d of filas as {
     orden_id: string;

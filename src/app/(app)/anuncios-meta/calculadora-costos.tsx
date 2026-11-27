@@ -9,6 +9,7 @@ import { horaDeMeta } from "@/lib/meta-ads/hora";
 import { guiaDeTope, topeDeProducto, type TopeProducto } from "@/lib/meta-ads/limite";
 import { dolares } from "@/lib/meta-ads/metricas";
 import { ordenarPor, type CriterioOrden, type Orden } from "@/lib/meta-ads/orden";
+import { MARGEN_FINO, MIN_PEDIDOS_RENTABILIDAD, NOMBRE_FUENTE, NOMBRE_ESTADO_RENTABLE, type EstadoRentable } from "@/lib/meta-ads/rentabilidad";
 import type { ProductoVista } from "@/lib/meta-ads/vistas";
 import { guardarCostosMeta } from "./actions";
 import { ColumnaOrdenable } from "./columna-ordenable";
@@ -41,7 +42,52 @@ const CRITERIOS: CriterioOrden<FilaCosto>[] = [
   criterio("entrega", "% de entrega", "desc", (f) => f.entrega),
   criterio("cpaReal", "CPA real", "asc", (f) => f.costo?.cpaReal ?? null),
   criterio("total", "Costo por venta entregada", "asc", (f) => f.costo?.total ?? null),
+  criterio("ganancia", "Ganancia por venta entregada", "desc", (f) => f.rentabilidad?.ganancia ?? null),
+  criterio("noPerder", "CPA para no perder", "desc", (f) => f.rentabilidad?.cpaParaNoPerder ?? null),
 ];
+
+/** Un monto que puede ser negativo, con su signo. */
+const conSigno = (n: number | null) => (n === null ? "—" : `${n < 0 ? "−" : ""}${dolares(Math.abs(n))}`);
+
+/** De dónde salen la venta y el costo del producto de una fila, en palabras (para el título de la celda). */
+const origenDe = (f: FilaCosto) =>
+  f.economia
+    ? `${f.economia.pedidos} pedidos entregados de solo este producto: se cobra ${plata(f.economia.venta)} por pedido, con ${f.economia.unidades ?? "—"} unidades en promedio (un 2x1 cuenta 2).${f.economia.fuente ? ` Costo: ${NOMBRE_FUENTE[f.economia.fuente]}${f.economia.costoUnitario !== null ? `, ${dolares(f.economia.costoUnitario)} por unidad` : ""}.` : " Sin costo en Compras ni en la Matriz."}`
+    : "Sin pedidos entregados de solo este producto en los últimos 180 días.";
+
+/** Cómo va un producto: pierde, margen fino, sobre el tope pero rentable o bien (27 nov 2026). */
+function estadoDeFila(f: FilaCosto, tope: number | null): EstadoRentable | null {
+  const r = f.rentabilidad;
+  if (!r || f.cpa === null) return null;
+  if (f.cpa > r.cpaParaNoPerder) return "pierde";
+  if (tope !== null && f.cpa > tope) return "sobre_tope_rentable";
+  if (r.cpaParaNoPerder > 0 && f.cpa >= r.cpaParaNoPerder * MARGEN_FINO) return "margen_fino";
+  return "bien";
+}
+
+const CLASE_ESTADO: Record<EstadoRentable, string> = {
+  pierde: "bg-destructive-soft text-destructive",
+  margen_fino: "bg-warning-soft text-warning",
+  sobre_tope_rentable: "bg-primario-suave text-primario",
+  bien: "bg-success-soft text-success",
+};
+
+function Cuidado({ estado }: { estado: EstadoRentable | null }) {
+  if (!estado) return <span className="text-muted-foreground">—</span>;
+  return <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${CLASE_ESTADO[estado]}`}>{NOMBRE_ESTADO_RENTABLE[estado]}</span>;
+}
+
+/** La ganancia de una venta entregada; «Sin costo» o «—» si falta el costo o la venta. */
+function Rentable({ f }: { f: FilaCosto }) {
+  const r = f.rentabilidad;
+  if (!r) return <span className="text-muted-foreground">{f.economia && f.economia.costoProducto === null ? "Sin costo" : "—"}</span>;
+  return (
+    <span className="tabular-nums">
+      <span className={`block font-semibold ${r.pierde ? "text-destructive" : ""}`}>{conSigno(r.ganancia)}</span>
+      {r.pierde && <span className="block text-xs font-medium text-destructive">pierde</span>}
+    </span>
+  );
+}
 
 const desglose = (f: FilaCosto) => (f.costo ? PARTES.map((p) => ({ nombre: p.nombre, valor: f.costo![p.clave], color: p.color })) : []);
 
@@ -94,7 +140,9 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
   const usados = "costos" in revisado ? revisado.costos : costos;
   const cambiado = "costos" in revisado && CAMPOS.some((c) => revisado.costos[c.clave] !== costos[c.clave]);
 
-  const filas = entrega ? filasDeCostos(productos.map((p) => ({ clave: p.clave, nombre: p.nombre, gasto: p.r.gasto, compras: p.r.compras })), entrega.productos, entrega.tienda, usados) : [];
+  const filas = entrega ? filasDeCostos(productos.map((p) => ({ clave: p.clave, nombre: p.nombre, gasto: p.r.gasto, compras: p.r.compras })), entrega.productos, entrega.tienda, usados, entrega.economia) : [];
+  // Un análisis guardado antes del 27 nov 2026 no trae la venta ni el costo del producto: salen con el siguiente.
+  const sinEconomia = !!entrega && !entrega.economia;
   const ordenadas = orden ? ordenarPor(filas, CRITERIOS, [orden], (f) => f.gasto) : filas;
   const visibles = todas ? ordenadas : ordenadas.slice(0, FILAS_A_LA_VISTA);
   // El tope de cada producto: el de Cuentas si se escribió uno; si no, el general ajustado por su envío y entrega (los costos de arriba no lo mueven).
@@ -116,7 +164,7 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
     });
 
   return (
-    <SeccionPlegable titulo="Costo de cada venta entregada" resumen={`Envío ${dolares(usados.envio)} · Operativo ${dolares(usados.operativo)}`} derecha={<span className="hidden sm:inline">Sin el costo del producto ni el IVA</span>} sinRelleno>
+    <SeccionPlegable titulo="Costo de cada venta entregada" resumen={`Envío ${dolares(usados.envio)} · Operativo ${dolares(usados.operativo)}`} derecha={<span className="hidden sm:inline">Con el costo del producto de Compras · sin flete ni IVA</span>} sinRelleno>
       <form
         className="flex flex-wrap items-end gap-3 border-b border-border px-4 py-3"
         onSubmit={(e) => {
@@ -164,6 +212,11 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
               Todavía no hay porcentaje de envío: se calcula con el siguiente análisis. Para tenerlo ya, pulsa «Actualizar el análisis ahora» en Hallazgos.
             </p>
           )}
+          {sinEconomia && (
+            <p className="m-0 border-b border-border bg-primario-suave px-4 py-2 text-xs text-foreground">
+              La venta y el costo del producto salen con el siguiente análisis. Para tenerlos ya, pulsa «Actualizar el análisis ahora» en Hallazgos.
+            </p>
+          )}
           {filas.length === 0 ? (
             <p className="m-0 px-4 py-4 text-sm text-muted-foreground">Ningún producto de esta vista gastó en el periodo elegido.</p>
           ) : (
@@ -185,15 +238,21 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
                       {f.envioDeLaTienda ? "*" : ""} · entrega {pct(f.entrega)}
                       {f.entregaDeLaTienda ? "*" : ""} · gastó {dolares(f.gasto)}
                     </p>
+                    {f.rentabilidad && (
+                      <p className={`m-0 ${f.rentabilidad.pierde ? "font-medium text-destructive" : "text-muted-foreground"}`}>
+                        Venta {dolares(f.rentabilidad.venta)} · producto {dolares(f.rentabilidad.producto)} · deja {conSigno(f.rentabilidad.ganancia)} por venta · no pierde hasta un CPA de {dolares(f.rentabilidad.cpaParaNoPerder)}
+                      </p>
+                    )}
                     <p className="m-0 flex flex-wrap items-baseline gap-1.5">
                       <span className="text-muted-foreground">CPA tope</span>
                       <TopeEnTabla t={topeDe(f.clave)} />
+                      <Cuidado estado={estadoDeFila(f, topeDe(f.clave)?.tope ?? null)} />
                     </p>
                   </li>
                 ))}
               </ul>
               <div className="hidden overflow-x-auto md:block">
-                <table className="tabla-datos w-full min-w-[64rem] border-collapse text-sm">
+                <table className="tabla-datos w-full min-w-[92rem] border-collapse text-sm">
                   <caption className="sr-only">Costo de cada venta entregada por producto, en el periodo elegido</caption>
                   <thead>
                     <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -206,7 +265,12 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
                       <th scope="col" className="px-3 py-2 text-right font-medium">Envíos</th>
                       <th scope="col" className="px-3 py-2 text-right font-medium">Operativo</th>
                       {columna("total", "Costo por venta entregada", "px-3 py-2 text-right")}
-                      <th scope="col" className="px-4 py-2 text-right font-medium">CPA tope</th>
+                      <th scope="col" className="px-3 py-2 text-right font-medium">Venta</th>
+                      <th scope="col" className="px-3 py-2 text-right font-medium">Producto</th>
+                      {columna("ganancia", "Ganancia por venta entregada", "px-3 py-2 text-right")}
+                      {columna("noPerder", "CPA para no perder", "px-3 py-2 text-right")}
+                      <th scope="col" className="px-3 py-2 text-right font-medium">CPA tope</th>
+                      <th scope="col" className="px-4 py-2 text-left font-medium">Cuidado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -238,8 +302,30 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-2.5 text-right">
+                        <td className="px-3 py-2.5 text-right" title={origenDe(f)}>
+                          {plata(f.economia && f.economia.pedidos >= MIN_PEDIDOS_RENTABILIDAD ? f.economia.venta : null)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right" title={origenDe(f)}>
+                          {f.economia?.costoProducto != null ? (
+                            <>
+                              <span className="block">{dolares(f.economia.costoProducto)}</span>
+                              <span className="block text-xs text-muted-foreground">{f.economia.fuente === "matriz" ? "de la Matriz" : `${f.economia.unidades ?? 1} ud. por pedido`}</span>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">Sin costo</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          <Rentable f={f} />
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          {f.rentabilidad ? <span className={`font-semibold ${f.cpa !== null && f.cpa > f.rentabilidad.cpaParaNoPerder ? "text-destructive" : ""}`}>{dolares(f.rentabilidad.cpaParaNoPerder)}</span> : "—"}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
                           <TopeEnTabla t={topeDe(f.clave)} />
+                        </td>
+                        <td className="px-4 py-2.5 text-left">
+                          <Cuidado estado={estadoDeFila(f, topeDe(f.clave)?.tope ?? null)} />
                         </td>
                       </tr>
                     ))}
@@ -264,6 +350,10 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
               <li>CPA real = CPA de Meta ÷ (% de envío × % de entrega).</li>
               <li>Envíos = envío + comisión × % de entrega + (1 − % de entrega) × envío.</li>
               <li>Costo por venta entregada = CPA real + envíos + costo operativo.</li>
+              <li>Venta: lo que se cobra por pedido, con los pedidos entregados de solo ese producto de los últimos 180 días (hacen falta al menos 5). Producto: costo por unidad × unidades del pedido; un 2x1 o un «PACK 2» cuenta como 2 unidades. El costo es el promedio de Compras (primero el del país); si no hay, el de la Matriz, que puede estar desactualizado. Sin flete ni IVA.</li>
+              <li>Ganancia por venta entregada = venta − producto − costo por venta entregada. En rojo y con «pierde»: con el CPA de ahora se pierde plata en cada venta.</li>
+              <li>CPA para no perder = (venta − producto − envíos − operativo) × % de envío × % de entrega: el CPA de Meta más alto con el que una venta entregada todavía no pierde. Por ahora solo informa: no cambia el CPA tope ni lo que el sistema recomienda apagar.</li>
+              <li>Cuidado: «Pierde» = con el CPA de ahora cada venta entregada pierde plata; «Margen fino» = el CPA ya va en el 85 % o más del límite para no perder; «Sobre el tope, rentable» = pasa del tope pero todavía deja ganancia. Los mismos avisos salen en las sugerencias, las fichas, «Por qué empeora» y el chat de Hallazgos.</li>
               <li>CPA tope: el general ($10) baja como mucho a $9 en el producto al que le llegan menos ventas que a la tienda (% de envío × % de entrega): $1 si le llegan un 25 % menos o peor, y en proporción si es menos. Nunca sube, uno escrito en Cuentas se usa tal cual y los costos de arriba no lo cambian. Con ese tope el sistema decide qué apagar y qué no tocar.</li>
             </ul>
           </details>

@@ -81,6 +81,21 @@ export const porConfirmar = (etiquetas: string[]) => tiene(etiquetas, ETIQUETA_P
 export const conNovedad = (etiquetas: string[]) => tiene(etiquetas, ETIQUETA_NOVEDAD);
 
 /**
+ * ¿Un pedido nuevo entra «En espera»? (26 nov 2026, manual ATC: «al entrar, el pedido queda En espera y con por confirmar datos».) Sí, si nadie lo
+ * gestionó todavía: sin zona, sin motivo de anulación y sin novedad. La «confirmada» que pone el bot no cuenta: la asesora confirma igual.
+ */
+export const entraEnEspera = (etiquetas: string[]) => !zonaAtc(etiquetas) && !motivoAtc(etiquetas) && !conNovedad(etiquetas);
+
+/** Lo mínimo y lo máximo de una dirección que se escribe a mano en la ficha (26 nov 2026). */
+export function leerDireccion(direccion: unknown, corregimiento: unknown): { direccion: string; corregimiento: string } | { error: string } {
+  const limpiar = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
+  const d = limpiar(direccion, 255);
+  const c = limpiar(corregimiento, 120);
+  if (d.length < 5) return { error: "Escribe la dirección exacta (al menos 5 letras)." };
+  return { direccion: d, corregimiento: c };
+}
+
+/**
  * ¿La asesora ya confirmó el pedido? Con la zona y sin «por confirmar datos» ni «novedad» (el manual), o con «Confirmada» (como se trabajaba antes del
  * 24 nov 2026, y lo que pone el bot).
  */

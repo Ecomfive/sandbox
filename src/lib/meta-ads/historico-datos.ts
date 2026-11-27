@@ -12,6 +12,7 @@ import { guiaDeTope, topeDeProducto, type TopeProducto } from "./limite";
 import { analizarHistorico, sinVentanas, type AnalisisHistorico, type CampanaHist, type EntregaProducto, type MesHist, type ProductoHist, type VideoHist, type Ventanas } from "./historico";
 import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
 import { claveDeProducto } from "./nombre";
+import { economiaDeProductos, type LineaVenta } from "./rentabilidad-datos";
 
 /** Cuántos días hacia atrás se miran los pedidos para la tasa de entrega: lo de hace más de medio año ya no dice cómo está hoy el producto. */
 export const DIAS_DE_ENTREGA = 180;
@@ -117,12 +118,13 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
   const { data: unidadesF } = await supabase.from("fin_unidades").select("id, nombre");
   const unidades = unidadesDeTiendas((unidadesF ?? []).map((u) => ({ id: u.id as string, nombre: String(u.nombre ?? "") })), cuentas.map((c) => String(c.tienda ?? "")));
   let entregas = new Map<string, EntregaProducto>();
+  let lineasVenta: LineaVenta[] = [];
   let pedidos = 0;
   if (unidades.length) {
     const lineas = await traerTodasLasFilas<Record<string, unknown>>((a, b) =>
       supabase
         .from("ven_orden_lineas")
-        .select("producto, cantidad, es_servicio, ven_ordenes!inner(estado_entrega, fecha, unidad_id)")
+        .select("orden_id, producto, cantidad, es_servicio, sku_maestro_id, costo_excel, ven_ordenes!inner(estado_entrega, fecha, unidad_id, total)")
         .in("ven_ordenes.unidad_id", unidades.map((u) => u.id))
         .gte("ven_ordenes.fecha", restar(hoy, DIAS_DE_ENTREGA))
         .order("orden_id")
@@ -136,6 +138,13 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
         return { producto: String(l.producto ?? ""), cantidad: num(l.cantidad), estado: (o2?.estado_entrega as string | null) ?? null, servicio: l.es_servicio === true };
       }),
     );
+    // Para la rentabilidad (27 nov 2026): lo que pagó el cliente por pedido, el producto de cada línea y su costo de la Matriz.
+    lineasVenta = lineas.map((l) => {
+      const o2 = Array.isArray(l.ven_ordenes) ? (l.ven_ordenes as Record<string, unknown>[])[0] : (l.ven_ordenes as Record<string, unknown> | null);
+      const total = o2?.total === null || o2?.total === undefined ? null : num(o2.total);
+      const costo = l.costo_excel === null || l.costo_excel === undefined ? null : num(l.costo_excel);
+      return { orden: String(l.orden_id ?? ""), producto: String(l.producto ?? ""), cantidad: Math.max(1, num(l.cantidad)), servicio: l.es_servicio === true, sku: (l.sku_maestro_id as string | null) ?? null, costoMatriz: costo, total, entregado: o2?.estado_entrega === "entregada" };
+    });
   }
   const indiceVentas = indexarCatalogo([...entregas.keys()].map((nombre) => ({ nombre, clase: "" })));
 
@@ -144,10 +153,14 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
   const tienda = tasasDe(pedidosDeLaTienda);
   const nombreDeClave = new Map(camp.map((c) => [claveDeProducto(((c.producto as string | null) ?? "").trim() || null), ((c.producto as string | null) ?? "").trim()]));
   const topes = new Map<string, TopeProducto>();
+  const claveDeVenta = new Map<string, string>();
   for (const [clave, nombre] of nombreDeClave) {
     const enTienda = nombre ? productoEnVentas(nombre, indiceVentas) : null;
+    if (enTienda && clave && !claveDeVenta.has(enTienda)) claveDeVenta.set(enTienda, clave);
     topes.set(clave, topeDeProducto(topePorClave.get(clave), enTienda ? entregas.get(enTienda) : null, tienda));
   }
+  // La venta y el costo de cada producto (Compras o la Matriz): solo informa, no mueve el tope.
+  const economia = lineasVenta.length ? await economiaDeProductos(supabase, o.paisId, lineasVenta, (producto) => claveDeVenta.get(producto) ?? null).catch(() => []) : [];
   const topeDe = (clave: string) => topes.get(clave)?.tope ?? topePorClave.get(clave) ?? CPA_TOPE_PREDETERMINADO;
   const guiaDe = (clave: string) => {
     const t = topes.get(clave);
@@ -297,7 +310,7 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
     for (const c of g.campanas) for (const [mes, r] of mesDeCampana.get(c.id) ?? []) meses.set(mes, sumar(meses.get(mes) ?? sinResultados(), r));
     return { clave, nombre: g.nombre, meses: [...meses].map(([mes, r]) => ({ mes, r })) };
   });
-  return { analisis: analizarHistorico({ campanas, videos, productos, desde, hasta, mensual, mensualPorProducto, pedidosDeLaTienda }), tiendas: unidades.map((u) => u.nombre), pedidos, vacio: false };
+  return { analisis: { ...analizarHistorico({ campanas, videos, productos, desde, hasta, mensual, mensualPorProducto, pedidosDeLaTienda }), economia }, tiendas: unidades.map((u) => u.nombre), pedidos, vacio: false };
 }
 
 /** Todo el historial analizado para un país (y una cuenta, o todas), guardado 10 minutos. */

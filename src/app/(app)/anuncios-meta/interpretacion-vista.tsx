@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { InterpretacionGuardada, OpinionIA } from "@/lib/meta-ads/interpretacion-guardada";
 import { SeccionPlegable } from "./plegable";
+import { VideoDeEjemplo } from "./ver-video-ejemplo";
 
 const fecha = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" });
 
@@ -56,6 +57,7 @@ function BloquePuntos({ tono, puntos }: { tono: Tono; puntos: { titulo: string; 
                 </svg>
               </summary>
               <p className="m-0 px-3 pb-3 pl-[2.6rem] text-sm text-muted-foreground">{p.detalle}</p>
+              {tono === "accion" && <VideoDeEjemplo texto={`${p.titulo} ${p.detalle}`} className="px-3 pb-2.5 pl-[2.6rem]" />}
             </details>
           </li>
         ))}

@@ -144,3 +144,19 @@ test("iComfly pide esperar: se espera lo que dice más un segundo; otro error no
   assert.equal(esperaDeIcomfly("fuera de la ventana de 24 horas"), null);
   assert.equal(esperaDeIcomfly(null), null);
 });
+
+import { entraEnEspera, leerDireccion } from "./gestion-atc";
+
+test("pedido nuevo: entra en espera si nadie lo gestionó; la «confirmada» del bot no lo salva", () => {
+  assert.equal(entraEnEspera([]), true);
+  assert.equal(entraEnEspera(["confirmada"]), true);
+  assert.equal(entraEnEspera(["CIUDAD"]), false);
+  assert.equal(entraEnEspera(["novedad"]), false);
+  assert.equal(entraEnEspera(["INTERIOR/SERVIENTREGA", "MOT-CLIENTE-NO-CONTESTA"]), false);
+});
+
+test("dirección escrita a mano: limpia espacios y pide la dirección exacta", () => {
+  assert.deepEqual(leerDireccion("  Calle 50,   casa 12  ", " Bella Vista "), { direccion: "Calle 50, casa 12", corregimiento: "Bella Vista" });
+  assert.ok("error" in leerDireccion("abc", "Bella Vista"));
+  assert.deepEqual(leerDireccion("Calle 50 casa 12", null), { direccion: "Calle 50 casa 12", corregimiento: "" });
+});

@@ -9,6 +9,7 @@ import { BotonesDecidir, Omitidas, useDecisiones } from "./decidir";
 import { InsigniaCerteza } from "./graficas";
 import { SeccionPlegable } from "./plegable";
 import { Cuales } from "./cuales";
+import { VideoDeEjemplo } from "./ver-video-ejemplo";
 
 const TONO: Record<TonoHallazgo, { fondo: string; texto: string; etiqueta: string }> = {
   alerta: { fondo: "bg-destructive-soft", texto: "text-destructive", etiqueta: "Para atender" },
@@ -69,16 +70,19 @@ export function TarjetaHallazgo({ h, conSeccion = false }: { h: Hallazgo; conSec
             </p>
           )}
           {h.accion && (
-            <p className="m-0 flex gap-2 rounded-md bg-success-soft px-2.5 py-1.5 text-xs text-foreground">
-              <span className="shrink-0 font-semibold text-success">Qué hacer</span>
-              <span>{h.accion}</span>
-            </p>
+            <div className="flex flex-col gap-1 rounded-md bg-success-soft px-2.5 py-1.5 text-xs text-foreground">
+              <p className="m-0 flex gap-2">
+                <span className="shrink-0 font-semibold text-success">Qué hacer</span>
+                <span>{h.accion}</span>
+              </p>
+              <VideoDeEjemplo texto={`${h.titulo} ${h.accion}`} />
+            </div>
           )}
           {h.quienes && <Cuales quienes={h.quienes} />}
         </div>
       </details>
       {h.guia && <GuiaEnLinea guia={h.guia} className="px-3 pb-2 sm:pl-14" />}
-      <BotonesDecidir clave={claveDeDecision(h)} titulo={h.titulo} className="px-3 pb-2.5 sm:pl-14" />
+      <BotonesDecidir clave={claveDeDecision(h)} titulo={h.titulo} accion={h.accion} className="px-3 pb-2.5 sm:pl-14" />
     </li>
   );
 }
