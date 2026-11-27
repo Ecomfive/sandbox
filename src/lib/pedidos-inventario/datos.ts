@@ -126,21 +126,23 @@ const uno = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? nu
 
 /**
  * Los pedidos: todos los abiertos (Solicitud, En proceso, Enviado) y los cerrados de los últimos 30 días, el más nuevo arriba.
- * Si falta la migración 0305, `faltaMigracion`; si falta la 0368, `sinConfirmacion`.
+ * Si falta la migración 0305, `faltaMigracion`; si falta la 0368, `sinConfirmacion`; si falta la 0371 (en proceso por producto), `sinEnProceso`.
  */
 export async function cargarPedidos(
   supabase: SupabaseClient,
   opciones: { archivados?: boolean } = {},
-): Promise<{ pedidos: PedidoInventario[]; faltaMigracion: boolean; totalArchivados: number; sinArchivo: boolean; sinConfirmacion: boolean }> {
+): Promise<{ pedidos: PedidoInventario[]; faltaMigracion: boolean; totalArchivados: number; sinArchivo: boolean; sinConfirmacion: boolean; sinEnProceso: boolean }> {
   const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const campos =
-    "id, numero, estado, pedido_por, pedido_por_nombre, creado_en, responsable_nombre, enviado_en, en_proceso_en, recibido_por_nombre, recibido_en, origen:wms_bodegas!despacho_pedidos_inventario_bodega_origen_id_fkey(nombre), traslado:wms_traslados!despacho_pedidos_inventario_traslado_id_fkey(numero), despacho_pedidos_inventario_items(id, orden, sku_id, producto, codigo, cantidad_pedida, nota, cantidad_entregada, observacion)";
+    "id, numero, estado, pedido_por, pedido_por_nombre, creado_en, responsable_nombre, enviado_en, en_proceso_en, recibido_por_nombre, recibido_en, origen:wms_bodegas!despacho_pedidos_inventario_bodega_origen_id_fkey(nombre), traslado:wms_traslados!despacho_pedidos_inventario_traslado_id_fkey(numero), despacho_pedidos_inventario_items(id, orden, sku_id, producto, codigo, cantidad_pedida, nota, cantidad_entregada, observacion__EN_PROCESO__)";
   // De qué bodega sale cada producto y lo confirmado (migración 0368).
   const conEnvios = "solicitud_grupo, bodega_asignada_id, asignada:wms_bodegas!despacho_pedidos_inventario_bodega_asignada_id_fkey(nombre), despacho_pedidos_inventario_envios(id, item_id, bodega_id, cantidad_enviada, cantidad_recibida, nota, confirmado_por_nombre, bodega:wms_bodegas(nombre), traslado:wms_traslados(numero))";
   let sinConfirmacion = false;
+  let sinEnProceso = false;
   // Los archivados (migración 0354, 23 nov 2026) salen de la lista de siempre y se ven aparte, sin el límite de 30 días.
   const consulta = (conArchivo: boolean) => {
-    const pedir = sinConfirmacion ? campos : `${campos}, ${conEnvios}`;
+    const base = campos.replace("__EN_PROCESO__", sinEnProceso ? "" : ", en_proceso_en, en_proceso_por_nombre");
+    const pedir = sinConfirmacion ? base : `${base}, ${conEnvios}`;
     const q = supabase.from("despacho_pedidos_inventario").select(conArchivo ? `${pedir}, archivado_en` : pedir);
     if (!conArchivo) return q.or(`estado.in.(solicitud,en_proceso,enviado),creado_en.gte.${desde}`).order("creado_en", { ascending: false }).limit(500);
     return (opciones.archivados ? q.not("archivado_en", "is", null) : q.is("archivado_en", null).or(`estado.in.(solicitud,en_proceso,enviado),creado_en.gte.${desde}`))
@@ -149,6 +151,11 @@ export async function cargarPedidos(
   };
   let sinArchivo = false;
   let { data, error } = await consulta(true);
+  if (error && /en_proceso_por_nombre|items(_\d+)?\.en_proceso_en/.test(error.message)) {
+    // Sin la migración 0371 todo carga como antes, sin «En proceso» por producto.
+    sinEnProceso = true;
+    ({ data, error } = await consulta(true));
+  }
   if (error && /despacho_pedidos_inventario_envios|bodega_asignada|solicitud_grupo/.test(error.message)) {
     sinConfirmacion = true;
     ({ data, error } = await consulta(true));
@@ -158,7 +165,7 @@ export async function cargarPedidos(
     sinArchivo = true;
     ({ data, error } = await consulta(false));
   }
-  if (error) return { pedidos: [], faltaMigracion: true, totalArchivados: 0, sinArchivo, sinConfirmacion };
+  if (error) return { pedidos: [], faltaMigracion: true, totalArchivados: 0, sinArchivo, sinConfirmacion, sinEnProceso };
   const { count } = sinArchivo ? { count: 0 } : await supabase.from("despacho_pedidos_inventario").select("id", { count: "exact", head: true }).not("archivado_en", "is", null);
   const pedidos = ((data ?? []) as unknown as Record<string, unknown>[]).map((p) => {
     const items = ((p.despacho_pedidos_inventario_items as Record<string, unknown>[] | null) ?? []).sort((a, b) => Number(a.orden) - Number(b.orden));
@@ -207,8 +214,10 @@ export async function cargarPedidos(
         nota: (it.nota as string | null) ?? null,
         cantidadEntregada: it.cantidad_entregada === null || it.cantidad_entregada === undefined ? null : Number(it.cantidad_entregada),
         observacion: (it.observacion as string | null) ?? null,
+        enProcesoEn: (it.en_proceso_en as string | null | undefined) ?? null,
+        enProcesoPorNombre: (it.en_proceso_por_nombre as string | null | undefined) ?? null,
       })),
     } satisfies PedidoInventario;
   });
-  return { pedidos, faltaMigracion: false, totalArchivados: count ?? 0, sinArchivo, sinConfirmacion };
+  return { pedidos, faltaMigracion: false, totalArchivados: count ?? 0, sinArchivo, sinConfirmacion, sinEnProceso };
 }

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
 import { cargarBodegasPedido, cargarComprometido, cargarStock, cargarStockLibre, stockInventario } from "@/lib/pedidos-inventario/datos";
-import { avisoEdicion, avisoPedido, cambiosDeEdicion, diferenciasDeEnvio, numeroPedido, estadoAntesDeEnviar, partirPorBodega, puedeArchivar, puedeDeshacerEnvio, puedeEditar, revisarConfirmacion, revisarEdicion, revisarEnvio, revisarLineas, revisarQuedan, revisarStockPedido, type EstadoPedido } from "@/lib/pedidos-inventario/reglas";
+import { avisoEdicion, avisoPedido, cambiosDeEdicion, diferenciasDeEnvio, numeroPedido, estadoAntesDeEnviar, partirPorBodega, puedeArchivar, puedeDeshacerEnvio, puedeEditar, revisarConfirmacion, revisarEdicion, revisarEnvio, revisarLineas, revisarQuedan, revisarStockPedido, MAX_LINEAS, type EstadoPedido } from "@/lib/pedidos-inventario/reglas";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { numeroTraslado } from "@/lib/wms/traslado";
@@ -108,14 +108,15 @@ export async function crearPedidoInventario(lineas: unknown): Promise<Resultado>
  * Despacho edita su pedido (20 nov 2026, pedido de Jhokser): quita productos, cambia cantidades o notas y agrega productos, mientras inventario no lo haya enviado (solicitud o en proceso). Recibe todas las líneas
  * que deben quedar: las que ya existían llevan su `id` y las que no vienen se quitan. Un pedido no puede quedar vacío (para eso se cancela). Lo que se agrega o se sube de cantidad se revisa contra lo que hay en inventario,
  * como al hacer un pedido; lo que no cambia no se vuelve a revisar. Si inventario ya lo tenía, le llega un aviso con lo que cambió.
+ * Desde el 27 nov 2026 (pedido de Hernán) también lo edita inventario (Dinora): entonces el aviso le llega a quien lo pidió.
  */
 export async function editarPedidoInventario(id: string, lineas: unknown): Promise<Resultado> {
-  return conPermiso(MODULO_DESPACHO, async (u) => {
+  const hacer = async (u: UsuarioActual, lado: "inventario" | "despacho"): Promise<Resultado> => {
     if (!ES_UUID(id)) return { error: "Pedido no válido." };
     const supabase = createServiceClient();
     const { data: p } = await supabase
       .from("despacho_pedidos_inventario")
-      .select("id, numero, estado, despacho_pedidos_inventario_items(id, sku_id, producto, cantidad_pedida, nota)")
+      .select("id, numero, estado, pedido_por, despacho_pedidos_inventario_items(id, sku_id, producto, cantidad_pedida, nota)")
       .eq("id", id)
       .maybeSingle();
     if (!p) return { error: "Ese pedido ya no existe." };
@@ -166,10 +167,60 @@ export async function editarPedidoInventario(id: string, lineas: unknown): Promi
       if (error) return { error: "No se pudo agregar el producto al pedido. Revisa cómo quedó y vuelve a intentarlo." };
     }
     const n = numeroPedido(p.numero as number);
-    await registrarAuditoria({ accion: "editar_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${n}: ${cambios.resumen.join("; ")}` });
-    // Inventario se entera de lo que cambió (ya lo haya tomado o no).
-    await avisar(supabase, await quienesAtienden(supabase), u, avisoEdicion(p.numero as number, nombreDe(u), cambios.resumen), "/inventario-pedidos-despacho");
+    await registrarAuditoria({ accion: "editar_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${n}: ${cambios.resumen.join("; ")}${lado === "inventario" ? " (lo editó inventario)" : ""}` });
+    // La otra parte se entera de lo que cambió: inventario si lo editó despacho, y quien lo pidió si lo editó inventario.
+    if (lado === "despacho") await avisar(supabase, await quienesAtienden(supabase), u, avisoEdicion(p.numero as number, nombreDe(u), cambios.resumen), "/inventario-pedidos-despacho");
+    else await avisar(supabase, [p.pedido_por as string], u, avisoEdicion(p.numero as number, nombreDe(u), cambios.resumen), "/inventario-despacho/solicitudes");
     return { ok: true, mensaje: `${n} editado.` };
+  };
+  // Quien tiene edición en inventario o en despacho.
+  const deInventario = await conPermiso(MODULO_INVENTARIO, (u) => hacer(u, "inventario"));
+  if ("ok" in deInventario) return deInventario;
+  const deDespacho = await conPermiso(MODULO_DESPACHO, (u) => hacer(u, "despacho"));
+  if ("ok" in deDespacho) return deDespacho;
+  const util = (e: string) => !/permiso|No tienes acceso/i.test(e);
+  return util(deInventario.error) ? deInventario : util(deDespacho.error) ? deDespacho : deInventario;
+}
+
+/**
+ * Inventario marca productos como «En proceso» (ya se están preparando) o los vuelve a pendientes (27 nov 2026, pedido de Hernán; migración 0371): uno, varios o toda una bodega.
+ * Lo marcado se oculta de lo pendiente en la pantalla. Marcar el primero pone el pedido «En proceso» (y le avisa a quien lo pidió). No mueve inventario.
+ */
+export async function marcarEnProcesoItems(id: string, itemIds: unknown, enProceso: boolean): Promise<Resultado> {
+  return conPermiso(MODULO_INVENTARIO, async (u) => {
+    if (!ES_UUID(id)) return { error: "Pedido no válido." };
+    if (!Array.isArray(itemIds) || !itemIds.length || itemIds.length > MAX_LINEAS || !itemIds.every(ES_UUID)) return { error: "Elige los productos." };
+    const supabase = createServiceClient();
+    const { data: p } = await supabase.from("despacho_pedidos_inventario").select("id, numero, estado, pedido_por, en_proceso_en, bodega_destino_id, despacho_pedidos_inventario_items(id)").eq("id", id).maybeSingle();
+    if (!p) return { error: "Ese pedido ya no existe." };
+    if (p.estado !== "solicitud" && p.estado !== "en_proceso") return { error: "Ese pedido ya fue enviado o cerrado: recarga la página." };
+    if (!(await puedeVerBodega(supabase, u.paisesPermitidos, p.bodega_destino_id as string))) return { error: "No tienes acceso al país de ese pedido." };
+    const ahora = new Date().toISOString();
+    const { data: cambiados, error } = await supabase
+      .from("despacho_pedidos_inventario_items")
+      .update(enProceso ? { en_proceso_en: ahora, en_proceso_por: u.id, en_proceso_por_nombre: nombreDe(u) } : { en_proceso_en: null, en_proceso_por: null, en_proceso_por_nombre: null })
+      .eq("pedido_id", id)
+      .in("id", itemIds as string[])
+      .select("id");
+    if (error) return { error: /en_proceso_(en|por)/.test(error.message) ? "Falta correr en Supabase la migración 0371 (en proceso por producto)." : "No se pudo guardar." };
+    if (!cambiados?.length) return { error: "Esos productos ya no están en el pedido: recarga la página." };
+    const n = numeroPedido(p.numero as number);
+    // El primer producto en proceso pone el pedido «En proceso».
+    if (enProceso && p.estado === "solicitud") {
+      const { data: tomado } = await supabase
+        .from("despacho_pedidos_inventario")
+        .update({ estado: "en_proceso", en_proceso_en: p.en_proceso_en ?? ahora, responsable_id: u.id, responsable_nombre: nombreDe(u) })
+        .eq("id", id)
+        .eq("estado", "solicitud")
+        .select("id");
+      if (tomado?.length) {
+        const items = (p.despacho_pedidos_inventario_items as unknown[] | null)?.length ?? 0;
+        await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items }, nombreDe(u), "en_proceso"), "/inventario-despacho/solicitudes");
+      }
+    }
+    const cuantos = cambiados.length;
+    await registrarAuditoria({ accion: "en_proceso_productos_pedido", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${n}: ${cuantos} ${cuantos === 1 ? "producto" : "productos"} ${enProceso ? "en proceso" : "vuelven a pendientes"}` });
+    return { ok: true, mensaje: enProceso ? `${cuantos === 1 ? "1 producto" : `${cuantos} productos`} en proceso en ${n}.` : `${cuantos === 1 ? "1 producto vuelve" : `${cuantos} productos vuelven`} a pendientes.` };
   });
 }
 

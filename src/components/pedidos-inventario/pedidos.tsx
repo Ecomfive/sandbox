@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   archivarPedidoInventario,
   cancelarPedidoInventario,
@@ -11,6 +11,7 @@ import {
   volverASolicitudPedido,
   editarPedidoInventario,
   enviarPedidoInventario,
+  marcarEnProcesoItems,
   ponerEnProcesoPedido,
   recibirPedidoInventario,
 } from "@/app/(app)/despacho-ciudad/pedir-inventario/actions";
@@ -51,7 +52,7 @@ import {
   type StockInventario,
 } from "@/lib/pedidos-inventario/reglas";
 import { BOTON_PEDIDO, useAccion } from "./comun";
-import { ConfirmarRecepcion, PorBodega, RepartoBodegas, type Seleccion } from "./envio";
+import { ConfirmarRecepcion, PorBodega, RepartoBodegas, type EnProceso, type Seleccion } from "./envio";
 
 // Pedir a inventario (16 nov 2026, migración 0305; prototipo aprobado https://claude.ai/artifact/ReVGwYZrBG11rmKFUT7V5T): la tabla
 // del Excel que reemplaza (N.º, código, producto, cantidades, fecha, quién, estado, observaciones), con los botones de cada lado.
@@ -61,6 +62,9 @@ const SECUNDARIO = BOTON_PEDIDO.secundario;
 const DESCARGA = BOTON_PEDIDO.descarga;
 const ARCHIVO = BOTON_PEDIDO.archivo;
 const DESHACER = BOTON_PEDIDO.deshacer;
+// «En proceso» por producto (27 nov 2026): morado suave para marcar, gris para volver a pendiente.
+const BOTON_EN_PROCESO = `inline-flex min-h-7 items-center rounded-md border border-primario/30 bg-primario-suave px-2 text-[11px] font-semibold whitespace-nowrap text-primario hover:brightness-95 disabled:opacity-50 ${anilloFoco}`;
+const BOTON_A_PENDIENTE = `inline-flex min-h-7 items-center rounded-md border border-border-control bg-card px-2 text-[11px] font-semibold whitespace-nowrap text-muted-foreground hover:bg-muted disabled:opacity-50 ${anilloFoco}`;
 
 interface Linea {
   clave: number;
@@ -398,6 +402,7 @@ function FilasPedido({
   columnas,
   fotos,
   sinConfirmacion,
+  sinEnProceso,
   hermanos,
 }: {
   p: PedidoInventario;
@@ -406,6 +411,8 @@ function FilasPedido({
   columnas: number;
   /** Falta la migración 0368: no se puede enviar. */
   sinConfirmacion: boolean;
+  /** Falta la migración 0371: sin «En proceso» por producto. */
+  sinEnProceso: boolean;
   modo: "despacho" | "inventario";
   puedeEscribir: boolean;
   origenes: { id: string; nombre: string }[];
@@ -422,9 +429,13 @@ function FilasPedido({
   const enInventario = modo === "inventario";
   const editable = enInventario && puedeEscribir && puedeEnviar(p.estado);
   // De qué bodega sale cada producto (26 nov 2026): viene sugerido (donde alcanza) y se puede cambiar o repartir entre varias.
-  const [reparto, setReparto] = useState<Record<string, { bodegaId: string; cantidad: number | string }[]>>(() =>
-    repartirSugerido(p.items.map((it) => ({ id: it.id, skuId: it.skuId, cantidad: it.cantidadPedida })), origenes.map((b) => b.id), stock, p.bodegaAsignada?.id ?? null),
+  // Lo sugerido se calcula con los productos de hoy (también los que se agregan al editar); lo que se cambia a mano se guarda aparte y manda.
+  const asignada = p.bodegaAsignada?.id ?? null;
+  const sugerido = useMemo(
+    () => repartirSugerido(p.items.map((it) => ({ id: it.id, skuId: it.skuId, cantidad: it.cantidadPedida })), origenes.map((b) => b.id), stock, asignada),
+    [p.items, origenes, stock, asignada],
   );
+  const [reparto, setReparto] = useState<Record<string, { bodegaId: string; cantidad: number | string }[]>>({});
   const [observaciones, setObservaciones] = useState<Record<string, string>>({});
   // Qué productos van en este envío (26 nov 2026, pedido de Hernán): los no marcados pasan a otro pedido, pendientes.
   const [quedan, setQuedan] = useState<Set<string>>(() => new Set());
@@ -444,9 +455,18 @@ function FilasPedido({
             }),
         }
       : undefined;
+  // «En proceso» por producto (27 nov 2026, pedido de Hernán; migración 0371; prototipo aprobado https://claude.ai/artifact/Sk4X5u2xDoWWuSbhAuS8m3): lo que ya se está preparando
+  // se oculta de lo pendiente, en las filas y en las tarjetas por bodega; «Ver pedido completo» lo muestra todo.
+  const [completo, setCompleto] = useState(false);
+  const conEnProceso = editable && !sinEnProceso;
+  const estaEnProceso = (it: { enProcesoEn?: string | null } | undefined) => conEnProceso && !!it?.enProcesoEn;
+  const cuantosEnProceso = p.items.filter((it) => estaEnProceso(it)).length;
+  const marcarProceso = (ids: string[], valor: boolean) => correr(() => marcarEnProcesoItems(p.id, ids, valor));
+  const enProceso: EnProceso | undefined = conEnProceso ? { esta: (id) => estaEnProceso(p.items.find((x) => x.id === id)), marcar: marcarProceso, completo, ocupado } : undefined;
+  const filas = conEnProceso && !completo ? p.items.filter((it) => !estaEnProceso(it)) : p.items;
   const vanAhora = p.items.filter((it) => !quedan.has(it.id));
   const pendientes = n - vanAhora.length;
-  const partesDe = (itemId: string) => (reparto[itemId] ?? []).map((x) => ({ bodegaId: x.bodegaId, cantidad: Math.max(0, Math.floor(Number(x.cantidad) || 0)) }));
+  const partesDe = (itemId: string) => (reparto[itemId] ?? sugerido[itemId] ?? []).map((x) => ({ bodegaId: x.bodegaId, cantidad: Math.max(0, Math.floor(Number(x.cantidad) || 0)) }));
   const noAlcanza = editable && vanAhora.some((it) => partesDe(it.id).some((x) => x.cantidad > Math.max(0, stock[x.bodegaId]?.[it.skuId] ?? 0)));
   const nadaQueEnviar = editable && vanAhora.every((it) => partesDe(it.id).every((x) => x.cantidad === 0));
   const envios = p.envios ?? [];
@@ -483,6 +503,8 @@ function FilasPedido({
               Pasar a «En proceso»
             </button>
           )}
+          {/* Inventario (Dinora) también edita el pedido (27 nov 2026): quitar, agregar o cambiar cantidades; le avisa a quien lo pidió. */}
+          {puedeEditar(p.estado) && <EditarPedido p={p} opciones={opciones} stock={hayEnInventario} />}
           {puedeEnviar(p.estado) && (
             <>
               {(noAlcanza || sinConfirmacion) && (
@@ -620,6 +642,26 @@ function FilasPedido({
     </button>
   );
 
+  /** La celda del N.º del pedido, con «Ver pedido completo» cuando hay productos en proceso. */
+  const celdaNumero = (filasQueAbarca: number) => (
+    <td rowSpan={filasQueAbarca} className={`${TD_FIN} bg-primario-suave px-3 whitespace-nowrap`}>
+      <span className="block font-semibold text-primario">{numeroPedido(p.numero)}</span>
+      <span className="block text-xs font-normal text-muted-foreground">{fechaCorta(p.creadoEn)}</span>
+      <BodegaDelPedido p={p} hermanos={hermanos} />
+      {alternar}
+      {enProceso && cuantosEnProceso > 0 && (
+        <span className="mt-2 flex flex-col items-start gap-1 border-t border-primario/20 pt-2 text-xs whitespace-normal">
+          <span className="text-foreground">
+            <b>{(n - cuantosEnProceso).toLocaleString("es-PA")}</b> pendientes · <b>{cuantosEnProceso.toLocaleString("es-PA")}</b> en proceso
+          </span>
+          <button type="button" onClick={() => setCompleto((c) => !c)} aria-pressed={completo} className={`rounded text-left font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}>
+            {completo ? "Ver solo pendientes" : "Ver pedido completo"}
+          </button>
+        </span>
+      )}
+    </td>
+  );
+
   // Plegado: una sola fila con el N.º, un resumen de lo que lleva y el estado. Si falta enviarlo (inventario escribe las cantidades), no se ofrece «Enviar» sin ver los productos.
   if (plegado) {
     const unidades = p.items.reduce((t, it) => t + it.cantidadPedida, 0);
@@ -677,21 +719,14 @@ function FilasPedido({
 
   return (
     <>
-      {p.items.map((it, i) => {
-        const ultima = i === n - 1;
+      {filas.map((it, i) => {
+        const ultima = i === filas.length - 1;
         const borde = ultima && !conGrupos ? TD_FIN : TD;
         const obs = [it.nota, it.observacion, ...notasDeDespacho(p, it.id), ultima && p.traslado ? p.traslado : null].filter(Boolean).join(" · ");
         const suyos = envios.filter((e) => e.itemId === it.id);
         return (
-          <tr key={it.id}>
-            {i === 0 && (
-              <td rowSpan={n + (conGrupos ? 1 : 0)} className={`${TD_FIN} bg-primario-suave px-3 whitespace-nowrap`}>
-                <span className="block font-semibold text-primario">{numeroPedido(p.numero)}</span>
-                <span className="block text-xs font-normal text-muted-foreground">{fechaCorta(p.creadoEn)}</span>
-                <BodegaDelPedido p={p} hermanos={hermanos} />
-                {alternar}
-              </td>
-            )}
+          <tr key={it.id} className={estaEnProceso(it) ? "bg-primario-suave/30" : undefined}>
+            {i === 0 && celdaNumero(filas.length + (conGrupos ? 1 : 0))}
             <td className={`${borde} font-mono text-xs text-muted-foreground`}>{it.codigo ?? "—"}</td>
             <td className={`${borde} font-medium`}>
               <span className="flex items-start gap-2">
@@ -729,8 +764,21 @@ function FilasPedido({
                     </label>
                   )}
                   <div className={quedan.has(it.id) ? "pointer-events-none opacity-40" : undefined} inert={quedan.has(it.id) || undefined}>
-                    <RepartoBodegas item={it} partes={(reparto[it.id] ?? []) as { bodegaId: string; cantidad: number }[]} alCambiar={(partes) => setReparto((x) => ({ ...x, [it.id]: partes }))} bodegas={origenes} stock={stock} />
+                    <RepartoBodegas item={it} partes={(reparto[it.id] ?? sugerido[it.id] ?? []) as { bodegaId: string; cantidad: number }[]} alCambiar={(partes) => setReparto((x) => ({ ...x, [it.id]: partes }))} bodegas={origenes} stock={stock} />
                   </div>
+                  {enProceso &&
+                    (estaEnProceso(it) ? (
+                      <span className="flex flex-wrap items-center justify-end gap-1.5 text-xs font-semibold text-primario">
+                        En proceso{it.enProcesoPorNombre ? ` · ${it.enProcesoPorNombre}` : ""}
+                        <button type="button" disabled={ocupado} onClick={() => marcarProceso([it.id], false)} className={BOTON_A_PENDIENTE}>
+                          Volver a pendiente
+                        </button>
+                      </span>
+                    ) : (
+                      <button type="button" disabled={ocupado} onClick={() => marcarProceso([it.id], true)} className={BOTON_EN_PROCESO}>
+                        Pasar a «En proceso»
+                      </button>
+                    ))}
                 </div>
               ) : p.estado === "enviado" && porConfirmar ? (
                 suyos.length ? (
@@ -777,17 +825,30 @@ function FilasPedido({
               )}
             </td>
             {i === 0 && (
-              <td rowSpan={n} className={`${TD_FIN} px-3`}>
+              <td rowSpan={filas.length} className={`${TD_FIN} px-3`}>
                 {acciones}
               </td>
             )}
           </tr>
         );
       })}
+      {filas.length === 0 && (
+        // Todo está en proceso: una sola fila con el aviso y los botones de siempre.
+        <tr>
+          {celdaNumero(1 + (conGrupos ? 1 : 0))}
+          <td colSpan={Math.max(1, columnas - 2)} className={`${TD} text-sm text-muted-foreground`}>
+            Todo el pedido está en proceso ({n.toLocaleString("es-PA")} {n === 1 ? "producto" : "productos"}).{" "}
+            <button type="button" onClick={() => setCompleto(true)} className={`rounded font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}>
+              Ver pedido completo
+            </button>
+          </td>
+          <td className={`${TD_FIN} px-3`}>{acciones}</td>
+        </tr>
+      )}
       {conGrupos && (
         <tr>
           <td colSpan={Math.max(1, columnas - 2)} className={TD_FIN}>
-            <PorBodega grupos={grupos} seleccion={seleccion} />
+            <PorBodega grupos={grupos} seleccion={seleccion} enProceso={enProceso} />
           </td>
           <td className={`${TD_FIN} px-3`} />
         </tr>
@@ -858,6 +919,7 @@ export function TablaPedidos({
   hayEnInventario = {},
   fotos = {},
   sinConfirmacion = false,
+  sinEnProceso = false,
 }: {
   pedidos: PedidoInventario[];
   modo: "despacho" | "inventario";
@@ -873,6 +935,8 @@ export function TablaPedidos({
   fotos?: Record<string, string>;
   /** Falta la migración 0368: inventario no puede enviar. */
   sinConfirmacion?: boolean;
+  /** Falta la migración 0371: sin «En proceso» por producto. */
+  sinEnProceso?: boolean;
 }) {
   const [ficha, setFicha] = useState<string | null>(null);
   const columnas = modo === "inventario" ? 8 : 9;
@@ -905,7 +969,7 @@ export function TablaPedidos({
           ) : (
             pedidos.map((p) => (
               <Fragment key={p.id}>
-                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={fichas ? (id) => fichas[id] && setFicha(id) : null} opciones={opciones} hayEnInventario={hayEnInventario} columnas={columnas} fotos={fotos} sinConfirmacion={sinConfirmacion} hermanos={p.grupo ? pedidos.filter((x) => x.grupo === p.grupo && x.id !== p.id).map((x) => numeroPedido(x.numero)) : []} />
+                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={fichas ? (id) => fichas[id] && setFicha(id) : null} opciones={opciones} hayEnInventario={hayEnInventario} columnas={columnas} fotos={fotos} sinConfirmacion={sinConfirmacion} sinEnProceso={sinEnProceso} hermanos={p.grupo ? pedidos.filter((x) => x.grupo === p.grupo && x.id !== p.id).map((x) => numeroPedido(x.numero)) : []} />
               </Fragment>
             ))
           )}

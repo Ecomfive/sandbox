@@ -19,21 +19,22 @@ export async function PaginaPedidos({ modo, usuario, estado, archivados = false 
   const rutaArchivo = modo === "despacho" ? "/inventario-despacho/archivo" : `${ruta}/archivo`;
   const puedeEscribir = !usuario.modulosSoloLectura.includes(modulo);
   const supabase = createServiceClient();
-  const [{ pedidos, faltaMigracion, totalArchivados, sinArchivo, sinConfirmacion }, bodegas, comprometido] = await Promise.all([cargarPedidos(supabase, { archivados }), cargarBodegasPedido(supabase), cargarComprometido(supabase)]);
+  const [{ pedidos, faltaMigracion, totalArchivados, sinArchivo, sinConfirmacion, sinEnProceso }, bodegas, comprometido] = await Promise.all([cargarPedidos(supabase, { archivados }), cargarBodegasPedido(supabase), cargarComprometido(supabase)]);
   const elegido = esEstado(estado) ? estado : null;
   const visibles = elegido ? pedidos.filter((p) => p.estado === elegido) : pedidos;
   const cuenta = contarPorEstado(pedidos);
 
-  // Despacho elige de la lista del catálogo: sin combos y sin el producto «padre» de unas variantes (se pide la variante exacta).
+  // Despacho elige de la lista del catálogo: sin combos y sin el producto «padre» de unas variantes (se pide la variante exacta). Desde el 27 nov 2026 inventario también
+  // edita los pedidos, así que también la recibe quien escribe en inventario.
   const opciones =
-    modo === "despacho" && puedeEscribir
+    puedeEscribir
       ? await obtenerOpcionesSkuMaestro(supabase).then((os) => {
           const padres = new Set(os.map((o) => o.padreId).filter(Boolean));
           return os.filter((o) => !o.compuesto && !padres.has(o.id));
         })
       : [];
   // Despacho ve cuánto hay en inventario de cada producto al elegirlo, y no puede pedir lo que no hay (19 nov 2026).
-  const hayEnInventario = modo === "despacho" && puedeEscribir ? await stockInventario(supabase, bodegas.origenes, undefined, comprometido) : {};
+  const hayEnInventario = puedeEscribir ? await stockInventario(supabase, bodegas.origenes, undefined, comprometido) : {};
   // Comunicación despacho (20 nov 2026): al tocar el producto se abre su ficha de stock, para ver cómo está repartido. Solo con el permiso de Inventario
   // (la ficha lo pide para leer el stock).
   const fotos = await fotosDeProductos(supabase, [...new Set(pedidos.flatMap((p) => p.items.map((it) => it.skuId)).filter(Boolean))]);
@@ -87,7 +88,7 @@ export async function PaginaPedidos({ modo, usuario, estado, archivados = false 
           ) : (
             <TableroPedidos modo={modo} ruta={ruta} cuenta={cuenta} total={pedidos.length} elegido={elegido} />
           )}
-          <TablaPedidos pedidos={archivados ? pedidos : visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} fichas={fichas} fotos={fotos} opciones={opciones} hayEnInventario={hayEnInventario} sinConfirmacion={sinConfirmacion} />
+          <TablaPedidos pedidos={archivados ? pedidos : visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} fichas={fichas} fotos={fotos} opciones={opciones} hayEnInventario={hayEnInventario} sinConfirmacion={sinConfirmacion} sinEnProceso={sinEnProceso} />
           {!archivados && !sinArchivo && (
             <p className="m-0 text-sm">
               <Link href={rutaArchivo} className="font-medium text-primario underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
