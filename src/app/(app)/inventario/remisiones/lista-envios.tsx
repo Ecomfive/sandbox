@@ -148,6 +148,7 @@ function FichaRemision({
   stock,
   puedeEscribir,
   anularDirecto,
+  corregirDirecto = false,
   codigoPais,
   conPendiente,
   resueltas,
@@ -159,6 +160,7 @@ function FichaRemision({
   puedeEscribir: boolean;
   /** Puede anular lo que sigue en camino sin pedir autorización (módulo «Anular remisión», migración 0344). */
   anularDirecto: boolean;
+  corregirDirecto?: boolean;
   codigoPais: string;
   conPendiente: Set<string>;
   resueltas: Record<string, string>;
@@ -250,7 +252,7 @@ function FichaRemision({
                     f.remisionId &&
                     f.estado !== "anulado" && (
                       <span className="mt-1 block">
-                        <PedirCorreccion envioId={f.id} tipo={f.estado === "en_camino" ? "anular" : "recibida"} codigo={f.codigo} enviada={f.enviada} recibida={f.recibida} anularDirecto={anularDirecto} />
+                        <PedirCorreccion envioId={f.id} tipo={f.estado === "en_camino" ? "anular" : "recibida"} codigo={f.codigo} enviada={f.enviada} recibida={f.recibida} anularDirecto={anularDirecto} corregirDirecto={corregirDirecto} />
                       </span>
                     )
                   )}
@@ -287,6 +289,7 @@ export function ListaEnvios({
   stock,
   puedeEscribir,
   anularDirecto,
+  corregirDirecto = false,
   codigoPais,
   conPendiente,
   resueltas,
@@ -299,6 +302,7 @@ export function ListaEnvios({
   stock: StockPorBodega;
   puedeEscribir: boolean;
   anularDirecto: boolean;
+  corregirDirecto?: boolean;
   codigoPais: string;
   /** Las líneas con una corrección esperando autorización. */
   conPendiente: string[];
@@ -372,7 +376,7 @@ export function ListaEnvios({
         </table>
       </ContenedorTabla>
       <Ventana abierto={!!elegida} alCerrar={() => setAbierta(null)} titulo={elegida?.numero ?? ""} lado="derecha" ancho="lg">
-        {elegida && <FichaRemision r={elegida} productos={productos} paraRetiro={paraRetiro} stock={stock} puedeEscribir={puedeEscribir} anularDirecto={anularDirecto} codigoPais={codigoPais} conPendiente={pendientes} resueltas={resueltas} />}
+        {elegida && <FichaRemision r={elegida} productos={productos} paraRetiro={paraRetiro} stock={stock} puedeEscribir={puedeEscribir} anularDirecto={anularDirecto} corregirDirecto={corregirDirecto} codigoPais={codigoPais} conPendiente={pendientes} resueltas={resueltas} />}
       </Ventana>
     </div>
   );

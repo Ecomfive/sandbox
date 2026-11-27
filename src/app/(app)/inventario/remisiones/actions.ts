@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
-import { puedeAnularSinAutorizacion } from "@/lib/permisos/anular-remision";
+import { puedeAnularSinAutorizacion, puedeCorregirSinAutorizacion } from "@/lib/permisos/anular-remision";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { quienesAutorizan, revisarCorreccion, textoCorreccion } from "@/lib/wms/correccion-remision";
@@ -100,7 +100,7 @@ async function avisar(supabase: ReturnType<typeof createServiceClient>, personas
 }
 
 /** Pide corregir lo recibido o anular lo que sigue en camino (migración 0237). No cambia nada: queda esperando a quien puede autorizar y les llega el aviso. */
-export async function pedirCorreccion(envioId: string, tipo: unknown, recibida: unknown, motivo: unknown): Promise<{ error?: string; anulada?: boolean }> {
+export async function pedirCorreccion(envioId: string, tipo: unknown, recibida: unknown, motivo: unknown): Promise<{ error?: string; anulada?: boolean; corregida?: boolean }> {
   const usuario = await requireModuloEscritura("inventario");
   if (!ES_ID(envioId)) return { error: "Línea no válida." };
   const supabase = createServiceClient();
@@ -120,6 +120,8 @@ export async function pedirCorreccion(envioId: string, tipo: unknown, recibida: 
   const que = textoCorreccion({ tipo: r.tipo, recibidaAntes: linea.recibida === null ? null : Number(linea.recibida), recibidaNueva: r.recibida, enviada: Number(linea.enviada) });
   // Quien lleva las remisiones (módulo `anular-remision`, migración 0344) anula lo que sigue en camino sin esperar a nadie: la petición queda guardada y resuelta al instante, con su motivo y su nombre.
   if (r.tipo === "anular" && puedeAnularSinAutorizacion(usuario)) return anularDirecto(supabase, { envioId, motivo: r.motivo, usuario: { id: usuario.id, nombre }, donde, que });
+  // Quien tiene «Corregir remisión» (módulo `corregir-remision`, migración 0993) corrige lo recibido al instante, igual que una anulación directa.
+  if (r.tipo === "recibida" && puedeCorregirSinAutorizacion(usuario)) return corregirDirecto(supabase, { envioId, recibidaAntes: linea.recibida === null ? null : Number(linea.recibida), recibidaNueva: r.recibida!, motivo: r.motivo, usuario: { id: usuario.id, nombre }, donde, que });
   const { data: autorizadores, error: errorAut } = await supabase.from("wms_autorizadores_remision").select("perfil_id, pais_id");
   if (errorAut) return { error: "Falta correr la migración 0237 en la base." };
   const autoriza = quienesAutorizan(autorizadores ?? [], bodega?.pais_id ?? "", usuario.id);
@@ -164,6 +166,29 @@ async function anularDirecto(
   revalidatePath(RUTA);
   revalidatePath("/inventario");
   return { anulada: true };
+}
+
+/** Corrige lo recibido sin esperar autorización: la petición se guarda «directa» y se resuelve al instante con la misma función de la base (que ajusta el stock en un retiro de plataforma). */
+async function corregirDirecto(
+  supabase: ReturnType<typeof createServiceClient>,
+  d: { envioId: string; recibidaAntes: number | null; recibidaNueva: number; motivo: string; usuario: { id: string; nombre: string }; donde: string; que: string },
+): Promise<{ error?: string; corregida?: boolean }> {
+  const { data: creada, error } = await supabase
+    .from("wms_correcciones_remision")
+    .insert({ envio_id: d.envioId, tipo: "recibida", recibida_antes: d.recibidaAntes, recibida_nueva: d.recibidaNueva, motivo: d.motivo, solicitante_id: d.usuario.id, solicitante_nombre: d.usuario.nombre, autoriza_a: [d.usuario.id], directa: true })
+    .select("id")
+    .single();
+  if (error || !creada) return { error: error?.code === "23505" ? "Esa línea ya tiene una petición esperando autorización." : "No se pudo corregir la línea." };
+  const { error: fallo } = await supabase.rpc("wms_resolver_correccion_remision", { p_correccion: creada.id, p_autorizar: true, p_nota: "Corregida directamente (sin autorización)", p_usuario: d.usuario.id, p_nombre: d.usuario.nombre });
+  if (fallo) {
+    await supabase.from("wms_correcciones_remision").delete().eq("id", creada.id);
+    if (/propia petición/.test(fallo.message)) return { error: "Falta correr en Supabase la migración 0993 (corregir remisión sin autorización)." };
+    return { error: fallo.message.length < 200 ? fallo.message : "No se pudo corregir la línea." };
+  }
+  await registrarAuditoria({ accion: "remision_corregida_directa", entidad: "wms_envios_dropi", entidadId: d.envioId, detalle: `${d.donde} · ${d.que} · ${d.motivo}` });
+  revalidatePath(RUTA);
+  revalidatePath("/inventario");
+  return { corregida: true };
 }
 
 /** Autoriza o rechaza una petición. La base comprueba que esta persona pueda hacerlo y que no sea quien la pidió. */

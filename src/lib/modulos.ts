@@ -44,6 +44,7 @@ export const MODULOS: Modulo[] = [
   { clave: "encargado-inventario", etiqueta: "A cargo del inventario: todas las bodegas, transferir y recibir (Inventario)" },
   { clave: "salida-manual", etiqueta: "Salida a mano donde va con remisión (Inventario)" },
   { clave: "anular-remision", etiqueta: "Anular una remisión en camino sin autorización (Inventario)" },
+  { clave: "corregir-remision", etiqueta: "Corregir lo recibido en una remisión sin autorización (Inventario)" },
   { clave: "wms-bodegas", etiqueta: "Bodegas (WMS)" },
   { clave: "wms-ubicaciones", etiqueta: "Ubicaciones (WMS)" },
   { clave: "wms-productos", etiqueta: "Ficha producto Shopify (WMS)" },

@@ -7,5 +7,14 @@ export const MODULO_ANULAR_REMISION = "anular-remision";
 
 type Acceso = { modulos: readonly string[]; modulosSoloLectura: readonly string[] };
 
+/**
+ * Corregir lo recibido en una remisión sin pedir autorización (27 nov 2026, pedido de Hernán: Yanixia en Costa Rica). Módulo `corregir-remision`, también **por persona**
+ * (migración 0993). La corrección queda guardada y resuelta al instante, con su motivo y su nombre.
+ */
+export const MODULO_CORREGIR_REMISION = "corregir-remision";
+
+/** Puede corregir lo recibido sin autorización: tiene el módulo «Corregir remisión» con edición. */
+export const puedeCorregirSinAutorizacion = (u: Acceso): boolean => u.modulos.includes(MODULO_CORREGIR_REMISION) && !u.modulosSoloLectura.includes(MODULO_CORREGIR_REMISION);
+
 /** Puede anular sin autorización: tiene el módulo «Anular remisión» con edición. */
 export const puedeAnularSinAutorizacion = (u: Acceso): boolean => u.modulos.includes(MODULO_ANULAR_REMISION) && !u.modulosSoloLectura.includes(MODULO_ANULAR_REMISION);
