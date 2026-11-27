@@ -403,6 +403,7 @@ function FilasPedido({
   fotos,
   sinConfirmacion,
   sinEnProceso,
+  soloEnProceso = false,
   hermanos,
 }: {
   p: PedidoInventario;
@@ -413,6 +414,8 @@ function FilasPedido({
   sinConfirmacion: boolean;
   /** Falta la migración 0371: sin «En proceso» por producto. */
   sinEnProceso: boolean;
+  /** La tarjeta «En proceso» está elegida (27 nov 2026, pedido de Hernán): en cada pedido se ve solo lo marcado en proceso. */
+  soloEnProceso?: boolean;
   modo: "despacho" | "inventario";
   puedeEscribir: boolean;
   origenes: { id: string; nombre: string }[];
@@ -463,7 +466,9 @@ function FilasPedido({
   const cuantosEnProceso = p.items.filter((it) => estaEnProceso(it)).length;
   const marcarProceso = (ids: string[], valor: boolean) => correr(() => marcarEnProcesoItems(p.id, ids, valor));
   const enProceso: EnProceso | undefined = conEnProceso ? { esta: (id) => estaEnProceso(p.items.find((x) => x.id === id)), marcar: marcarProceso, completo, ocupado } : undefined;
-  const filas = conEnProceso && !completo ? p.items.filter((it) => !estaEnProceso(it)) : p.items;
+  // Con la tarjeta «En proceso» elegida se ve solo lo marcado en proceso (si el pedido se puso entero en proceso sin marcar productos, se ve todo).
+  const vistaEnProceso = soloEnProceso && conEnProceso && cuantosEnProceso > 0 && !completo;
+  const filas = !conEnProceso || completo ? p.items : vistaEnProceso ? p.items.filter((it) => estaEnProceso(it)) : soloEnProceso && cuantosEnProceso === 0 ? p.items : p.items.filter((it) => !estaEnProceso(it));
   const vanAhora = p.items.filter((it) => !quedan.has(it.id));
   const pendientes = n - vanAhora.length;
   const partesDe = (itemId: string) => (reparto[itemId] ?? sugerido[itemId] ?? []).map((x) => ({ bodegaId: x.bodegaId, cantidad: Math.max(0, Math.floor(Number(x.cantidad) || 0)) }));
@@ -655,7 +660,7 @@ function FilasPedido({
             <b>{(n - cuantosEnProceso).toLocaleString("es-PA")}</b> pendientes · <b>{cuantosEnProceso.toLocaleString("es-PA")}</b> en proceso
           </span>
           <button type="button" onClick={() => setCompleto((c) => !c)} aria-pressed={completo} className={`rounded text-left font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}>
-            {completo ? "Ver solo pendientes" : "Ver pedido completo"}
+            {completo ? (soloEnProceso ? "Ver solo en proceso" : "Ver solo pendientes") : "Ver pedido completo"}
           </button>
         </span>
       )}
@@ -848,7 +853,11 @@ function FilasPedido({
       {conGrupos && (
         <tr>
           <td colSpan={Math.max(1, columnas - 2)} className={TD_FIN}>
-            <PorBodega grupos={grupos} seleccion={seleccion} enProceso={enProceso} />
+            <PorBodega
+              grupos={vistaEnProceso ? grupos.flatMap((g) => { const lineas = g.lineas.filter((l) => l.itemId && estaEnProceso(p.items.find((x) => x.id === l.itemId))); return lineas.length ? [{ ...g, lineas, unidades: lineas.reduce((t, l) => t + l.cantidad, 0) }] : []; }) : grupos}
+              seleccion={seleccion}
+              enProceso={vistaEnProceso && enProceso ? { ...enProceso, completo: true } : enProceso}
+            />
           </td>
           <td className={`${TD_FIN} px-3`} />
         </tr>
@@ -920,6 +929,7 @@ export function TablaPedidos({
   fotos = {},
   sinConfirmacion = false,
   sinEnProceso = false,
+  soloEnProceso = false,
 }: {
   pedidos: PedidoInventario[];
   modo: "despacho" | "inventario";
@@ -937,6 +947,8 @@ export function TablaPedidos({
   sinConfirmacion?: boolean;
   /** Falta la migración 0371: sin «En proceso» por producto. */
   sinEnProceso?: boolean;
+  /** La tarjeta «En proceso» está elegida: cada pedido muestra solo lo marcado en proceso. */
+  soloEnProceso?: boolean;
 }) {
   const [ficha, setFicha] = useState<string | null>(null);
   const columnas = modo === "inventario" ? 8 : 9;
@@ -969,7 +981,7 @@ export function TablaPedidos({
           ) : (
             pedidos.map((p) => (
               <Fragment key={p.id}>
-                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={fichas ? (id) => fichas[id] && setFicha(id) : null} opciones={opciones} hayEnInventario={hayEnInventario} columnas={columnas} fotos={fotos} sinConfirmacion={sinConfirmacion} sinEnProceso={sinEnProceso} hermanos={p.grupo ? pedidos.filter((x) => x.grupo === p.grupo && x.id !== p.id).map((x) => numeroPedido(x.numero)) : []} />
+                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={fichas ? (id) => fichas[id] && setFicha(id) : null} opciones={opciones} hayEnInventario={hayEnInventario} columnas={columnas} fotos={fotos} sinConfirmacion={sinConfirmacion} sinEnProceso={sinEnProceso} soloEnProceso={soloEnProceso} hermanos={p.grupo ? pedidos.filter((x) => x.grupo === p.grupo && x.id !== p.id).map((x) => numeroPedido(x.numero)) : []} />
               </Fragment>
             ))
           )}

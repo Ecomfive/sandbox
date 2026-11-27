@@ -88,7 +88,7 @@ export async function PaginaPedidos({ modo, usuario, estado, archivados = false 
           ) : (
             <TableroPedidos modo={modo} ruta={ruta} cuenta={cuenta} total={pedidos.length} elegido={elegido} />
           )}
-          <TablaPedidos pedidos={archivados ? pedidos : visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} fichas={fichas} fotos={fotos} opciones={opciones} hayEnInventario={hayEnInventario} sinConfirmacion={sinConfirmacion} sinEnProceso={sinEnProceso} />
+          <TablaPedidos pedidos={archivados ? pedidos : visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} fichas={fichas} fotos={fotos} opciones={opciones} hayEnInventario={hayEnInventario} sinConfirmacion={sinConfirmacion} sinEnProceso={sinEnProceso} soloEnProceso={!archivados && elegido === "en_proceso"} />
           {!archivados && !sinArchivo && (
             <p className="m-0 text-sm">
               <Link href={rutaArchivo} className="font-medium text-primario underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
