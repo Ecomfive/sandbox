@@ -33,8 +33,8 @@ test("el video de ejemplo sale de lo que dice la recomendación", () => {
   const c = (id: string, angulo: string, productoClave: string, cpa: number, compras: number) => ({ id, nombre: `Video ${id}`, angulo, anguloNombre: angulo, rasgos: id === "d" ? ["pregunta", "UGC"] : [], productoClave, producto: productoClave, cpa, compras, miniatura: null });
   const candidatos = [c("a", "Salud prostática", "ETHIOPIAN", 7, 10), c("b", "Salud prostática", "ETHIOPIAN", 5, 3), c("c", "Salud prostática", "OTRO", 2, 9), c("d", "Parásitos intestinales", "ETHIOPIAN", 4, 8), c("e", "Salud prostática", "ETHIOPIAN", 1, 1)];
   const texto = "Subir creativos nuevos cada semana. El ángulo que mejor ha funcionado con este producto en 60 días es «Salud prostática (sobre todo próstata inflamada)» (CPA $6.81 con 96 compras): empieza por ahí.";
-  // Del mismo producto, el de CPA más bajo con 2 compras o más.
-  assert.equal(videoDelTexto(texto, candidatos, "ETHIOPIAN")?.id, "b");
+  // Del mismo producto, el de CPA más bajo entre los de 5 compras o más (b tiene solo 3).
+  assert.equal(videoDelTexto(texto, candidatos, "ETHIOPIAN")?.id, "a");
   // Sin producto, el mejor de todos (y dice de qué producto es).
   const todos = videoDelTexto(texto, candidatos)!;
   assert.equal(todos.id, "c");

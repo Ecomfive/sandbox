@@ -20,6 +20,14 @@ export interface VideoEjemplo {
 
 /** Con menos compras que estas, un video no sirve de ejemplo (su CPA es casualidad). */
 export const COMPRAS_PARA_EJEMPLO = 2;
+/** Con al menos estas compras un ejemplo es más confiable: se prefieren, y los de 2 a 4 compras quedan solo si no hay otro. */
+export const COMPRAS_CONFIABLES = 5;
+
+/** Los que tienen compras suficientes para confiar en su CPA; si no hay ninguno, todos. */
+const confiables = <T extends { compras: number }>(l: T[]): T[] => {
+  const firmes = l.filter((v) => v.compras >= COMPRAS_CONFIABLES);
+  return firmes.length ? firmes : l;
+};
 
 const redondear = (n: number) => Math.round(n * 100) / 100;
 
@@ -36,7 +44,7 @@ export function ejemploDeAnuncio(a: { videoId?: string | null; nombre: string; n
  */
 export function mejorVideoDeAngulo(videos: readonly { id: string; nombre: string; angulo: string | null; r: Resultados; miniatura?: string | null }[], angulo: string, dias = 60): VideoEjemplo | null {
   const candidatos = videos.filter((v) => v.angulo === angulo && v.r.compras >= COMPRAS_PARA_EJEMPLO && cpa(v.r) !== null);
-  const mejor = [...candidatos].sort((a, b) => cpa(a.r)! - cpa(b.r)! || b.r.compras - a.r.compras)[0];
+  const mejor = [...confiables(candidatos.map((v) => ({ ...v, compras: v.r.compras })))].sort((a, b) => cpa(a.r)! - cpa(b.r)! || b.r.compras - a.r.compras)[0];
   if (!mejor) return null;
   return { id: mejor.id, nombre: mejor.nombre, angulo: mejor.angulo, cpa: redondear(cpa(mejor.r)!), compras: mejor.r.compras, dias, miniatura: mejor.miniatura ?? null };
 }
@@ -80,7 +88,7 @@ export function videoDelTexto(texto: string | null | undefined, candidatos: read
     );
     if (!delAngulo.length) continue;
     const mismos = productoClave ? delAngulo.filter((v) => v.productoClave === productoClave) : [];
-    const lista = mismos.length ? mismos : delAngulo;
+    const lista = confiables(mismos.length ? mismos : delAngulo);
     const v = [...lista].sort((a, b) => a.cpa! - b.cpa! || b.compras - a.compras)[0];
     return { id: v.id, nombre: v.nombre, angulo: v.anguloNombre ?? v.angulo, cpa: redondear(v.cpa!), compras: v.compras, dias: 30, miniatura: v.miniatura, producto: mismos.length ? null : v.producto };
   }
