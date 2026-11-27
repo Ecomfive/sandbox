@@ -271,7 +271,10 @@ export function Levantamiento({
       if (verTodos || q || orden) return true;
       return p.clase === "fisico" || p.enSistema !== 0 || contados[p.id] !== undefined || lotes[p.id] !== undefined || cajas[p.id] !== undefined || sumas[p.id] !== undefined || restas[p.id] !== undefined || traslados[p.id] !== undefined;
     });
-    return orden ? lista.sort((a, b) => (orden.get(a.id) ?? orden.get(a.padre?.id ?? "") ?? 0) - (orden.get(b.id) ?? orden.get(b.padre?.id ?? "") ?? 0)) : lista;
+    if (orden) return lista.sort((a, b) => (orden.get(a.id) ?? orden.get(a.padre?.id ?? "") ?? 0) - (orden.get(b.id) ?? orden.get(b.padre?.id ?? "") ?? 0));
+    // Primero lo que tiene stock en la bodega, de más a menos (27 nov 2026, pedido de Hernán); con el mismo stock, en el orden de siempre. Se ordena por lo que dice el
+    // sistema, no por lo que se va contando, para que las filas no salten mientras se escribe. Un producto con variantes sale donde está su variante con más stock.
+    return lista.sort((a, b) => b.enSistema - a.enSistema);
   }, [productos, buscar, verTodos, porImagen, contados, lotes, cajas, sumas, restas, traslados]);
 
   // Cada producto con variantes sale como una sola fila que se despliega; los demás, como siempre.
