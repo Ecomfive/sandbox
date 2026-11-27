@@ -442,6 +442,7 @@ export async function entregaPorProductoMeta(cuentaId: string | null): Promise<E
       promedio: analisis.resumen.tasaEntrega,
       // Un análisis guardado antes de la calculadora no trae el total de la tienda: se suma el de los productos con campañas.
       tienda: tasasDe(analisis.pedidosDeLaTienda ?? sumarPedidos(analisis.entrega)),
+      economia: Object.fromEntries((analisis.economia ?? []).map((e) => [e.clave, e])),
     };
   } catch {
     return vacio;

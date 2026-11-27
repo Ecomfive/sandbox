@@ -11,6 +11,7 @@ import { NO_TOCAR, zonaDe, zonaDeCpa, type GuiaDeTope, type Zona } from "./limit
 import { detallesDe, enComun, temasDe, textoDeDetalles, type RasgoComun } from "./angulo-detalle";
 import { esAnguloTactico } from "./video-angulo";
 import { claveDeProducto } from "./nombre";
+import type { EconomiaProducto } from "./rentabilidad";
 import { calcularEnMarcha, type EnMarcha } from "./en-marcha";
 import { CPA_TOPE_PREDETERMINADO, certezaDe, confiable, cpa, cpm, ctr, cvr, efectividad, GASTO_MINIMO_CONFIABLE, hookRate, sinResultados, sumar, type Certeza, type Resultados } from "./metricas";
 
@@ -866,6 +867,8 @@ export interface AnalisisHistorico {
   entrega: FilaEntrega[];
   /** Todos los pedidos de las tiendas juntos, para la calculadora de costos. Un análisis guardado antes no lo trae. */
   pedidosDeLaTienda?: Omit<EntregaProducto, "nombre"> | null;
+  /** La venta y el costo de cada producto, para saber si sigue siendo rentable (27 nov 2026). Un análisis guardado antes no lo trae. */
+  economia?: EconomiaProducto[];
   rankings: Rankings;
   /** Lo que tenía campañas activas con gasto en la última semana al calcular el análisis (los análisis guardados antes no lo traen). */
   enMarcha?: EnMarcha;

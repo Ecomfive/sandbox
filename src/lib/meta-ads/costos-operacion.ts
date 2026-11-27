@@ -7,6 +7,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EntregaProducto } from "./historico";
+import { rentabilidadDe, type EconomiaProducto, type Rentabilidad } from "./rentabilidad";
 
 export interface CostosOperacion {
   /** Lo que cuesta cada envío (US$). */
@@ -120,6 +121,9 @@ export interface FilaCosto {
   envioDeLaTienda: boolean;
   entregaDeLaTienda: boolean;
   costo: CostoDeVenta | null;
+  /** La venta y el costo del producto (27 nov 2026): de dónde sale y, si alcanza, cuánto deja y hasta qué CPA no se pierde. */
+  economia: EconomiaProducto | null;
+  rentabilidad: Rentabilidad | null;
 }
 
 /** La entrega de cada producto (por la llave de su nombre) y los porcentajes de toda la tienda, como llegan a la pantalla de Productos. */
@@ -127,6 +131,8 @@ export interface EntregasMeta {
   productos: Record<string, PedidosParaTasa & { tasa: number | null; cerradas: number }>;
   promedio: number | null;
   tienda: Tasas;
+  /** La venta y el costo de cada producto (por la llave de su nombre); un análisis guardado antes no lo trae. */
+  economia?: Record<string, EconomiaProducto>;
 }
 
 /** Cada producto con su CPA de Meta, sus porcentajes (los suyos o, con pocos pedidos, los de la tienda) y lo que cuesta cada venta entregada; de más a menos gasto. */
@@ -135,6 +141,7 @@ export function filasDeCostos(
   pedidos: Readonly<Record<string, PedidosParaTasa | undefined>>,
   tienda: Tasas,
   c: CostosOperacion,
+  economia: Readonly<Record<string, EconomiaProducto | undefined>> = {},
 ): FilaCosto[] {
   return productos
     .filter((p) => p.clave && p.gasto > 0)
@@ -143,6 +150,8 @@ export function filasDeCostos(
       const envio = suyas.envio ?? tienda.envio;
       const entrega = suyas.entrega ?? tienda.entrega;
       const cpa = p.compras > 0 ? p.gasto / p.compras : null;
+      const costo = costoPorVenta(cpa, envio, entrega, c);
+      const e = economia[p.clave] ?? null;
       return {
         clave: p.clave,
         nombre: p.nombre,
@@ -153,7 +162,9 @@ export function filasDeCostos(
         entrega,
         envioDeLaTienda: suyas.envio === null && envio !== null,
         entregaDeLaTienda: suyas.entrega === null && entrega !== null,
-        costo: costoPorVenta(cpa, envio, entrega, c),
+        costo,
+        economia: e,
+        rentabilidad: rentabilidadDe(e, envio, entrega, c, costo),
       };
     })
     .sort((a, b) => b.gasto - a.gasto);
