@@ -6,6 +6,7 @@ import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
+import { useLineasArriba } from "@/components/ui/usar-lineas-arriba";
 import { Ventana } from "@/components/ui/ventana";
 import { textoCaja, type CajaGuardada } from "@/lib/wms/cajas";
 import { crearRemision } from "./actions";
@@ -32,9 +33,10 @@ interface Linea {
 
 /**
  * «Nueva remisión»: de qué bodega sale, a cuál va y los productos con sus cantidades. Al crearla ofrece el papel que va con la carga. Con `plataformas`, también puede salir de una
- * plataforma hacia otra (migración 0242): es un documento, así que el movimiento se hace allá.
+ * plataforma hacia otra (migración 0242; es un documento, así que el movimiento se hace allá) o hacia una bodega propia: un **retiro** (migración 0364), que entra al inventario
+ * al confirmar lo que llegó. En un retiro se elige cualquier producto y no hay tope: la lectura de la plataforma puede venir ya descontada.
  */
-export function NuevaRemision({ propias, externas, plataformas = [], productos, stock, cajas }: { propias: BodegaRemision[]; externas: BodegaRemision[]; plataformas?: BodegaRemision[]; productos: OpcionSkuMaestro[]; stock: StockPorBodega; cajas: CajasPorBodega }) {
+export function NuevaRemision({ propias, externas, plataformas = [], productos, paraRetiro = [], stock, cajas }: { propias: BodegaRemision[]; externas: BodegaRemision[]; plataformas?: BodegaRemision[]; productos: OpcionSkuMaestro[]; paraRetiro?: OpcionSkuMaestro[]; stock: StockPorBodega; cajas: CajasPorBodega }) {
   const router = useRouter();
   const [abierta, setAbierta] = useState(false);
   const [desde, setDesde] = useState(propias[0]?.id ?? "");
@@ -43,10 +45,12 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
   const [notas, setNotas] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [creada, setCreada] = useState<{ id: string; numero: string } | null>(null);
+  const { buscador, enfocarCantidadDe, volverAlBuscador } = useLineasArriba(lineas);
   const [pendiente, empezar] = useTransition();
 
   const dePlataforma = plataformas.some((b) => b.id === desde);
   const destinos = externas.filter((b) => b.id !== desde);
+  const retiro = dePlataforma && propias.some((b) => b.id === hacia);
   const hay = (sku: string) => stock[desde]?.[sku] ?? 0;
   const numero = (t: string) => Number(t);
   const cajasDe = (sku: string) => cajas[desde]?.[sku] ?? [];
@@ -63,7 +67,7 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
     return s >= c.porCaja || n + (s > 0 ? 1 : 0) > c.cajas;
   };
   const cajaPasada = (l: Linea) => cajasDe(l.sku.id).some((c) => cajaMal(l, c));
-  const pasada = lineas.find((l) => cantidadDe(l) > hay(l.sku.id) || cajaPasada(l));
+  const pasada = retiro ? undefined : lineas.find((l) => cantidadDe(l) > hay(l.sku.id) || cajaPasada(l));
   const incompleta = lineas.some((l) => !Number.isInteger(cantidadDe(l)) || cantidadDe(l) <= 0);
   const unidades = lineas.reduce((t, l) => t + (Number.isInteger(cantidadDe(l)) ? cantidadDe(l) : 0), 0);
   const totalCajas = lineas.reduce((t, l) => t + elegidasDe(l).reduce((s, { n }) => s + n, 0), 0);
@@ -77,12 +81,16 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
     setError(null);
   }
   function agregar(sku: OpcionSkuMaestro | null) {
-    if (sku && !lineas.some((l) => l.sku.id === sku.id)) setLineas((l) => [...l, { sku, cantidad: "", elegidas: {}, sueltas: {} }]);
+    // El producto nuevo entra arriba, pegado al buscador, con el cursor en su cantidad.
+    if (sku && !lineas.some((l) => l.sku.id === sku.id)) {
+      enfocarCantidadDe(sku.id);
+      setLineas((l) => [{ sku, cantidad: "", elegidas: {}, sueltas: {} }, ...l]);
+    }
   }
   function crear() {
     setError(null);
     empezar(async () => {
-      const r = await crearRemision({ desde, hacia, notas, lineas: lineas.map((l) => ({ sku: l.sku.id, cantidad: cantidadDe(l), cajas: elegidasDe(l).map(({ c, n, s }) => (s > 0 ? { id: c.id, cajas: n, sueltas: s } : { id: c.id, cajas: n })) })) }).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      const r = await crearRemision({ desde, hacia, notas, lineas: [...lineas].reverse().map((l) => ({ sku: l.sku.id, cantidad: cantidadDe(l), cajas: elegidasDe(l).map(({ c, n, s }) => (s > 0 ? { id: c.id, cajas: n, sueltas: s } : { id: c.id, cajas: n })) })) }).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
       if ("error" in r) return void setError(r.error);
       setCreada(r);
       router.refresh();
@@ -100,7 +108,11 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
           {creada ? (
             <div className="flex flex-col gap-4 p-5 text-sm">
               <p className="m-0">
-                {dePlataforma ? (
+                {retiro ? (
+                  <>
+                    Quedó <b className="font-medium">en camino</b>. Sácalo en la plataforma. Cuando llegue, abre {creada.numero} y confirma cuántas llegaron: ahí entran a {propias.find((b) => b.id === hacia)?.nombre ?? "la bodega"}.
+                  </>
+                ) : dePlataforma ? (
                   <>
                     Quedó <b className="font-medium">en camino</b>. El sistema no mueve nada en las plataformas: hay que sacarlo de una y entrarlo en la otra allá. Imprime el papel: va con la carga y ahí anotan lo que recibieron.
                   </>
@@ -133,8 +145,10 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
                   <select
                     value={desde}
                     onChange={(e) => {
-                      setDesde(e.target.value);
-                      if (hacia === e.target.value) setHacia("");
+                      const nueva = e.target.value;
+                      setDesde(nueva);
+                      // De una bodega propia solo se remite a una externa.
+                      if (hacia === nueva || (propias.some((b) => b.id === nueva) && propias.some((b) => b.id === hacia))) setHacia("");
                     }}
                     className={`${fieldClass} w-full`}
                   >
@@ -160,35 +174,60 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
                     <option value="" disabled>
                       Elige la bodega
                     </option>
-                    {destinos.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.nombre}
-                      </option>
-                    ))}
+                    {dePlataforma ? (
+                      <>
+                        <optgroup label="Retiro a bodega propia">
+                          {propias.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.nombre}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Otra plataforma">
+                          {destinos.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.nombre}
+                            </option>
+                          ))}
+                        </optgroup>
+                      </>
+                    ) : (
+                      destinos.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.nombre}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </label>
               </div>
-              {dePlataforma && <p className="m-0 text-xs text-muted-foreground">Las unidades disponibles son las de la última lectura de la plataforma. El sistema deja el documento: el movimiento se hace en cada plataforma.</p>}
-              <div className="flex flex-col gap-1">
+              {dePlataforma && (
+                <p className="m-0 text-xs text-muted-foreground">
+                  {retiro
+                    ? "Retiro de plataforma: entra al inventario cuando confirmes lo que llegó."
+                    : "Las unidades disponibles son las de la última lectura de la plataforma. El sistema deja el documento: el movimiento se hace en cada plataforma."}
+                </p>
+              )}
+              <div ref={buscador} className="flex flex-col gap-1">
                 <span className={labelClassSm}>Agregar producto</span>
-                <ProveedorSkusMaestros opciones={productos}>
+                <ProveedorSkusMaestros opciones={retiro ? paraRetiro : productos}>
                   <CampoSkuMaestro key={lineas.length} valor={null} alCambiar={agregar} etiquetaAria="Agregar producto a la remisión" placeholder="Busca por SKU o nombre" claseContenedor="w-full" />
                 </ProveedorSkusMaestros>
               </div>
               {lineas.length > 0 && (
                 <ul className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-border p-0">
                   {lineas.map((l) => {
-                    const pasa = cantidadDe(l) > hay(l.sku.id);
+                    const pasa = !retiro && cantidadDe(l) > hay(l.sku.id);
                     const guardadas = cajasDe(l.sku.id);
                     return (
-                      <li key={l.sku.id} className="flex flex-col gap-2 px-3 py-2">
+                      <li key={l.sku.id} data-linea={l.sku.id} className="flex flex-col gap-2 px-3 py-2">
                         <div className="flex items-center gap-3">
                         <MiniaturaFoto url={l.sku.foto ?? null} nombre={l.sku.nombre} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-medium">{l.sku.nombre}</span>
                           <span className="block truncate text-xs text-muted-foreground">{l.sku.codigo}</span>
                           <CodigosProducto numero={l.sku.numero} barras={l.sku.barras} className="block" />
-                          <span className={`block text-xs tabular-nums ${pasa ? "text-destructive" : "text-muted-foreground"}`}>{hay(l.sku.id).toLocaleString("es-PA")} disponibles en la bodega</span>
+                          <span className={`block text-xs tabular-nums ${pasa ? "text-destructive" : "text-muted-foreground"}`}>{hay(l.sku.id).toLocaleString("es-PA")} {dePlataforma ? "en la plataforma (última lectura)" : "disponibles en la bodega"}</span>
                         </span>
                         {guardadas.length > 0 ? (
                           <span className="w-24 text-right text-sm font-medium tabular-nums">{cantidadDe(l).toLocaleString("es-PA")} u.</span>
@@ -199,6 +238,7 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
                             min={1}
                             step={1}
                             aria-label={`Unidades de ${l.sku.codigo}`}
+                            onKeyDown={volverAlBuscador}
                             value={l.cantidad}
                             onChange={(e) => setLineas((ls) => ls.map((x) => (x.sku.id === l.sku.id ? { ...x, cantidad: e.target.value } : x)))}
                             placeholder="0"

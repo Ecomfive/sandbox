@@ -68,12 +68,17 @@ export async function cargarReporteria(
       return { ordenes: await leer(`${COLS_BASE}, ${COLS_REL})`), faltaMigracion: true };
     }
   };
-  type Costo = { orden_id: string; linea: number; costo: number | null; costo_fuente: string };
+  type Costo = { orden_id: string; linea: number; costo: number | null; costo_fuente: string; costo_hoja?: number | null };
   const [{ ordenes, faltaMigracion }, costos, ediciones] = await Promise.all([
     leerOrdenes(),
+    // Con la 0992 trae también el costo de la hoja de Costos de producto (`costo_hoja`), que manda; sin ella, lo de antes.
     traerTodasLasFilas<Costo>((d, h) =>
-      supabase.from("ven_lineas_costo").select("orden_id, linea, costo, costo_fuente").in("unidad_id", unidades).eq("periodo", periodo).order("orden_id").order("linea").range(d, h) as unknown as PromiseLike<{ data: Costo[] | null; error: unknown }>,
-    ).catch(() => [] as Costo[]),
+      supabase.from("ven_lineas_costo").select("orden_id, linea, costo, costo_fuente, costo_hoja").in("unidad_id", unidades).eq("periodo", periodo).order("orden_id").order("linea").range(d, h) as unknown as PromiseLike<{ data: Costo[] | null; error: unknown }>,
+    ).catch(() =>
+      traerTodasLasFilas<Costo>((d, h) =>
+        supabase.from("ven_lineas_costo").select("orden_id, linea, costo, costo_fuente").in("unidad_id", unidades).eq("periodo", periodo).order("orden_id").order("linea").range(d, h) as unknown as PromiseLike<{ data: Costo[] | null; error: unknown }>,
+      ).catch(() => [] as Costo[]),
+    ),
     // Por el pedido (tienda y mes), en una sola consulta: de a 300 ids eran 26 viajes seguidos y la página tardaba 15 segundos.
     supabase
       .from("ven_orden_ediciones")
@@ -84,7 +89,11 @@ export async function cargarReporteria(
       .then((r) => (r.error ? [] : (r.data ?? []))),
   ]);
   const costoCompras = new Map<string, number>();
-  for (const c of costos) if (c.costo !== null && c.costo_fuente === "costo_vigente") costoCompras.set(`${c.orden_id}:${c.linea}`, Number(c.costo));
+  const costoHoja = new Map<string, number>();
+  for (const c of costos) {
+    if (c.costo_hoja !== null && c.costo_hoja !== undefined && c.costo !== null) costoHoja.set(`${c.orden_id}:${c.linea}`, Number(c.costo));
+    else if (c.costo !== null && c.costo_fuente === "costo_vigente") costoCompras.set(`${c.orden_id}:${c.linea}`, Number(c.costo));
+  }
   const editadas = new Map<string, string[]>();
   for (const e of ediciones) editadas.set(e.orden_id as string, [...new Set([...(editadas.get(e.orden_id as string) ?? []), e.campo as string])]);
 
@@ -94,8 +103,11 @@ export async function cargarReporteria(
     const lineas = [...(o.ven_orden_lineas ?? [])].sort((a, b) => a.linea - b.linea);
     const id = o.id as string;
     for (const [k, l] of (lineas.length ? lineas : [null]).entries()) {
+      // Primero la hoja de Costos de producto (por producto y fecha del pedido); si no, la Matriz; si no, el costo de antes.
+      const deHoja = l ? costoHoja.get(`${id}:${l.linea}`) : undefined;
       const deCompras = l ? costoCompras.get(`${id}:${l.linea}`) : undefined;
-      const costo = l?.costo_excel !== null && l?.costo_excel !== undefined ? Number(l.costo_excel) : (deCompras ?? null);
+      const deMatriz = l?.costo_excel !== null && l?.costo_excel !== undefined ? Number(l.costo_excel) : undefined;
+      const costo = deHoja ?? deMatriz ?? deCompras ?? null;
       filas.push({
         id: `${id}:${l?.linea ?? 1}`,
         ordenId: id,
@@ -131,7 +143,7 @@ export async function cargarReporteria(
         mesCobro: txt(o.mes_gestion),
         pagadoDelivery: num(o.monto_pagado_delivery),
         costo,
-        costoFuente: l?.costo_excel !== null && l?.costo_excel !== undefined ? "matriz" : deCompras !== undefined ? "compras" : null,
+        costoFuente: deHoja !== undefined ? "hoja" : deMatriz !== undefined ? "matriz" : deCompras !== undefined ? "compras" : null,
         // Sin la migración 0310, el envío sale de la suma de siempre.
         montoEnvio: faltaMigracion ? num(o.costo_envio) : num(o.monto_envio),
         montoEnvioSe: num(o.monto_envio_se),

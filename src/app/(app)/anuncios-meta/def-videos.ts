@@ -3,7 +3,9 @@ import { NOMBRE_ETAPA } from "@/lib/meta-ads/nombre";
 import { VERSION_ANALISIS } from "@/lib/meta-ads/video-angulo";
 import type { VideoVista } from "@/lib/meta-ads/vistas";
 import type { DefTabla } from "@/lib/tabla/motor";
+import { campoPrioridad } from "./def-prioridad";
 import { NOMBRE_VEREDICTO, veredictoDeResultados, type Veredicto } from "./def-campanas";
+import { nombreDeAngulo } from "@/lib/meta-ads/angulo-detalle";
 
 const SIN = "__sin_valor__";
 
@@ -19,13 +21,15 @@ const estadoAnalisis = (v: VideoVista): EstadoAnalisis => (!v.analisis ? "sin_an
 
 /**
  * Los videos con la barra común: se filtran, buscan y agrupan por ángulo, producto, campaña, etapa, formato, cómo les va o si ya los vio la IA, y por rangos de gasto, compras, CPA, hook, CTR… (18 nov 2026,
- * pedido de Alcides). El orden de las filas no lo hace la barra: lo elige el selector «Ordenar por» de la lista (`orden-videos.ts`).
+ * pedido de Alcides). El orden de las filas no lo hace la barra: lo elige el selector «Ordenar por» de la lista (`orden-listas.ts`).
  */
 export const DEF_VIDEOS: DefTabla<VideoVista> = {
   clave: "anuncios-meta-videos",
   campos: [
     { id: "nombre", etiqueta: "Nombre del video", tipo: "texto", valor: (v) => `${v.numero ?? ""} ${v.nombre} ${v.producto ?? ""} ${anguloDeVideo(v) ?? ""}` },
     { id: "campanaTexto", etiqueta: "Nombre de la campaña", tipo: "texto", sinCsv: true, valor: (v) => campanasDeVideo(v).join(" ") },
+    campoPrioridad<VideoVista>((v) => v.pendiente),
+    { id: "anguloDetalle", etiqueta: "Ángulo con su detalle", tipo: "seleccion", valores: (v) => [nombreDeAngulo(anguloDeVideo(v), v.analisis?.anguloDetalle) ?? SIN], etiquetaSinValor: "Sin ángulo", agrupable: true, sinCsv: true },
     { id: "angulo", etiqueta: "Ángulo", tipo: "seleccion", valores: (v) => [anguloDeVideo(v) ?? SIN], etiquetaSinValor: "Sin ángulo", agrupable: true },
     { id: "producto", etiqueta: "Producto", tipo: "seleccion", valores: (v) => [v.producto ?? SIN], etiquetaSinValor: "Sin producto", agrupable: true },
     { id: "campana", etiqueta: "Campaña donde se usa", tipo: "seleccion", valores: (v) => (campanasDeVideo(v).length ? campanasDeVideo(v) : [SIN]), etiquetaSinValor: "Sin campaña", agrupable: true },
@@ -51,6 +55,7 @@ export const DEF_VIDEOS: DefTabla<VideoVista> = {
   csvAntes: [
     { etiqueta: "Video", valor: (v) => v.nombre },
     { etiqueta: "Número", valor: (v) => v.numero },
+    { etiqueta: "Detalle del ángulo", valor: (v) => v.analisis?.anguloDetalle ?? null },
     { etiqueta: "Gasto del periodo", valor: (v) => Number(v.r.gasto.toFixed(2)) },
     { etiqueta: "Compras", valor: (v) => v.r.compras },
     { etiqueta: "CPA", valor: (v) => { const c = cpa(v.r); return c === null ? null : Number(c.toFixed(2)); } },

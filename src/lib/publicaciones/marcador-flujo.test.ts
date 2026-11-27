@@ -232,8 +232,12 @@ async function aplicar(dropi: ReturnType<typeof crearDropi>, cambios: Obj[]): Pr
     },
   };
   let oyente: ((e: Obj) => Promise<void>) | null = null;
+  let abierta = "";
   const ventanaGlobal = {
-    open: () => ventana,
+    open: (url: string) => {
+      abierta = url;
+      return ventana;
+    },
     addEventListener: (_t: string, f: (e: Obj) => Promise<void>) => {
       oyentes.add(f);
       if (!oyente) oyente = f;
@@ -243,13 +247,60 @@ async function aplicar(dropi: ReturnType<typeof crearDropi>, cambios: Obj[]): Pr
   const localStorageFalso = { getItem: (k: string) => (k === "DROPI_token" ? JSON.stringify("tok") : k === "DROPI_LoginResult" ? JSON.stringify({ objects: { id: 2094, type_user: "SUPPLIER" } }) : null) };
   new Function("location", "localStorage", "window", "alert", "fetch", codigo)({ hostname: "app.dropi.pa" }, localStorageFalso, ventanaGlobal, (m: string) => assert.fail(`alert: ${m}`), dropi.fetchFalso);
   assert.ok(oyente, "el favorito debe quedar escuchando a la ventana");
-  await (oyente as (e: Obj) => Promise<void>)({ origin: ORIGEN, source: ventana, data: { tipo: "pendientes", cambios } });
+  const k = new URL(abierta).searchParams.get("k");
+  assert.ok(k, "la ventana se abre con el código de la pulsación");
+  await (oyente as (e: Obj) => Promise<void>)({ origin: ORIGEN, source: ventana, data: { tipo: "aplicar", k, cambios } });
   const final = mensajes.find((m) => m.tipo === "resultados");
   assert.ok(final, "el favorito debe devolver los resultados");
   return final.resultados as Obj[];
 }
 
 const base = { quitarPrivados: false, restaurar: false, nuevo: null, nombre: null, guia: null, precio: null, sugerido: null, descripcion: null, fotos: [], datos: null };
+
+test("pulsar el favorito varias veces en la misma pestaña: solo aplica la última pulsación, una vez (20 nov 2026, el Shilajit creado tres veces)", async () => {
+  const d = crearDropi();
+  d.productos.set(8751, productoBase(8751));
+  const codigo = decodeURIComponent(marcadorAplicarDropi(ORIGEN).slice("javascript:".length));
+  const mensajes: Obj[] = [];
+  const ventana = { postMessage: (m: Obj) => void mensajes.push(m) };
+  const oyentes: ((e: Obj) => Promise<void>)[] = [];
+  const urls: string[] = [];
+  const ventanaGlobal: Obj = {
+    open: (url: string) => {
+      urls.push(url);
+      return ventana;
+    },
+    addEventListener: (_t: string, f: (e: Obj) => Promise<void>) => void oyentes.push(f),
+    removeEventListener: () => {},
+  };
+  const localStorageFalso = { getItem: (k: string) => (k === "DROPI_token" ? JSON.stringify("tok") : k === "DROPI_LoginResult" ? JSON.stringify({ objects: { id: 2094, type_user: "SUPPLIER" } }) : null) };
+  const pulsar = () => new Function("location", "localStorage", "window", "alert", "fetch", codigo)({ hostname: "app.dropi.pa" }, localStorageFalso, ventanaGlobal, (m: string) => assert.fail(`alert: ${m}`), d.fetchFalso);
+  pulsar();
+  pulsar();
+  pulsar();
+  assert.equal(oyentes.length, 3);
+  const k = new URL(urls[2]).searchParams.get("k");
+  assert.notEqual(k, new URL(urls[0]).searchParams.get("k"), "cada pulsación lleva su propio código");
+  const cambios = [{ ...base, id: "r1", tipo: "republicar", producto: 8751 }];
+  // Un favorito de antes (mensaje «pendientes») y la ventana mandando a la última pulsación: todos los oyentes reciben el mensaje, como en el navegador.
+  for (const data of [{ tipo: "pendientes", cambios }, { tipo: "aplicar", k, cambios }]) await Promise.all(oyentes.map((f) => f({ origin: ORIGEN, source: ventana, data })));
+  const creados = d.llamadas.filter((l) => l === "POST /products").length;
+  assert.equal(creados, 1, "un solo producto nuevo en Dropi");
+  assert.equal(mensajes.filter((m) => m.tipo === "resultados").length, 1);
+});
+
+test("la ventana con un código que no es el de la pulsación no aplica nada", async () => {
+  const d = crearDropi();
+  d.productos.set(8751, productoBase(8751));
+  const codigo = decodeURIComponent(marcadorAplicarDropi(ORIGEN).slice("javascript:".length));
+  const ventana = { postMessage: () => {} };
+  let oyente: ((e: Obj) => Promise<void>) | null = null;
+  const ventanaGlobal: Obj = { open: () => ventana, addEventListener: (_t: string, f: (e: Obj) => Promise<void>) => void (oyente = f), removeEventListener: () => {} };
+  const localStorageFalso = { getItem: (k: string) => (k === "DROPI_token" ? JSON.stringify("tok") : k === "DROPI_LoginResult" ? JSON.stringify({ objects: { id: 2094, type_user: "SUPPLIER" } }) : null) };
+  new Function("location", "localStorage", "window", "alert", "fetch", codigo)({ hostname: "app.dropi.pa" }, localStorageFalso, ventanaGlobal, () => {}, d.fetchFalso);
+  await (oyente as unknown as (e: Obj) => Promise<void>)({ origin: ORIGEN, source: ventana, data: { tipo: "aplicar", k: "otro", cambios: [{ ...base, id: "r1", tipo: "republicar", producto: 8751 }] } });
+  assert.equal(d.llamadas.filter((l) => l === "POST /products").length, 0);
+});
 const foto = (n: string) => ({ url: `https://x.supabase.co/storage/v1/object/public/wms-productos/publicaciones/p/ia/${n}`, nombre: n });
 
 test("archivar: lo archiva en Dropi y lo comprueba; sacar de Archivados lo devuelve; si ya estaba, no hace nada", async () => {
@@ -349,6 +400,8 @@ const completo: DatosCrearDropi = {
   codigoBarras: null,
   bodegas: [{ id: 81, unidades: 120 }],
   fotos: ["1.jpg", "2.jpg", "3.jpg"].map(foto),
+  // Estas pruebas miran lo que se publica; dejar el stock en 0 tiene sus propias pruebas más abajo.
+  quitarTemporal: false,
 };
 
 test("publicar: crea el producto, sube las 3 fotos (la primera principal), pone las garantías y el stock, y devuelve el ID", async () => {
@@ -373,6 +426,32 @@ test("publicar: si Dropi no toma el stock al crear, se le da con una entrada y s
   assert.equal(r.ok, true, String(r.error));
   assert.deepEqual(d.stockDe(d.productos.get(9001)!), { 81: 120 });
   assert.ok(d.llamadas.includes("PUT /products/9001"));
+});
+
+test("publicar: al terminar deja el stock en 0 (solo las unidades que se pusieron para poder crear)", async () => {
+  const d = crearDropi();
+  const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: { ...completo, quitarTemporal: true } }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.stock, 0);
+  assert.equal(r.aviso, null);
+  assert.deepEqual(d.stockDe(d.productos.get(9001)!), { 81: 0 });
+  assert.equal(r.fotos, 3);
+});
+
+test("publicar: con «dejar en 0» apagado, el stock queda como se puso", async () => {
+  const d = crearDropi();
+  const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: { ...completo, quitarTemporal: false } }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.stock, 120);
+});
+
+test("publicar: si Dropi no deja sacar el stock, el producto queda publicado y el aviso dice que se saque en Dropi (sin reintento que lo vuelva a poner)", async () => {
+  const d = crearDropi({ fallaPutDe: 9001 });
+  const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: { ...completo, quitarTemporal: true } }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.nuevo, 9001);
+  assert.match(String(r.aviso), /dejar el stock en 0/);
+  assert.equal(r.stock, 120);
 });
 
 test("publicar: un reintento sigue desde el producto ya creado (no crea otro, no repite garantías ni fotos)", async () => {
@@ -513,6 +592,33 @@ test("republicar: crea el nuevo con sus fotos, le copia las garantías del viejo
   const llamadasAntes = d.llamadas.filter((l) => l === "POST /productwarranty/create").length;
   await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751, nuevo: 9001 }]);
   assert.equal(d.llamadas.filter((l) => l === "POST /productwarranty/create").length, llamadasAntes);
+});
+
+test("republicar sumando las unidades que llegaron: el nuevo queda con las del viejo más esas y un reintento no las vuelve a sumar", async () => {
+  for (const stockAlCrear of [false, true]) {
+    const d = crearDropi({ stockAlCrear });
+    d.productos.set(8751, productoBase(8751));
+    const datos = { sumar: 20, bodega: 81, nombreBodega: "Proveedor Ecomfive" };
+    const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751, datos }]);
+    assert.equal(r.ok, true, String(r.error));
+    assert.equal(r.stock, 244);
+    assert.deepEqual(d.stockDe(d.productos.get(9001)!), { 81: 244 }, "224 del viejo + 20 que llegaron");
+    assert.deepEqual(d.stockDe(d.productos.get(8751)!), { 81: 0 });
+    assert.equal(d.productos.get(8751)!.archived, true);
+    const [r2] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751, nuevo: 9001, datos }]);
+    assert.equal(r2.ok, true, String(r2.error));
+    assert.deepEqual(d.stockDe(d.productos.get(9001)!), { 81: 244 }, "el reintento no suma otra vez");
+  }
+});
+
+test("republicar sumando en una bodega que no es de ECOMFIVE: no crea nada en Dropi", async () => {
+  const d = crearDropi();
+  d.productos.set(8751, productoBase(8751));
+  const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751, datos: { sumar: 5, bodega: 280, nombreBodega: "Bodega Dropi" } }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /^La bodega para sumar las unidades/);
+  assert.equal(d.productos.has(9001), false);
+  assert.deepEqual(d.stockDe(d.productos.get(8751)!), { 81: 224 });
 });
 
 test("republicar (B280): crea el nuevo con 100 temporales en la B81 y lo deja en 0; el viejo sigue igual, con su stock en la B280", async () => {

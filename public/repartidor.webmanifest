@@ -1,0 +1,18 @@
+{
+  "name": "Ecomfive",
+  "short_name": "Ecomfive",
+  "description": "El panel del repartidor: su ruta del día, las entregas y el cierre.",
+  "lang": "es",
+  "id": "/repartidor",
+  "start_url": "/repartidor",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fafafa",
+  "theme_color": "#8a35c9",
+  "icons": [
+    { "src": "/pwa/ecomfive-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/ecomfive-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/ecomfive-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

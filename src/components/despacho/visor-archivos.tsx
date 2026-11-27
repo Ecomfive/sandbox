@@ -9,7 +9,7 @@ import type { ArchivoVisible } from "@/lib/monday/comprobantes";
  * Comprobantes y adjuntos que se ven en el sistema (16 nov 2026, pedido de Hernán: «que el botón Ver no me mande a Monday»): miniaturas y, al tocar
  * una, el archivo en grande aquí mismo, con anterior / siguiente y descargar. Los PDF se abren dentro; lo que el navegador no muestra (HEIC) se descarga.
  * La ventana se dibuja directo en <body> (18 nov 2026, pedido de Hernán): dentro del panel del pedido, que es fijo al bajar, la cabecera de la tabla
- * de Despacho ciudad le pasaba por encima.
+ * de Envíos Delivery le pasaba por encima.
  */
 export function VisorArchivos({ archivos, titulo, compacto = false }: { archivos: ArchivoVisible[]; titulo: string; compacto?: boolean }) {
   const [abierto, setAbierto] = useState<number | null>(null);

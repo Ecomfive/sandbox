@@ -86,6 +86,16 @@ export interface FilaPublicacionDrop {
   /** Lo que todavía se cotiza (01 - Cotizar y 02 - Cotizado) y su etapa. */
   enCotizacion: number;
   etapaCotizacion: EtapaCotizacion | null;
+  /** Ventas netas (salidas − devueltas) de los últimos 30 días y de los 30 anteriores (24 nov 2026); null sin lectura de ventas de Drop. */
+  ventas30: number | null;
+  ventasAntes30: number | null;
+  /** Los clientes con exclusivo activo (lo que Drop les guarda aparte). */
+  clientesExclusivos: string[];
+  /** «Ventas en caída» y «Verificar dropshipper», con las reglas de Gestión de IDs Dropi (`src/lib/publicaciones-drop/ventas.ts`). */
+  ventasEnCaida: boolean;
+  verificarDropshipper: boolean;
+  /** El competidor más barato que nosotros en el Catálogo de Drop, con stock, a precio equivalente (`src/lib/publicaciones-drop/competencia.ts`); null si nadie. */
+  competidorMasBarato: { proveedor: string; precio: number } | null;
 }
 
 export const estadoVinculoDrop = (f: FilaPublicacionDrop): "vinculado" | "sugerido" | "sin_vincular" => (f.producto ? "vinculado" : f.sugerido ? "sugerido" : "sin_vincular");
@@ -183,6 +193,39 @@ export const DEF_PUBLICACIONES_DROP: DefTabla<FilaPublicacionDrop> = {
         { valor: "sin_dato", etiqueta: "Sin costo" },
       ],
     },
+    {
+      id: "ventas",
+      etiqueta: "Ventas (30 días)",
+      tipo: "seleccion",
+      valores: (f) => [f.ventas30 === null ? "sin_dato" : f.ventasEnCaida ? "caida" : "normal"],
+      opciones: () => [
+        { valor: "caida", etiqueta: "En caída" },
+        { valor: "normal", etiqueta: "Sin caída" },
+        { valor: "sin_dato", etiqueta: "Sin ventas leídas" },
+      ],
+    },
+    {
+      id: "dropshipper",
+      etiqueta: "Exclusivo de cliente",
+      tipo: "seleccion",
+      valores: (f) => [f.verificarDropshipper ? "verificar" : f.clientesExclusivos.length ? "con_exclusivo" : "sin_exclusivo"],
+      opciones: () => [
+        { valor: "verificar", etiqueta: "Verificar con el cliente (sin ventas en 30 días)" },
+        { valor: "con_exclusivo", etiqueta: "Con exclusivo y vendiendo" },
+        { valor: "sin_exclusivo", etiqueta: "Sin exclusivo" },
+      ],
+    },
+    {
+      id: "competencia",
+      etiqueta: "Competencia",
+      tipo: "seleccion",
+      valores: (f) => [f.competidorMasBarato ? "mas_barato" : "no"],
+      opciones: () => [
+        { valor: "mas_barato", etiqueta: "Alguien lo vende más barato" },
+        { valor: "no", etiqueta: "Nadie más barato" },
+      ],
+    },
+    { id: "ventas30", etiqueta: "Ventas netas (30 días)", tipo: "numero", valor: (f) => f.ventas30 },
     { id: "precio", etiqueta: "Precio", tipo: "numero", valor: (f) => f.precio },
     { id: "inventario", etiqueta: "Inventario", tipo: "numero", valor: (f) => stockDrop(f) },
   ],

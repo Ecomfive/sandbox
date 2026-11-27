@@ -3,6 +3,7 @@
 // Un producto del sistema puede estar publicado varias veces en Dropi (pública y privadas): se suman sus ventas y su stock, porque
 // la compra es una sola. Lo que ya viene en compras abiertas se descuenta de lo sugerido.
 
+import { ETAPAS_LLEGADA_PUERTO } from "./etapas-puerto";
 import { DIAS_REPONER, type ResumenProducto } from "@/lib/publicaciones/ventas";
 
 /** Para cuántos días de venta se sugiere comprar (se puede cambiar en la página). */
@@ -75,7 +76,7 @@ export function filasReponer(
 }
 
 /** Etapas de una compra que todavía no llegó (las que se cuentan como «en camino»). */
-export const ETAPAS_EN_CAMINO = ["cotizar", "enviado_cotizacion", "cotizado", "produccion", "tracking", "arribo_mercancia"];
+export const ETAPAS_EN_CAMINO = ["cotizar", "enviado_cotizacion", "cotizado", "produccion", "tracking", ...ETAPAS_LLEGADA_PUERTO];
 
 /**
  * Suma lo que viene en compras abiertas de un país, por código de SKU. Cada compra trae sus líneas (código y cantidad), su etapa

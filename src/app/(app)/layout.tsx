@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta";
+import { RUTA_PANEL_REPARTIDOR, cuentaDeRepartidor } from "@/lib/despacho/cuenta-repartidor";
 import { BannerVistaPrevia } from "@/components/banner-vista-previa";
 import { BarraMigas } from "@/components/barra-migas";
 import { LatidoPresencia } from "@/components/latido-presencia";
@@ -20,7 +21,7 @@ import { getDosPasos, getUsuarioActual, getUsuarioIdSesion, getUsuarioSesion, ir
 import { AvisoDosPasos } from "@/components/cuenta/aviso-dos-pasos";
 import { tieneContrasenaTemporal } from "@/lib/cuenta/contrasena";
 import { getPaisActual } from "@/lib/pais";
-import { PAISES_CON_RECEPCION } from "@/lib/wms/recepcion";
+import { PAISES_CON_RECEPCION, PAISES_QUE_RECIBEN_COMPRAS } from "@/lib/wms/recepcion";
 import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
 import { colapsarGestionDeIds, construirAreas, pestanasSinModulo } from "@/lib/nav-data";
 import { getPlataformaActual } from "@/lib/plataforma-actual";
@@ -35,6 +36,7 @@ import { obtenerFavoritos } from "@/lib/favoritos";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { modulosSegunTiendas } from "@/lib/finanzas/tiendas-permitidas";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
+import { leerUrgentes, SIN_URGENTES } from "@/lib/avisos-urgentes";
 import { contarParaTi } from "@/lib/menciones";
 import {
   SIN_PENDIENTES,
@@ -69,7 +71,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               supabase.from("tareas_equipo").select("id", { count: "exact", head: true }).eq("responsable_id", u.id).not("estado", "in", "(hecho,archivado)"),
             ).then((r) => (r.error ? 0 : (r.count ?? 0)), () => 0)
           : 0,
-      ]).then(([menu, paraTi, novedades, tareasMias]) => conParaTi(menu, paraTi, novedades, tareasMias))
+        // Pedidos y mercancía en puerto sin ver: ponen el menú en rojo.
+        u ? leerUrgentes(supabase, u.id).catch(() => SIN_URGENTES) : SIN_URGENTES,
+      ]).then(([menu, paraTi, novedades, tareasMias, urgentes]) => conParaTi(menu, paraTi, novedades, tareasMias, urgentes))
     )
     .catch(() => SIN_PENDIENTES);
   const [plataformasPais, favoritosDeSesion, usuario, permitidas, paisActual, avisoInactividad] = await Promise.all([
@@ -92,6 +96,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     await irADosPasosSiFalta();
     const usuarioId = await getUsuarioIdSesion();
     if (usuarioId && (await cuentaDeProveedor(usuarioId))) redirect(RUTA_PORTAL_PROVEEDOR);
+    // Una cuenta de repartidor (24 nov 2026) tampoco tiene perfil: vuelve a su panel.
+    if (usuarioId && (await cuentaDeRepartidor(usuarioId))) redirect(RUTA_PANEL_REPARTIDOR);
   }
   // Quien administra sin la verificación en dos pasos, mientras no es obligatoria: una invitación a activarla.
   const invitarDosPasos = !!usuario && !usuario.vistaPrevia && (await getDosPasos())?.estado === "invitar";
@@ -106,7 +112,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN),
         ...(usuario.modulos.includes("uso-sistema") ? [] : PESTANAS_USO_SISTEMA),
         ...(usuario.modulos.includes("compras-por-pais") ? [] : PESTANAS_POR_PAIS),
-        ...(PAISES_CON_RECEPCION.includes(paisActual.codigo) ? [] : ["/inventario/recepcion", "/inventario/cuadro", "/inventario/novedades"]),
+        ...(PAISES_QUE_RECIBEN_COMPRAS.includes(paisActual.codigo) ? [] : ["/inventario/recepcion"]),
+        ...(PAISES_CON_RECEPCION.includes(paisActual.codigo) ? [] : ["/inventario/cuadro", "/inventario/novedades"]),
         // Los KPIs de atención y el panel de Dirección ya no son pestañas: desde el 30 oct 2026 son la Bandeja de Dirección.
       ]
     : [];

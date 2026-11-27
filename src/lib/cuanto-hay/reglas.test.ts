@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { agruparPorTienda, avisoPregunta, cuandoCorto, avisoRespuesta, leerCantidad, limpiarNota, tiendasDePersona } from "./reglas";
+import { agruparPorTienda, avisoFotos, avisoPregunta, cuandoCorto, avisoRespuesta, leerCantidad, leerTipo, limpiarNota, MAX_FOTOS_POR_SUBIDA, rutasDeFotosValidas, tiendasDePersona } from "./reglas";
 
 test("la nota se limpia y una vacía no se guarda", () => {
   assert.equal(limpiarNota("  es para   un cambio \n"), "es para un cambio");
@@ -86,4 +86,32 @@ test("el motivo del ajuste dice quién contó, quién pidió y de cuánto a cuá
   const { motivoConteoDespacho } = await import("./reglas");
   assert.equal(motivoConteoDespacho({ quien: "Yiletsi", pidio: "Nicol", antes: 120, despues: 98 }), "Conteo de despacho (¿Cuánto hay?) de Yiletsi, pedido por Nicol: 120 → 98");
   assert.equal(motivoConteoDespacho({ quien: "Yiletsi", pidio: null, antes: 0, despues: 5 }), "Conteo de despacho (¿Cuánto hay?) de Yiletsi: 0 → 5");
+});
+
+test("lo que se pide: contar (por defecto) o fotos reales", () => {
+  assert.equal(leerTipo("fotos"), "fotos");
+  assert.equal(leerTipo("cantidad"), "cantidad");
+  assert.equal(leerTipo("otra cosa"), "cantidad");
+  assert.equal(leerTipo(undefined), "cantidad");
+});
+
+test("el aviso a despacho dice si piden fotos o preguntan cuánto hay", () => {
+  assert.deepEqual(avisoPregunta({ producto: "Extracto de ajo", tienda: "Proveeduría", nota: null, tipo: "fotos" }, "Nicole"), { titulo: "Proveeduría pide fotos reales de Extracto de ajo", texto: "Nicole pide fotos reales." });
+  assert.equal(avisoPregunta({ producto: "Extracto de ajo", tienda: "Kenku", nota: "las dos caras", tipo: "fotos" }, "Ana").texto, "Ana: «las dos caras»");
+  assert.equal(avisoPregunta({ producto: "Extracto de ajo", tienda: "Kenku", nota: null }, "Ana").titulo, "Kenku pregunta cuánto hay de Extracto de ajo");
+});
+
+test("el aviso de las fotos subidas dice cuántas son", () => {
+  assert.equal(avisoFotos({ producto: "Faja", tienda: "Proveeduría" }, 1, "Yiletsi").texto, "Yiletsi subió 1 foto de Faja para Proveeduría.");
+  assert.equal(avisoFotos({ producto: "Faja", tienda: "Proveeduría" }, 3, "Yiletsi").titulo, "Fotos reales · Faja (3)");
+});
+
+test("solo se registran rutas de la carpeta de ese pedido, sin repetir y con un máximo", () => {
+  const id = "11111111-1111-4111-8111-111111111111";
+  const buena = `fotos/${id}/a-foto.jpg`;
+  assert.deepEqual(rutasDeFotosValidas([buena, buena, `fotos/${id}/b.png`], id), [buena, `fotos/${id}/b.png`]);
+  assert.deepEqual(rutasDeFotosValidas([`fotos/otro/a.jpg`, `fotos/${id}/../x.jpg`, `fotos/${id}/sub/a.jpg`, `/fotos/${id}/a.jpg`, `fotos/${id}/`, 5, null], id), []);
+  assert.deepEqual(rutasDeFotosValidas("no es lista", id), []);
+  const muchas = Array.from({ length: 20 }, (_, i) => `fotos/${id}/f${i}.jpg`);
+  assert.equal(rutasDeFotosValidas(muchas, id).length, MAX_FOTOS_POR_SUBIDA);
 });

@@ -40,6 +40,9 @@ export function BarraTienda({
   periodo,
   extra = {},
   sinTodas = false,
+  enlaces = [],
+  tiendaActiva = true,
+  rutaTiendas,
 }: {
   ruta: string;
   tiendas: Tienda[];
@@ -50,19 +53,30 @@ export function BarraTienda({
   extra?: Record<string, string | null | undefined>;
   /** Sin el botón «Todas las tiendas»: quien tiene tiendas limitadas (17 nov 2026) mira de a una de las suyas. */
   sinTodas?: boolean;
+  /** Botones después de las tiendas (20 nov 2026: «Asesores» en Pedidos de tienda), con su dirección y si es la página que se mira. */
+  enlaces?: { texto: string; href: string; activo: boolean }[];
+  /** false = ninguna tienda sale marcada (se mira uno de los `enlaces`). */
+  tiendaActiva?: boolean;
+  /** Adónde llevan los botones de las tiendas, si no es `ruta` (desde Asesores vuelven a Pedidos). */
+  rutaTiendas?: string;
 }) {
   const deFechas = periodo ? parametrosPeriodo(periodo.id === "rango" ? { tipo: "rango", desde: periodo.desde, hasta: periodo.hasta } : { tipo: "atajo", id: periodo.id }) : {};
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <nav aria-label="Tienda" className="flex flex-wrap gap-2">
         {!sinTodas && (
-          <Chip href={rutaCon(ruta, { ...extra, ...deFechas })} activo={!tiendaId}>
+          <Chip href={rutaCon(rutaTiendas ?? ruta, { ...extra, ...deFechas })} activo={tiendaActiva && !tiendaId}>
             Todas las tiendas
           </Chip>
         )}
         {tiendas.map((t) => (
-          <Chip key={t.id} href={rutaCon(ruta, { ...extra, ...deFechas, tienda: t.id })} activo={tiendaId === t.id}>
+          <Chip key={t.id} href={rutaCon(rutaTiendas ?? ruta, { ...extra, ...deFechas, tienda: t.id })} activo={tiendaActiva && tiendaId === t.id}>
             {t.nombre}
+          </Chip>
+        ))}
+        {enlaces.map((e) => (
+          <Chip key={e.href} href={e.href} activo={e.activo}>
+            {e.texto}
           </Chip>
         ))}
       </nav>

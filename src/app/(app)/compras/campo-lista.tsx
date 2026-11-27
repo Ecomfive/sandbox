@@ -36,7 +36,7 @@ export function CampoLista({
   renderValor?: (nombre: string) => ReactNode;
   /** Las tiendas: color y nombre editables desde el panel. */
   gestion?: GestionTiendas | null;
-  /** Se elige uno solo (la tienda): elegir otro lo cambia y cierra el panel. */
+  /** Se elige uno solo: elegir otro lo cambia y cierra el panel. */
   unica?: boolean;
 }) {
   const [valores, setValores] = useState(inicial);
@@ -63,7 +63,7 @@ export function CampoLista({
     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
       {/* El valor que viaja al guardar; no se ve ni se usa con el teclado. */}
       <input ref={oculto} type="text" name={nombre} aria-label={etiqueta} defaultValue={inicial.join(", ")} tabIndex={-1} readOnly aria-hidden="true" className="sr-only" />
-      {/* Uno solo (la tienda): todo el campo se pulsa, como la celda de la columna, y abre la lista para elegir otra. */}
+      {/* Uno solo: todo el campo se pulsa, como la celda de la columna, y abre la lista para elegir otra. */}
       {unica && (
         <button
           ref={boton}

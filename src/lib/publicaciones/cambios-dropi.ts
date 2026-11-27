@@ -11,6 +11,7 @@ import type { DatosCrearDropi, FotoCrear } from "./crear-dropi";
 import { MAX_NOMBRE_DROPI } from "./dropi-guardado";
 import { normalizarDatosDevolver } from "./apagar-dropi";
 import { destinosDe, normalizarDatosPrivatizar, type DatosPrivatizar } from "./privatizar-dropi";
+import type { SumarAlRepublicar } from "./republicar-dropi";
 import { idsDeDropi } from "./sincronizar-dropi";
 import { normalizarDatosReserva, type DatosReserva } from "./reservas-dropi";
 import { normalizarDatosStock, productoDelCambio, type DatosStock } from "./stock-dropi";
@@ -163,16 +164,27 @@ export async function encolarRepublicar(
   precio?: { precio: number; precioAntes: number | null },
   /** «Republicar (B280)» (12 nov 2026): el stock está en la bodega de Dropi; el ID nuevo nace con `temporal` unidades en la nuestra y Dropi traslada `unidades`. */
   b280?: { temporal: number; unidades: number; variable?: boolean },
+  /** «Sumar unidades al republicar» (20 nov 2026): las que llegaron, en qué bodega de ECOMFIVE. null = ninguna (también quita las de una republicación que esperaba). */
+  sumar?: SumarAlRepublicar | null,
 ): Promise<{ id: string; yaEstaba: boolean } | { error: string }> {
   const productoId = idsDeDropi(pub.dropi_id)[0];
   if (!productoId) return { error: "La publicación no tiene ID de Dropi." };
   const falta = (m: string) => /tipo|column|does not exist|schema cache/i.test(m);
-  const previo = await supabase.from("dropi_cambios_pendientes").select("id").eq("publicacion_id", pub.id).eq("tipo", "republicar").in("estado", ["pendiente", "error"]).limit(1).maybeSingle();
+  const previo = await supabase.from("dropi_cambios_pendientes").select("id, datos").eq("publicacion_id", pub.id).eq("tipo", "republicar").in("estado", ["pendiente", "error"]).limit(1).maybeSingle();
   if (previo.error) return { error: falta(previo.error.message) ? "Falta correr en Supabase la migración 0145." : "No se pudo dejar la republicación para Dropi." };
   const precios = precio ? { precio: precio.precio, precio_sugerido: precio.precio, precio_antes: precio.precioAntes } : {};
   if (previo.data) {
-    // Ya esperaba: si ahora se eligió un precio, se le pone (todavía no se creó el producto nuevo).
-    if (precio) await supabase.from("dropi_cambios_pendientes").update(precios).eq("id", previo.data.id as string).is("nuevo_dropi_id", null);
+    // Ya esperaba: si ahora se eligió un precio (y las unidades que llegaron), se le ponen (todavía no se creó el producto nuevo).
+    if (precio) {
+      const antes = previo.data.datos && typeof previo.data.datos === "object" ? (previo.data.datos as Record<string, unknown>) : {};
+      const { sumar: _s, bodega: _b, nombreBodega: _n, ...resto } = antes;
+      const datos = sumar ? { ...resto, ...sumar } : resto;
+      await supabase
+        .from("dropi_cambios_pendientes")
+        .update({ ...precios, datos: Object.keys(datos).length ? datos : null })
+        .eq("id", previo.data.id as string)
+        .is("nuevo_dropi_id", null);
+    }
     return { id: previo.data.id as string, yaEstaba: true };
   }
   const { data, error } = await supabase
@@ -183,7 +195,7 @@ export async function encolarRepublicar(
       dropi_producto_id: productoId,
       tipo: "republicar",
       ...precios,
-      ...(b280 ? { datos: { b280: true, temporal: b280.temporal, unidadesB280: b280.unidades, variable: b280.variable === true } } : {}),
+      ...(b280 ? { datos: { b280: true, temporal: b280.temporal, unidadesB280: b280.unidades, variable: b280.variable === true } } : sumar ? { datos: sumar } : {}),
       creado_por: por.id,
       creado_por_nombre: por.nombre,
     })

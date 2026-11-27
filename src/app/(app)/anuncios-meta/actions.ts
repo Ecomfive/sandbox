@@ -3,10 +3,26 @@
 import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { analizarVideoDeMeta, pendienteDeVideo, videosPorAnalizar } from "@/lib/meta-ads/analizar-videos";
+import { claveDeCostos, revisarCostos, sumarPedidos, tasasDe, type EntregasMeta } from "@/lib/meta-ads/costos-operacion";
+import { AJUSTE_ANALISIS_AUTOMATICO } from "@/lib/meta-ads/ajustes";
+import { iasParaInterpretar, leerAnalisisGuardado, refrescarAnalisisMeta } from "@/lib/meta-ads/analisis-guardado";
+import { claveDeTema, ejecutarAnalisis, validarAnalisis, validarPrioridad, validarVigilancia, vigilanciaDeAnalisis, type Prioridad } from "@/lib/meta-ads/analisis-pedido";
+import { cargarBaseDias } from "@/lib/meta-ads/base-dias";
+import { guardarInvestigacion, investigarProducto, leerInvestigaciones } from "@/lib/meta-ads/investigacion-datos";
+import { textoParaIA } from "@/lib/meta-ads/investigacion-entrega";
+import { leerValorSenales, claveDeSenales, senalesParaIA } from "@/lib/meta-ads/senales-creativas";
+import { senalesVisibles } from "@/lib/meta-ads/senales-modulos";
+import { claveDeRasgos, leerValorRasgos, rasgosParaIA } from "@/lib/meta-ads/rasgos-ganadores";
+import { interpretarRespuestaChat, LIMITES_CHAT, limpiarRespuesta, pedidoChat, pedidoConResultados, revisarPregunta, sanitizarHistorial } from "@/lib/meta-ads/chat-ia";
+import { cambiarVigilancia, crearVigilancia, DIAS_DE_INSISTENCIA, leerVigilancias, VECES_PARA_VIGILAR } from "@/lib/meta-ads/vigilancias";
+import { tieneHistorialSuficiente } from "@/lib/meta-ads/historico";
+import { cargarHistorico } from "@/lib/meta-ads/historico-datos";
+import { NOMBRE_PROVEEDOR, pedirIAEn, proveedoresConectados } from "@/lib/publicaciones/ia/proveedor";
+import { afinarAnguloDeVideo, analizarVideoDeMeta, pendienteDeVideo, videosPorAnalizar } from "@/lib/meta-ads/analizar-videos";
 import { pedirMeta, tokenDeMeta } from "@/lib/meta-ads/api";
 import { buscarArchivoDeVideo, motivoSinArchivoDeVideo } from "@/lib/meta-ads/archivo-video";
 import { clasificarGanchosPendientes } from "@/lib/meta-ads/clasificar-ganchos";
+import type { CoberturaBruta } from "@/lib/meta-ads/cobertura";
 import { actividadDeCampana } from "@/lib/meta-ads/datos";
 import { leerCuentasMeta } from "@/lib/meta-ads/leer-cuentas";
 import { claveDeProducto, type Etapa } from "@/lib/meta-ads/nombre";
@@ -17,6 +33,7 @@ import { esHostDeVideoMeta } from "@/lib/meta-ads/video-angulo";
 import type { ActividadVista } from "@/lib/meta-ads/vistas";
 import { getPaisActual } from "@/lib/pais";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
+import { exigirAcceso } from "@/lib/seguridad/exigir-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const MODULO = "anuncios-meta";
@@ -127,7 +144,7 @@ export async function guardarTopeMeta(producto: string, tope: number): Promise<R
   return {};
 }
 
-const ETAPAS = new Set(["testing", "escala", "retargeting"]);
+const ETAPAS = new Set(["testing", "venta", "escala", "retargeting"]);
 
 /** Corrige a mano el producto, el ángulo o la etapa de una campaña (la lectura de Meta ya no los pisa). Vacío = volver a lo que dice el nombre. */
 export async function corregirCampanaMeta(id: string, cambio: { producto?: string | null; angulo?: string | null; etapa?: Etapa | "" | null }): Promise<Resultado> {
@@ -156,7 +173,7 @@ export async function corregirCampanaMeta(id: string, cambio: { producto?: strin
   poner("angulo", cambio.angulo, "Ángulo");
   if (cambio.etapa !== undefined) {
     const e = cambio.etapa ?? "";
-    if (e && !ETAPAS.has(e)) return { error: "La etapa debe ser Testing, Escala o Retargeting." };
+    if (e && !ETAPAS.has(e)) return { error: "La etapa debe ser Testing, Ventas, Escala o Retargeting." };
     if ((e || null) !== ((c.etapa as string | null) ?? null)) {
       antes.Etapa = (c.etapa as string | null) ?? "—";
       despues.Etapa = e || "—";
@@ -203,6 +220,20 @@ export async function decidirSugerenciaMeta(clave: string, estado: "aceptada" | 
   const { error } = await supabase.from("meta_decisiones").upsert({ clave: k, estado, nota: texto || null, vigente_hasta: hasta, decidido_por: u.id, decidido_por_nombre: u.nombre ?? u.email ?? null, decidido_en: new Date().toISOString() }, { onConflict: "clave" });
   if (error) return { error: sinMigracion(error.message) ? MIGRACION : error.message };
   await registrarAuditoria({ accion: "decidir_sugerencia_meta", entidad: "meta_decisiones", entidadId: k, detalle: `${estado}${texto ? ` · ${texto}` : ""}` });
+  revalidatePath("/anuncios-meta", "layout");
+  return {};
+}
+
+/** Deshace una decisión: la sugerencia vuelve a mostrarse. */
+export async function quitarDecisionMeta(clave: string): Promise<Resultado> {
+  const acceso = await exigirAcceso({ modulo: MODULO, escritura: true });
+  if (acceso.error !== undefined) return { error: acceso.error };
+  const k = String(clave ?? "").trim();
+  if (!/^[a-z_]+:[A-Za-z0-9_.:-]{1,80}$/.test(k)) return { error: "Esa sugerencia no se reconoce." };
+  const supabase = createServiceClient();
+  const { error } = await supabase.from("meta_decisiones").delete().eq("clave", k);
+  if (error) return { error: sinMigracion(error.message) ? MIGRACION : error.message };
+  await registrarAuditoria({ accion: "decidir_sugerencia_meta", entidad: "meta_decisiones", entidadId: k, detalle: "volvió a mostrarse" });
   revalidatePath("/anuncios-meta", "layout");
   return {};
 }
@@ -274,13 +305,15 @@ export async function analizarSiguienteMeta(): Promise<{ error?: string; ninguno
   const u = await requireModuloEscritura(MODULO);
   const supabase = createServiceClient();
   try {
-    const { pendientes, total } = await videosPorAnalizar(supabase, { max: 1, ahora: true });
-    const v = pendientes[0];
+    const { pendientes, total, afinar } = await videosPorAnalizar(supabase, { max: 1, ahora: true });
+    // Primero lo que falta analizar por completo; cuando no queda nada, sigue con el reanálisis solo del ángulo de lo ya analizado.
+    const v = pendientes[0] ?? afinar.pendientes[0];
     if (!v) return { ninguno: true, faltan: 0 };
-    const r = await analizarVideoDeMeta(supabase, v, u.nombre ?? u.email ?? null);
-    await registrarAuditoria({ accion: "analizar_video_meta", entidad: "meta_campanas", entidadId: v.videoId, detalle: `${r.estado} · ${r.mensaje}`.slice(0, 300) });
+    const afinando = !pendientes[0];
+    const r = afinando ? await afinarAnguloDeVideo(supabase, v, u.nombre ?? u.email ?? null) : await analizarVideoDeMeta(supabase, v, u.nombre ?? u.email ?? null);
+    await registrarAuditoria({ accion: afinando ? "afinar_angulo_video_meta" : "analizar_video_meta", entidad: "meta_campanas", entidadId: v.videoId, detalle: `${r.estado} · ${r.mensaje}`.slice(0, 300) });
     if (!r.ok && /Falta (el acceso|conectar)/.test(r.mensaje)) return { error: r.mensaje };
-    return { videoId: v.videoId, estado: r.estado, mensaje: r.mensaje, faltan: total };
+    return { videoId: v.videoId, estado: r.estado, mensaje: r.mensaje, faltan: total + afinar.total };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo analizar." };
   }
@@ -293,7 +326,7 @@ const DIA_MS = 86_400_000;
  * Trae el historial de una cuenta de a un tramo de fechas por llamada (la pantalla las encadena, de lo más nuevo a lo más viejo, y muestra el avance). Meta guarda hasta 37 meses. Cada tramo es de 31 días como mucho
  * y guarda lo mismo que una lectura normal: resultados por día, campañas, anuncios y registro de actividad de esas fechas.
  */
-export async function leerTramoMeta(cuentaId: string, desde: string, hasta: string): Promise<{ error?: string; texto?: string; filas?: number }> {
+export async function leerTramoMeta(cuentaId: string, desde: string, hasta: string): Promise<{ error?: string; texto?: string; filas?: number; /** El tramo no cupo en una lectura (o Meta tardó): no se guardó nada y conviene leerlo en partes más chicas. */ partir?: boolean }> {
   const u = await requireModuloEscritura(MODULO);
   if (!UUID.test(cuentaId)) return { error: "Esa cuenta no existe." };
   if (!FECHA.test(desde) || !FECHA.test(hasta) || desde > hasta) return { error: "Las fechas no son válidas." };
@@ -303,10 +336,40 @@ export async function leerTramoMeta(cuentaId: string, desde: string, hasta: stri
   const supabase = createServiceClient();
   const { data: cuenta } = await supabase.from("meta_cuentas").select("id, nombre, act_id, ultima_lectura_en, pais_id").eq("id", cuentaId).maybeSingle();
   if (!cuenta || !(await puedeVerPaisId(supabase, u.paisesPermitidos, cuenta.pais_id as string))) return { error: "No tienes acceso a las cuentas de ese país." };
-  const r = await sincronizarCuenta(supabase, cuenta as { id: string; nombre: string; act_id: string; ultima_lectura_en: string | null }, { limiteMs: 100_000, rango: { desde, hasta } });
+  const r = await sincronizarCuenta(supabase, cuenta as { id: string; nombre: string; act_id: string; ultima_lectura_en: string | null }, { limiteMs: 250_000, rango: { desde, hasta } });
   await registrarAuditoria({ accion: "leer_cuentas_meta", entidad: "meta_cuentas", entidadId: cuentaId, detalle: `Historial ${desde} a ${hasta}: ${r.ok ? `${r.campanas} campañas, ${r.filas} filas` : "con error"}` });
   revalidatePath("/anuncios-meta", "layout");
-  return r.ok ? { texto: `${r.filas} filas de resultados${r.avisos.length ? ` (${r.avisos[0]})` : ""}`, filas: r.filas } : { error: r.error ?? "No se pudo leer ese tramo." };
+  return r.ok ? { texto: `${r.filas} filas de resultados${r.avisos.length ? ` (${r.avisos[0]})` : ""}`, filas: r.filas } : { error: r.error ?? "No se pudo leer ese tramo.", partir: r.partir };
+}
+
+/**
+ * Qué fechas de cada cuenta activa del país ya se trajeron de Meta (migración 0346): los rangos leídos completos y los días con resultados, de los últimos 37 meses. La pantalla arma de ahí el cuadro por mes y
+ * decide qué tramos del historial ya no hace falta volver a leer. Solo mira.
+ */
+export async function coberturaMeta(): Promise<{ error?: string; cuentas?: { id: string; nombre: string; bruta: CoberturaBruta }[] }> {
+  const u = await requireModuloEscritura(MODULO);
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return { error: "No tienes acceso a las cuentas de ese país." };
+  const { data, error } = await supabase.from("meta_cuentas").select("id, nombre").eq("pais_id", pais.id).eq("activa", true).order("nombre");
+  if (error) return { error: sinMigracion(error.message) ? MIGRACION : error.message };
+  const hoy = hoyEnPanama();
+  const desde = restarDias(hoy, 37 * 31);
+  const cuentas: { id: string; nombre: string; bruta: CoberturaBruta }[] = [];
+  for (const c of data ?? []) {
+    const { data: bruta, error: e } = await supabase.rpc("meta_cobertura", { p_cuenta: c.id, p_desde: desde, p_hasta: hoy });
+    if (e) return { error: /meta_cobertura|schema cache|does not exist/i.test(e.message) ? "Falta correr la migración 0346 (registro de lo leído de Meta) en Supabase." : e.message };
+    const b = (bruta ?? {}) as { tramos?: unknown; dias?: unknown };
+    cuentas.push({
+      id: c.id as string,
+      nombre: c.nombre as string,
+      bruta: {
+        tramos: Array.isArray(b.tramos) ? (b.tramos as unknown[]).filter((t): t is [string, string] => Array.isArray(t) && typeof t[0] === "string" && typeof t[1] === "string") : [],
+        dias: Array.isArray(b.dias) ? (b.dias as unknown[]).filter((d): d is string => typeof d === "string") : [],
+      },
+    });
+  }
+  return { cuentas };
 }
 
 /** Corrige a mano el ángulo de un video (un nuevo análisis ya no lo pisa). Vacío = volver a lo que dijo la IA en el próximo análisis. */
@@ -347,4 +410,222 @@ export async function clasificarGanchosMeta(): Promise<{ error?: string; clasifi
     revalidatePath("/anuncios-meta", "layout");
   }
   return r.error ? { error: r.error, clasificados: r.clasificados, faltan: r.faltan } : { clasificados: r.clasificados, faltan: r.faltan };
+}
+
+/**
+ * Pausa o reanuda el análisis automático de videos (el cron que corre cada 10 minutos). No toca lo manual («Analizar los pendientes», «Reintentar este video»). Queda en la auditoría con quién y cuándo.
+ */
+export async function cambiarAnalisisAutomaticoMeta(activo: boolean): Promise<Resultado> {
+  const u = await requireModuloEscritura(MODULO);
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("meta_ajustes")
+    .upsert({ clave: AJUSTE_ANALISIS_AUTOMATICO, valor: { activo: !!activo }, actualizado_por: u.id, actualizado_por_nombre: u.nombre ?? u.email ?? null, actualizado_en: new Date().toISOString() }, { onConflict: "clave" });
+  if (error) return { error: /meta_ajustes|schema cache|does not exist/i.test(error.message) ? "Falta correr la migración 0347 (ajustes de Anuncios Meta) en Supabase." : error.message };
+  await registrarAuditoria({ accion: "analisis_automatico_meta", entidad: "meta_ajustes", detalle: activo ? "Reanudó el análisis automático de videos" : "Pausó el análisis automático de videos" });
+  revalidatePath("/anuncios-meta", "layout");
+  return {};
+}
+
+/** La entrega de cada producto de las campañas (para la lista y la ficha de Productos): tasa, pedidos resueltos y la tasa de todos. Sale del análisis guardado (se prepara solo); sin él, se calcula. Nunca lanza. */
+export async function entregaPorProductoMeta(cuentaId: string | null): Promise<EntregasMeta> {
+  const u = await requireModulo(MODULO);
+  const vacio: EntregasMeta = { productos: {}, promedio: null, tienda: { envio: null, entrega: null } };
+  try {
+    const supabase = createServiceClient();
+    const pais = await getPaisActual(supabase);
+    if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return vacio;
+    const guardado = cuentaId ? null : await leerAnalisisGuardado(supabase, pais.id);
+    const analisis = guardado?.analisis ?? (await cargarHistorico({ paisId: pais.id, cuentaId: cuentaId && UUID.test(cuentaId) ? cuentaId : null, hoy: hoyEnPanama() }, supabase)).analisis;
+    return {
+      productos: Object.fromEntries(analisis.entrega.map((f) => [f.clave, { tasa: f.tasa, cerradas: f.cerradas, entregadas: f.entregadas, devueltas: f.devueltas, canceladas: f.canceladas, enCamino: f.enCamino, sinEnviar: f.sinEnviar }])),
+      promedio: analisis.resumen.tasaEntrega,
+      // Un análisis guardado antes de la calculadora no trae el total de la tienda: se suma el de los productos con campañas.
+      tienda: tasasDe(analisis.pedidosDeLaTienda ?? sumarPedidos(analisis.entrega)),
+      economia: Object.fromEntries((analisis.economia ?? []).map((e) => [e.clave, e])),
+    };
+  } catch {
+    return vacio;
+  }
+}
+
+/** Guarda los costos de la calculadora (envío, comisión contra entrega y costo operativo) del país de la barra. Los ven todos los que abren Anuncios Meta; los cambia quien puede modificar el módulo. */
+export async function guardarCostosMeta(valores: unknown): Promise<Resultado> {
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const acceso = await exigirAcceso({ modulo: MODULO, escritura: true, paisId: pais.id });
+  if (acceso.error !== undefined) return { error: acceso.error };
+  const u = acceso.usuario;
+  const revisados = revisarCostos(valores);
+  if ("error" in revisados) return revisados;
+  const clave = claveDeCostos(pais.id);
+  const { data: previo } = await supabase.from("meta_ajustes").select("valor").eq("clave", clave).maybeSingle();
+  const { error } = await supabase
+    .from("meta_ajustes")
+    .upsert({ clave, valor: revisados.costos, actualizado_por: u.id, actualizado_por_nombre: u.nombre ?? u.email ?? null, actualizado_en: new Date().toISOString() }, { onConflict: "clave" });
+  if (error) return { error: /meta_ajustes|schema cache|does not exist/i.test(error.message) ? "Falta correr la migración 0347 (ajustes de Anuncios Meta) en Supabase." : error.message };
+  const antes = revisarCostos(previo?.valor);
+  const texto = (c: { envio: number; cod: number; operativo: number }) => ({ Envío: `$${c.envio.toFixed(2)}`, "Comisión contra entrega": `$${c.cod.toFixed(2)}`, "Costo operativo": `$${c.operativo.toFixed(2)}` });
+  await registrarAuditoria({ accion: "guardar_costos_meta", entidad: "meta_ajustes", detalle: pais.nombre, antes: "costos" in antes ? texto(antes.costos) : undefined, despues: texto(revisados.costos) });
+  revalidatePath("/anuncios-meta", "layout");
+  return {};
+}
+
+/**
+ * El chat de Hallazgos (24 nov 2026): una pregunta sobre el historial («¿qué producto funciona mejor?», «¿qué cambió más este mes?») que la IA contesta **solo con las estadísticas que el sistema ya calculó** (`chat-ia.ts`).
+ * Basta poder abrir el módulo. Cada pregunta cuesta unos centavos de crédito de IA: hay un tope por persona cada 24 horas. Usa Claude si está conectado y, si no, OpenAI. Devuelve el error como valor.
+ */
+export async function preguntarHallazgosMeta(pregunta: unknown, historial: unknown): Promise<{ respuesta?: string; proveedor?: string; error?: string; quedan?: number; analisisNuevos?: string[]; vigilancia?: { titulo: string; prioridad: Prioridad }; vigilanciaAutomatica?: string }> {
+  const u = await requireModulo(MODULO);
+  const revisada = revisarPregunta(pregunta);
+  if ("error" in revisada) return { error: revisada.error };
+  const conectadas = iasParaInterpretar(proveedoresConectados());
+  if (!conectadas.length) return { error: "Falta conectar una IA de texto (la clave OPENAI_API_KEY o ANTHROPIC_API_KEY en Vercel)." };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return { error: "No tienes acceso a ese país." };
+  // El tope por persona: lo que ya preguntó en las últimas 24 horas.
+  const { count } = await supabase.from("ia_consumo").select("id", { count: "exact", head: true }).eq("operacion", "meta_chat").eq("usuario_id", u.id).gte("creado_en", new Date(Date.now() - 86_400_000).toISOString());
+  const usadas = count ?? 0;
+  if (usadas >= LIMITES_CHAT.porDia) return { error: `Ya hiciste ${LIMITES_CHAT.porDia} preguntas hoy: es el tope diario (cada una cuesta crédito de IA). Mañana puedes seguir.` };
+  const hoy = hoyEnPanama();
+  const guardado = await leerAnalisisGuardado(supabase, pais.id);
+  const analisis = guardado?.analisis ?? (await cargarHistorico({ paisId: pais.id, cuentaId: null, hoy }, supabase)).analisis;
+  const tiendas = guardado?.tiendas ?? [];
+  if (!tieneHistorialSuficiente(analisis)) return { error: "Todavía hay muy poco historial (menos de 8 campañas con gasto suficiente) para contestar con datos." };
+  const investigadas = (await leerInvestigaciones(supabase, pais.id))?.items ?? [];
+  const { data: filaSenales } = await supabase.from("meta_ajustes").select("valor").eq("clave", claveDeSenales(pais.id)).maybeSingle();
+  // En el chat, cada persona solo recibe las señales de los módulos que puede abrir.
+  const senales = (leerValorSenales(filaSenales?.valor)?.items ?? []).map((s) => ({ ...s, otras: senalesVisibles(s.otras ?? [], u.modulos) }));
+  const { data: filaRasgos } = await supabase.from("meta_ajustes").select("valor").eq("clave", claveDeRasgos(pais.id)).maybeSingle();
+  const rasgos = leerValorRasgos(filaRasgos?.valor)?.items ?? [];
+  const { instrucciones, texto } = pedidoChat(analisis, tiendas, hoy, revisada.pregunta, sanitizarHistorial(historial), investigadas.map(textoParaIA), senales.map(senalesParaIA), rasgos.map(rasgosParaIA));
+  const proveedor = conectadas[0];
+  const quien = { id: u.id, nombre: u.nombre ?? null, email: u.email };
+  const quedan = Math.max(0, LIMITES_CHAT.porDia - usadas - 1);
+  const r = await pedirIAEn(proveedor, { instrucciones, texto, imagenes: [] }, { operacion: "meta_chat", modulo: "anuncios-meta", usuario: quien, referencia: revisada.pregunta.slice(0, 120) }, "analisis");
+  if ("error" in r) return { error: r.error };
+  const nombreIA = NOMBRE_PROVEEDOR[proveedor];
+  const que = interpretarRespuestaChat(r.texto);
+
+  // 1) Contestó con las estadísticas que ya estaban calculadas.
+  if (que.tipo === "texto") {
+    const respuesta = limpiarRespuesta(que.texto);
+    if (!respuesta) return { error: "La IA no devolvió una respuesta. Inténtalo de nuevo." };
+    return { respuesta, proveedor: nombreIA, quedan };
+  }
+
+  // 2b) Pidió ir a fondo con un producto: se cruzan sus pedidos con Servientrega, Monday, la confirmación y, leyendo las conversaciones de los pedidos devueltos, lo que dijeron los clientes.
+  if (que.tipo === "investigar") {
+    if (u.modulosSoloLectura.includes(MODULO)) return { respuesta: "Investigar a fondo lee conversaciones de clientes y gasta crédito de IA: hace falta poder modificar Anuncios Meta. Pídeselo a alguien con ese permiso.", proveedor: nombreIA, quedan };
+    const fila = buscarFilaDeEntrega(analisis.entrega, que.producto);
+    if (!fila?.enTienda) return { respuesta: `No encontré «${que.producto}» entre los productos con pedidos de la tienda. Dime el nombre como sale en la tabla de entrega de Productos.`, proveedor: nombreIA, quedan };
+    if (!tiendas.length) return { error: "No se encontró la tienda de las cuentas en los pedidos (anótala en Cuentas › Tienda)." };
+    const hecha = await investigarProducto(supabase, { paisId: pais.id, clave: fila.clave, producto: fila.nombre, productoEnTienda: fila.enTienda, tiendas, hoy, cpa: fila.cpa, tope: fila.tope, aFondo: { proveedor, quien } });
+    if ("error" in hecha) return { error: hecha.error };
+    await guardarInvestigacion(supabase, pais.id, hecha.investigacion, u.nombre ?? u.email ?? "—");
+    await registrarAuditoria({ accion: "investigar_entrega_meta", entidad: "meta_ajustes", detalle: `${fila.nombre} · a fondo (por el chat)` });
+    revalidatePath("/anuncios-meta", "layout");
+    const r3 = await pedirIAEn(proveedor, { ...pedidoConResultados({ instrucciones, texto }, [textoParaIA(hecha.investigacion)]), imagenes: [] }, { operacion: "meta_chat_analisis", modulo: "anuncios-meta", usuario: quien, referencia: `investigar:${fila.clave}`.slice(0, 160) }, "analisis");
+    if ("error" in r3) return { error: r3.error };
+    const respuesta = limpiarRespuesta(r3.texto);
+    if (!respuesta) return { error: "La IA no devolvió una respuesta. Inténtalo de nuevo." };
+    return { respuesta: hecha.aviso ? `${respuesta}\n\nNota: ${hecha.aviso}` : respuesta, proveedor: nombreIA, quedan, analisisNuevos: [`Por qué no se entrega ${fila.nombre}`] };
+  }
+
+  // 2) Pidió un análisis que no estaba hecho: se corre sobre los resultados por día y se le devuelve para que conteste con eso.
+  if (que.tipo === "analizar") {
+    const specs = que.analisis.map((a) => validarAnalisis(a, hoy)).filter((a): a is NonNullable<typeof a> => a !== null).slice(0, 2);
+    if (!specs.length) return { error: "No pude armar ese análisis con los datos que tengo. Prueba con otra pregunta, indicando las fechas o el producto." };
+    const base = await cargarBaseDias({ paisId: pais.id, cuentaId: null }, supabase);
+    if (!base) return { error: "No hay resultados por día de Meta para hacer ese análisis." };
+    const resultados = specs.map((spec) => ejecutarAnalisis(spec, base));
+    const tema = claveDeTema(specs[0]);
+    const r2 = await pedirIAEn(proveedor, { ...pedidoConResultados({ instrucciones, texto }, resultados), imagenes: [] }, { operacion: "meta_chat_analisis", modulo: "anuncios-meta", usuario: quien, referencia: `tema:${tema}|${specs[0].titulo}`.slice(0, 160) }, "analisis");
+    if ("error" in r2) return { error: r2.error };
+    const respuesta = limpiarRespuesta(r2.texto);
+    if (!respuesta) return { error: "La IA no devolvió una respuesta. Inténtalo de nuevo." };
+    const automatica = await vigilarSiInsisten(supabase, { paisId: pais.id, hoy, tema, spec: specs[0], pregunta: revisada.pregunta });
+    return { respuesta, proveedor: nombreIA, quedan, analisisNuevos: specs.map((x) => x.titulo), ...(automatica ? { vigilanciaAutomatica: automatica } : {}) };
+  }
+
+  // 3) Pidió que desde ahora se le indique algo: queda como una vigilancia con la prioridad que dijo. Hace falta poder modificar el módulo.
+  if (u.modulosSoloLectura.includes(MODULO)) return { respuesta: "Tu cuenta solo puede ver Anuncios Meta: para dejar una vigilancia hace falta poder modificar el módulo. Pídeselo a alguien con ese permiso.", proveedor: nombreIA, quedan };
+  const spec = validarVigilancia(que.vigilancia);
+  if (!spec) return { error: "No pude entender qué vigilar. Dime la métrica y a qué (por ejemplo: «vigila el CPA de cada producto, prioridad alta»)." };
+  const prioridad = validarPrioridad(que.prioridad);
+  const creada = await crearVigilancia(supabase, { paisId: pais.id, hoy, spec, prioridad, origen: "chat", quien: u.nombre ?? u.email ?? "—", pregunta: revisada.pregunta, tema: null });
+  if ("error" in creada) return { error: creada.error };
+  await registrarAuditoria({ accion: "crear_vigilancia_meta", entidad: "meta_ajustes", detalle: `${spec.titulo} · prioridad ${prioridad}${creada.yaExistia ? " (ya existía: se actualizó)" : ""}` });
+  revalidatePath("/anuncios-meta", "layout");
+  const base = `Listo: ${que.mensaje ?? `desde ahora vigilo «${spec.titulo}» con prioridad ${prioridad}.`}`;
+  return { respuesta: `${base}${creada.resultado ? ` Primera lectura: ${creada.resultado.resumen}` : ""} La verás en Hallazgos › Lo que estás vigilando y, si se pone mala, entre las sugerencias del Resumen.`, proveedor: nombreIA, quedan, vigilancia: { titulo: spec.titulo, prioridad } };
+}
+
+/**
+ * Si una misma pregunta (el mismo desglose, filtros y métrica) se hizo `VECES_PARA_VIGILAR` veces en las últimas semanas, el sistema empieza a vigilarla solo con prioridad media y se lo dice a quien preguntó. Se cuenta con las
+ * preguntas que ya dejó el chat en el consumo de IA (`referencia` = `tema:<llave>|…`), así que no necesita guardar nada más. Nunca lanza.
+ */
+async function vigilarSiInsisten(supabase: ReturnType<typeof createServiceClient>, o: { paisId: string; hoy: string; tema: string; spec: NonNullable<ReturnType<typeof validarAnalisis>>; pregunta: string }): Promise<string | null> {
+  try {
+    const desde = new Date(Date.now() - DIAS_DE_INSISTENCIA * 86_400_000).toISOString();
+    const { count } = await supabase.from("ia_consumo").select("id", { count: "exact", head: true }).eq("operacion", "meta_chat_analisis").like("referencia", `tema:${o.tema}|%`).gte("creado_en", desde);
+    if ((count ?? 0) < VECES_PARA_VIGILAR) return null;
+    if ((await leerVigilancias(supabase, o.paisId)).some((v) => v.tema === o.tema)) return null;
+    const creada = await crearVigilancia(supabase, { paisId: o.paisId, hoy: o.hoy, spec: vigilanciaDeAnalisis(o.spec), prioridad: "media", origen: "insistencia", quien: "Sistema (por las preguntas del chat)", pregunta: o.pregunta, tema: o.tema });
+    if ("error" in creada || creada.yaExistia) return null;
+    await registrarAuditoria({ accion: "crear_vigilancia_meta", entidad: "meta_ajustes", detalle: `${o.spec.titulo} · prioridad media (por insistencia: ${count} preguntas)` });
+    revalidatePath("/anuncios-meta", "layout");
+    return o.spec.titulo;
+  } catch {
+    return null;
+  }
+}
+
+/** Cambia la prioridad de una vigilancia, la pausa o la reanuda, o la quita. Hace falta poder modificar el módulo. */
+export async function cambiarVigilanciaMeta(id: unknown, cambio: { prioridad?: unknown; activa?: unknown; quitar?: unknown }): Promise<Resultado> {
+  const u = await requireModuloEscritura(MODULO);
+  if (typeof id !== "string" || id.length > 40) return { error: "Esa vigilancia no existe." };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return { error: "No tienes acceso a ese país." };
+  const prioridad: Prioridad | undefined = cambio.prioridad === undefined ? undefined : validarPrioridad(cambio.prioridad);
+  const r = await cambiarVigilancia(supabase, { paisId: pais.id, hoy: hoyEnPanama(), id, prioridad, activa: typeof cambio.activa === "boolean" ? cambio.activa : undefined, quitar: cambio.quitar === true, quien: u.nombre ?? u.email ?? "—" });
+  if ("error" in r) return { error: r.error };
+  await registrarAuditoria({ accion: "cambiar_vigilancia_meta", entidad: "meta_ajustes", detalle: cambio.quitar === true ? "Quitó una vigilancia" : `Cambió una vigilancia${prioridad ? ` · prioridad ${prioridad}` : ""}${typeof cambio.activa === "boolean" ? (cambio.activa ? " · reanudada" : " · pausada") : ""}` });
+  revalidatePath("/anuncios-meta", "layout");
+  return {};
+}
+
+const sinTildes = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+
+/** El producto de la tabla de entrega que la persona nombró (por palabras, sin acentos); si hay varios, el que más gastó. */
+function buscarFilaDeEntrega<T extends { nombre: string; gasto: number; enTienda: string | null }>(filas: readonly T[], texto: string): T | null {
+  const palabras = sinTildes(texto).split(/\s+/).filter((p) => p.length >= 3);
+  if (!palabras.length) return null;
+  const coinciden = filas.filter((f) => palabras.every((p) => sinTildes(`${f.nombre} ${f.enTienda ?? ""}`).includes(p)));
+  return coinciden.sort((a, b) => b.gasto - a.gasto)[0] ?? null;
+}
+
+
+/**
+ * «Actualizar el análisis ahora» (Hallazgos): lo mismo que hace el sistema cada día —calcular todo el historial, evaluar las vigilancias, investigar por qué no se entregan los productos con problema, mirar los creativos y lo que pasó en otros módulos
+ * e interpretar con las IA— pero ya, sin esperar a la próxima lectura. Gasta crédito de IA (la interpretación se vuelve a pedir) y tarda uno o dos minutos: hace falta poder modificar el módulo.
+ */
+export async function actualizarAnalisisMeta(): Promise<{ error?: string; mensaje?: string }> {
+  const u = await requireModuloEscritura(MODULO);
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return { error: "No tienes acceso a ese país." };
+  const r = await refrescarAnalisisMeta(supabase, { paisId: pais.id, paisNombre: pais.nombre, hoy: hoyEnPanama(), interpretar: true, forzar: true, bloqueo: true });
+  await registrarAuditoria({ accion: "actualizar_analisis_meta", entidad: "meta_ajustes", detalle: `${pais.nombre} · ${r.analizado ? "listo" : (r.motivo ?? "no se pudo")}` });
+  revalidatePath("/anuncios-meta", "layout");
+  if (!r.analizado) return { error: r.motivo ?? "No se pudo actualizar el análisis." };
+  const partes = [
+    "Análisis del historial al día.",
+    `${r.investigados ?? 0} ${r.investigados === 1 ? "producto investigado" : "productos investigados"} por su entrega.`,
+    `${r.conSenales ?? 0} ${r.conSenales === 1 ? "producto" : "productos"} con señales de creativos y de otros módulos.`,
+    r.interpretado ? "Interpretación de la IA renovada." : `Interpretación: ${r.motivo ?? "no se renovó"}.`,
+  ];
+  return { mensaje: partes.join(" ") };
 }

@@ -13,7 +13,7 @@ export default async function CuentasMetaPage({ searchParams }: { searchParams: 
   const { datos, escribe, pais, hayToken } = await cargarPaginaMeta(searchParams);
   return (
     <MarcoMeta titulo="Cuentas" datos={datos} escribe={escribe} hayToken={hayToken} pais={pais} soloContenidoSiHayCuentas={false}>
-      <PanelCuentas cuentas={datos.cuentas} topes={datos.topes} productos={datos.productos} escribe={escribe} hayToken={hayToken} pais={pais} hoy={datos.hasta} />
+      <PanelCuentas calculados={datos.topesProductos} cuentas={datos.cuentas} topes={datos.topes} productos={datos.productos} enMarcha={datos.enMarcha.productos} escribe={escribe} hayToken={hayToken} pais={pais} hoy={datos.hasta} />
     </MarcoMeta>
   );
 }

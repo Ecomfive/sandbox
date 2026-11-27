@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { conPausaAlVolver } from "@/lib/consulta-con-pausa";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { pedidosNuevos, type PedidoNuevo } from "@/app/(app)/tienda-pedidos/avisos-actions";
@@ -14,8 +15,8 @@ import { CerrarIcon, PedidoIcon, SilencioIcon, SonidoIcon } from "@/lib/nav-icon
  * Compras, Producto u otro panel. Fuera de estas páginas no se pregunta ni se muestra nada.
  */
 const PAGINAS_DEL_AVISO = ["/tienda-pedidos", "/tienda-pedidos/logistica", "/despacho-ciudad", "/despacho-ciudad/devoluciones"];
-/** Las pestañas de esos paneles que no son de pedidos por despachar (17 nov 2026: ahora cuelgan de Pedidos y de Despacho ciudad). */
-const PESTANAS_SIN_AVISO = ["/tienda-pedidos/confirmacion", "/despacho-ciudad/cambios", "/despacho-ciudad/cuanto-hay", "/despacho-ciudad/pedir-inventario"];
+/** Las pestañas de esos paneles que no son de pedidos por despachar (17 nov 2026: ahora cuelgan de Pedidos y de Envíos Delivery). */
+const PESTANAS_SIN_AVISO = ["/tienda-pedidos/confirmacion", "/despacho-ciudad/cambios"];
 
 const enRuta = (ruta: string, p: string) => ruta === p || ruta.startsWith(`${p}/`);
 
@@ -90,7 +91,7 @@ function suscribir(alCambiar: () => void) {
 /**
  * El aviso de «Nuevo pedido» (12 nov 2026, pedido de Hernán, como en la app de Jorge): cuando cae un pedido en una tienda conectada a Shopify, abajo a la
  * derecha sale una tarjeta con la tienda, el número y el total, y un sonido corto; «Ver» abre el pedido. Se pregunta cada 30 segundos mientras la pestaña
- * está a la vista. Desde el 16 nov 2026 es para el equipo de despacho (quien tiene Despacho ciudad) y sale solo en Pedidos de tienda, Logística y las
+ * está a la vista. Desde el 16 nov 2026 es para el equipo de despacho (quien tiene Envíos Delivery) y sale solo en Pedidos de tienda, Logística y las
  * páginas de despacho; a Admin y CEO les llega sin sonido de entrada (`sonidoPorDefecto`), y cada uno lo activa o silencia con la cornetita.
  */
 export function AvisoPedidosNuevos({ codigoPais, sonidoPorDefecto }: { codigoPais: string; sonidoPorDefecto: boolean }) {
@@ -128,14 +129,16 @@ export function AvisoPedidosNuevos({ codigoPais, sonidoPorDefecto }: { codigoPai
         // Sin red: se vuelve a intentar en la próxima vuelta.
       }
     }
+    // Al volver a la pestaña solo si la última consulta fue hace 20 s o más.
+    const pausa = conPausaAlVolver(() => void revisar());
     function ciclo() {
-      temporizador = setTimeout(async () => {
-        await revisar();
+      temporizador = setTimeout(() => {
+        pausa.ahora();
         if (vivo) ciclo();
       }, CADA_MS);
     }
     ciclo();
-    const alVolver = () => void revisar();
+    const alVolver = pausa.alVolver;
     document.addEventListener("visibilitychange", alVolver);
     return () => {
       vivo = false;

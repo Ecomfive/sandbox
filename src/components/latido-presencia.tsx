@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { registrarActividad } from "@/lib/presencia-actions";
+import { conPausaAlVolver } from "@/lib/consulta-con-pausa";
 
 // Cada 60 s (rendimiento, 27 oct 2026: antes 20 s, una escritura en la base cada 20 s por persona con la app abierta).
 const INTERVALO_MS = 60_000;
@@ -26,13 +27,15 @@ export function LatidoPresencia() {
       if (document.visibilityState !== "visible") return;
       void registrarActividad(window.location.pathname, Date.now() - ultimoUso < SIN_USO_MS);
     }
-    latir();
-    const id = setInterval(latir, INTERVALO_MS);
-    document.addEventListener("visibilitychange", latir);
+    // Al volver a la pestaña solo si el último aviso fue hace 20 s o más (no uno por cada ida y vuelta).
+    const pausa = conPausaAlVolver(latir);
+    pausa.ahora();
+    const id = setInterval(pausa.ahora, INTERVALO_MS);
+    document.addEventListener("visibilitychange", pausa.alVolver);
     for (const e of EVENTOS_USO) window.addEventListener(e, usar, { passive: true, capture: true });
     return () => {
       clearInterval(id);
-      document.removeEventListener("visibilitychange", latir);
+      document.removeEventListener("visibilitychange", pausa.alVolver);
       for (const e of EVENTOS_USO) window.removeEventListener(e, usar, { capture: true });
     };
   }, []);

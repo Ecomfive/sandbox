@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- fotos de Effi */
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import type { ReactNode } from "react";
 import { EtapaCotizando, LlegadaCamino } from "@/app/(app)/publicaciones-dropi/llegada-camino";
 import { CodigosProducto } from "@/components/ui/codigos-producto";
@@ -99,7 +99,7 @@ export function FilaPublicacionEffiLista({ f, moneda, alAbrir }: { f: FilaPublic
     >
       <span className="flex min-w-0 items-center gap-3">
         {f.fotoUrl ? (
-          <img src={f.fotoUrl} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-lg border border-border object-cover" />
+          <FotoAmpliable src={f.fotoUrl} alt="" className="h-12 w-12 shrink-0 rounded-lg border border-border object-cover" />
         ) : (
           <span aria-hidden="true" className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-border-control" />
         )}

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { esLlegadaPuerto } from "@/lib/compras/etapas-puerto";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,7 @@ import { BuscarIcon } from "@/lib/nav-icons";
 import { diferenciaRecepcion } from "@/lib/wms/recepcion";
 import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { textoCodigos } from "@/lib/wms/codigos-producto";
-import { recibirCompra } from "./actions";
+import { marcarYaContadas, recibirCompra } from "./actions";
 import { codigoLote, PEDIR_CODIGO_LOTE } from "@/lib/wms/vencimiento";
 
 export interface LineaPorRecibir {
@@ -59,17 +60,22 @@ const cantidadDe = (t: string) => {
 /**
  * Recepción de una compra (migración 0241, flujograma de Costa Rica): se elige la compra, se escribe cuánto llegó de cada producto y lo que no cuadra lleva una nota. Lo escrito entra
  * al inventario de la bodega elegida en un solo paso, y el faltante queda en la compra. Un producto en blanco sigue pendiente, y una línea se recibe una sola vez.
+ * Donde la cantidad viene escrita (Panamá), «Llegaron» trae lo pedido y se corrige; lo que ya se había contado a mano se marca sin sumar («Ya estaban contadas»).
  */
 export function Recepcion({
   compras,
   bodegas,
   ubicaciones,
   puedeEscribir,
+  vieneEscrita = false,
+  admiteYaContadas = false,
 }: {
   compras: CompraPorRecibir[];
   bodegas: { id: string; nombre: string }[];
   ubicaciones: { id: string; bodegaId: string; codigo: string }[];
   puedeEscribir: boolean;
+  vieneEscrita?: boolean;
+  admiteYaContadas?: boolean;
 }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
@@ -80,6 +86,8 @@ export function Recepcion({
   const [ubicacion, setUbicacion] = useState("");
   const [escritos, setEscritos] = useState<Record<string, Escrito>>({});
   const [error, setError] = useState<string | null>(null);
+  // «Ya estaban contadas» pide confirmar antes de marcar.
+  const [confirmando, setConfirmando] = useState(false);
 
   const visibles = useMemo(() => {
     const q = sinAcentos(buscar.trim());
@@ -88,8 +96,16 @@ export function Recepcion({
   const compra = compras.find((c) => c.id === abierta) ?? null;
   const delaBodega = ubicaciones.filter((u) => u.bodegaId === bodega);
 
-  const escritoDe = (id: string) => escritos[id] ?? VACIO;
-  const cambiar = (id: string, cambio: Partial<Escrito>) => setEscritos((x) => ({ ...x, [id]: { ...escritoDe(id), ...cambio } }));
+  // Lo que la casilla trae de entrada: lo pedido donde la cantidad viene escrita (borrarla deja el producto pendiente); nada en un producto que no se puede recibir.
+  const deEntrada = (id: string): Escrito => {
+    const l = vieneEscrita && puedeEscribir ? compra?.lineas.find((x) => x.id === id) : undefined;
+    return l && !l.bloqueo ? { ...VACIO, llego: String(l.pedida) } : VACIO;
+  };
+  const escritoDe = (id: string) => escritos[id] ?? deEntrada(id);
+  const cambiar = (id: string, cambio: Partial<Escrito>) => {
+    setConfirmando(false);
+    setEscritos((x) => ({ ...x, [id]: { ...(x[id] ?? deEntrada(id)), ...cambio } }));
+  };
   const lineasEscritas = (compra?.lineas ?? []).filter((l) => !l.bloqueo && cantidadDe(escritoDe(l.id).llego) !== null);
   const faltaNota = lineasEscritas.some((l) => cantidadDe(escritoDe(l.id).llego) !== l.pedida && !escritoDe(l.id).nota.trim());
   const faltaLote = lineasEscritas.some((l) => l.manejaVencimiento && cantidadDe(escritoDe(l.id).llego) !== 0 && !escritoDe(l.id).vencimiento);
@@ -116,12 +132,30 @@ export function Recepcion({
     });
   };
 
+  const marcarSinSumar = () => {
+    if (!compra) return;
+    setError(null);
+    const items = lineasEscritas.map((l) => ({ item: l.id, cantidad: cantidadDe(escritoDe(l.id).llego), nota: escritoDe(l.id).nota }));
+    startTransition(async () => {
+      const r = await marcarYaContadas(compra.id, items);
+      setConfirmando(false);
+      if (r.error) {
+        setError(r.error);
+        return;
+      }
+      mostrarToast(`${compra.codigo}: ${r.lineas} ${r.lineas === 1 ? "producto marcado" : "productos marcados"} sin sumar al inventario`);
+      setEscritos({});
+      setAbierta(null);
+      router.refresh();
+    });
+  };
+
   if (compra) {
     return (
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
           <div className="flex min-w-0 flex-1 basis-72 flex-col gap-0.5">
-            <button type="button" onClick={() => { setAbierta(null); setError(null); }} className={`w-fit text-xs text-muted-foreground hover:text-foreground ${anilloFoco}`}>
+            <button type="button" onClick={() => { setAbierta(null); setError(null); setConfirmando(false); }} className={`w-fit text-xs text-muted-foreground hover:text-foreground ${anilloFoco}`}>
               ← Todas las compras
             </button>
             <h2 className="m-0 text-base font-semibold">{compra.codigo}</h2>
@@ -254,14 +288,34 @@ export function Recepcion({
                 {error}
               </p>
             )}
-            <button
-              type="button"
-              onClick={recibir}
-              disabled={pendiente || lineasEscritas.length === 0 || faltaNota || faltaLote || !bodega}
-              className="ml-auto min-h-10 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
-            >
-              {pendiente ? "Guardando…" : `Recibir en ${nombreBodega}`}
-            </button>
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              {admiteYaContadas &&
+                (confirmando ? (
+                  <span role="group" aria-label="Confirmar que ya estaban contadas" className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm">¿Marcar {lineasEscritas.length} sin sumar al inventario?</span>
+                    <button type="button" onClick={marcarSinSumar} disabled={pendiente} className={`min-h-10 rounded-md border border-warning px-3 text-sm font-semibold text-warning hover:bg-warning/10 ${anilloFoco}`}>
+                      Sí, ya estaban
+                    </button>
+                    <button type="button" onClick={() => setConfirmando(false)} disabled={pendiente} className={`min-h-10 rounded-md px-3 text-sm text-muted-foreground hover:bg-muted ${anilloFoco}`}>
+                      Cancelar
+                    </button>
+                  </span>
+                ) : (
+                  <button type="button" onClick={() => setConfirmando(true)} disabled={pendiente || lineasEscritas.length === 0} className={`min-h-10 rounded-md border border-border-control px-3 text-sm font-medium hover:bg-muted disabled:text-muted-foreground ${anilloFoco}`}>
+                    Ya estaban contadas
+                  </button>
+                ))}
+              {!confirmando && (
+                <button
+                  type="button"
+                  onClick={recibir}
+                  disabled={pendiente || lineasEscritas.length === 0 || faltaNota || faltaLote || !bodega}
+                  className={`min-h-10 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground ${anilloFoco}`}
+                >
+                  {pendiente ? "Guardando…" : `Recibir en ${nombreBodega}`}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -278,7 +332,11 @@ export function Recepcion({
             <input type="search" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Compra o producto" className={`${fieldClassSm} w-64 pl-8`} />
           </span>
         </label>
-        <p className="m-0 text-xs text-muted-foreground">Las compras en camino o que ya llegaron, con lo que falta por recibir. Las completadas no salen: ya están en el levantamiento.</p>
+        <p className="m-0 text-xs text-muted-foreground">
+          {vieneEscrita
+            ? "Las compras que ya llegaron a puerto o a bodega, con lo que falta por recibir. Nada suma al inventario hasta que se recibe."
+            : "Las compras en camino o que ya llegaron, con lo que falta por recibir. Las completadas no salen: ya están en el levantamiento."}
+        </p>
       </div>
       <ul className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-border bg-card p-0">
         {visibles.length === 0 && <li className="px-4 py-8 text-center text-sm text-muted-foreground">{compras.length ? "Ninguna compra coincide." : "No hay compras por recibir."}</li>}
@@ -291,7 +349,7 @@ export function Recepcion({
                   <span className="block truncate text-sm font-medium">{c.codigo}</span>
                   <span className="block truncate text-xs text-muted-foreground">{c.lineas.map((l) => l.nombre).join(" · ")}</span>
                 </span>
-                {c.etapa === "arribo_mercancia" || c.etapa === "en_bodega" ? <Badge tone="success">Llegó</Badge> : <Badge tone="azul">En camino</Badge>}
+                {esLlegadaPuerto(c.etapa) || c.etapa === "en_bodega" || c.etapa === "completado" ? <Badge tone="success">Llegó</Badge> : <Badge tone="azul">En camino</Badge>}
                 <span className="w-28 text-right text-xs text-muted-foreground">{c.llegada ? formatearFecha(c.llegada) : "Sin fecha"}</span>
                 <span className="w-24 text-right text-sm tabular-nums">{entero(pedidas)} u.</span>
               </button>

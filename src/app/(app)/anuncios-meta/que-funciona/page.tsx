@@ -8,10 +8,15 @@ export const dynamic = "force-dynamic";
 
 /** Anuncios Meta › Qué funciona: lo que ya sabemos y, por videos (ángulo, gancho, formato, llamado, recursos, estructura, duración, oferta), campañas (ángulo, CBO o ABO, puja, producto, etapa) y anuncios (copy, landing), qué da mejores resultados, de mejor a peor CPA y con qué tan seguro es. */
 export default async function QueFuncionaPage({ searchParams }: { searchParams: ParametrosMeta }) {
-  const { datos, escribe, pais, hayToken } = await cargarPaginaMeta(searchParams);
+  const sp = await searchParams;
+  const uno = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  // Arranca en lo que está en marcha; `?ver=apagados` o `?ver=todos` cambian de qué se aprende.
+  const pedido = uno(sp.ver);
+  const ver = pedido === "apagados" || pedido === "todos" ? pedido : "activos";
+  const { datos, escribe, pais, hayToken } = await cargarPaginaMeta(searchParams, { ver });
   return (
     <MarcoMeta titulo="Qué funciona" datos={datos} escribe={escribe} hayToken={hayToken} pais={pais}>
-      <QueFunciona grupos={datos.grupos} gruposVideo={datos.gruposVideo} videosSinAngulo={datos.videosSinAngulo} ganchosSinTipo={datos.ganchosSinTipo} iaConectada={datos.iaConectada} escribe={escribe} />
+      <QueFunciona ver={ver} productos={datos.productosVista.filter((p) => p.clave).sort((a, b) => Number(b.enMarcha) - Number(a.enMarcha) || b.r.gasto - a.r.gasto).map((p) => ({ clave: p.clave, nombre: p.nombre, enMarcha: p.enMarcha }))} productoActual={uno(sp.producto) ?? null} grupos={datos.grupos} gruposVideo={datos.gruposVideo} videosSinAngulo={datos.videosSinAngulo} ganchosSinTipo={datos.ganchosSinTipo} iaConectada={datos.iaConectada} escribe={escribe} />
     </MarcoMeta>
   );
 }

@@ -9,6 +9,9 @@ export type EventoAviso = "llegada_puerto" | "llegada_bodega" | "pago_adelantado
 /** Qué etapa de la compra dispara el aviso de una llegada. */
 export const LLEGADA_DE_ETAPA: Readonly<Record<string, { tipo: TipoLlegada; evento: EventoAviso }>> = {
   arribo_mercancia: { tipo: "puerto", evento: "llegada_puerto" },
+  llegada_puerto_lote_1: { tipo: "puerto", evento: "llegada_puerto" },
+  llegada_puerto_lote_2: { tipo: "puerto", evento: "llegada_puerto" },
+  llegada_puerto_lote_3: { tipo: "puerto", evento: "llegada_puerto" },
   en_bodega: { tipo: "bodega", evento: "llegada_bodega" },
 };
 
@@ -54,7 +57,60 @@ export interface FilaLlegada {
   /** La llegada de la que sale esta fila y cuándo se avisó (solo en la lista de todas las llegadas). */
   llegadaId?: string;
   llegadaEn?: string;
+  /** Cuándo se archivó (ya se recibió); null = pendiente de recibir (migración 0360). */
+  archivadaEn?: string | null;
 }
+
+/** Las que siguen pendientes de recibir (sin archivar) y las ya archivadas, cada una en el orden en que llegaron. */
+export const pendientesDeRecibir = <T extends { archivadaEn?: string | null }>(filas: readonly T[]): T[] => filas.filter((f) => !f.archivadaEn);
+export const yaArchivadas = <T extends { archivadaEn?: string | null }>(filas: readonly T[]): T[] => filas.filter((f) => !!f.archivadaEn);
+
+/** Una compra se mueve a «Llegada a Puerto» de a una; las que pasan una tras otra en una misma tanda forman un lote. Más que esto sin moverse nada, empieza otro lote. */
+export const MINUTOS_ENTRE_LOTES = 20;
+
+/** Las llegadas que se avisaron juntas: de la primera a la última compra que pasó a puerto en esa tanda. */
+export interface LoteLlegada<T> {
+  /** La compra más antigua del lote: así el lote conserva su identidad aunque le lleguen más compras después. */
+  clave: string;
+  desde: string;
+  hasta: string;
+  filas: T[];
+}
+
+/**
+ * Separa la lista de llegadas en lotes (24 nov 2026, pedido de Logística: «cada llegada a puerto por separado, para descargarla y verla por lotes»). Compras llega con un aviso por compra
+ * (se mueven de a una, a veces 17 en un minuto), así que el lote es la tanda: las compras cuya llegada cayó con menos de `MINUTOS_ENTRE_LOTES` minutos entre una y otra. Las filas vienen de la
+ * más reciente a la más antigua (`llegadaEn`) y el resultado va igual: el lote más reciente primero, y dentro de cada uno el orden en que vienen. Una fila sin fecha forma su propio lote.
+ */
+export function agruparEnLotes<T extends { compraId: string; llegadaEn?: string }>(filas: readonly T[], minutos = MINUTOS_ENTRE_LOTES): LoteLlegada<T>[] {
+  const lotes: LoteLlegada<T>[] = [];
+  const brecha = minutos * 60_000;
+  for (const f of filas) {
+    const t = f.llegadaEn ? Date.parse(f.llegadaEn) : NaN;
+    const ultimo = lotes[lotes.length - 1];
+    // `desde` es la hora de la compra más antigua que ya tiene el lote (las filas vienen de la más nueva a la más vieja).
+    if (ultimo && Number.isFinite(t) && f.llegadaEn && Date.parse(ultimo.desde) - t <= brecha && Date.parse(ultimo.desde) - t >= 0) {
+      ultimo.filas.push(f);
+      ultimo.desde = f.llegadaEn;
+      ultimo.clave = f.compraId;
+    } else lotes.push({ clave: f.compraId, desde: f.llegadaEn ?? "", hasta: f.llegadaEn ?? "", filas: [f] });
+  }
+  return lotes;
+}
+
+const HORA = { hour: "numeric", minute: "2-digit", timeZone: "America/Panama" } as const;
+
+/** Cómo se llama un lote en pantalla y en el PDF: «24 nov 2026 · 7:14 a. m.» (o «7:14 – 7:15 a. m.» si la tanda duró más de un minuto), en hora de Panamá. Sin fecha, «Sin fecha». */
+export function nombreDeLote(desde: string, hasta: string): string {
+  if (!desde || Number.isNaN(Date.parse(desde))) return "Sin fecha";
+  const dia = new Date(desde).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Panama" });
+  const a = new Date(desde).toLocaleTimeString("es-PA", HORA);
+  const b = hasta && !Number.isNaN(Date.parse(hasta)) ? new Date(hasta).toLocaleTimeString("es-PA", HORA) : a;
+  return a === b ? `${dia} · ${a}` : `${dia} · ${a} – ${b}`;
+}
+
+/** Cuántas compras archivar o sacar del archivo de una vez, como mucho. */
+export const MAX_ARCHIVAR_A_LA_VEZ = 300;
 
 /** Los periodos de «Todas las llegadas» (días contando hoy) y el de entrada. */
 export const DIAS_LISTA_LLEGADAS = [1, 7, 30, 90] as const;
@@ -69,6 +125,13 @@ export function desdeDeLista(hoy: string, dias: number): string {
   const d = new Date(`${hoy}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() - (Math.max(1, dias) - 1));
   return `${d.toISOString().slice(0, 10)}T00:00:00-05:00`;
+}
+
+/** La dirección de «Llegadas a puerto» con el periodo más corto que alcanza a todo lo que sigue por recibir (si algo es más viejo que el más largo, el más largo). */
+export function hrefDeListaPuerto(hoy: string, pendientes: readonly { llegadaEn?: string }[]): string {
+  const alcanza = (dias: number) => pendientes.every((f) => !f.llegadaEn || Date.parse(f.llegadaEn) >= Date.parse(desdeDeLista(hoy, dias)));
+  const dias = pendientes.length ? (DIAS_LISTA_LLEGADAS.find((d) => d >= DIAS_LISTA_PREDETERMINADO && alcanza(d)) ?? DIAS_LISTA_LLEGADAS[DIAS_LISTA_LLEGADAS.length - 1]) : DIAS_LISTA_PREDETERMINADO;
+  return `${RUTA_LISTA_PUERTO}&dias=${dias}`;
 }
 
 /** Una compra puede estar en dos llegadas (si se movió de etapa y volvió): en la lista de todas cuenta una vez, con su llegada más reciente (las filas vienen de la más nueva a la más vieja). */

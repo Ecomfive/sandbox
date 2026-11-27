@@ -69,9 +69,13 @@ export async function cambiarEtiquetasPedido(ordenId: string, agregarCrudo: unkn
   const quitadas = antes.filter((h) => !final.some((e) => e.toLowerCase() === h.toLowerCase()));
   const detalle = textoCambio(agregadas, quitadas);
   const evento = { orden_id: o.id, tipo: "etiqueta", detalle, usuario: quien };
-  const { error: eE } = await supabase.from("ven_orden_eventos").insert(evento);
-  // Sin la migración 0337 el tipo «etiqueta» no existe: queda como nota del historial.
-  if (eE) await supabase.from("ven_orden_eventos").insert({ ...evento, tipo: "nota" });
+  // Quién fue y qué etiquetas (20 nov 2026, migración 0345): de aquí sale el rendimiento de cada asesor (Pedidos de tienda › Asesores).
+  const { error: eE } = await supabase.from("ven_orden_eventos").insert({ ...evento, usuario_id: usuario.id, agregadas, quitadas });
+  // Sin la migración 0345, sin esas columnas; sin la 0337, el tipo «etiqueta» no existe y queda como nota del historial.
+  if (eE) {
+    const { error: e2 } = await supabase.from("ven_orden_eventos").insert(evento);
+    if (e2) await supabase.from("ven_orden_eventos").insert({ ...evento, tipo: "nota" });
+  }
   await registrarAuditoria({ accion: "etiquetas_shopify", entidad: "ven_ordenes", entidadId: o.id as string, detalle: `${tienda.nombre} ${o.numero ?? ""}: ${detalle}`.slice(0, 500) });
   for (const ruta of RUTAS) revalidatePath(ruta);
   return { ok: true, etiquetas: final, ...(r.error ? { aviso: `Una parte no entró: ${r.error}` } : {}) };

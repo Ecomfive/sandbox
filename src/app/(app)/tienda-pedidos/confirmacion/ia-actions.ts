@@ -10,7 +10,7 @@ import { etiquetaDeZona, type Combinado, type EstadoAnalisis, type ResultadoMode
 import { coincideConPropuesta, faltaVigente, revisarVeredicto, type DecisionRevision, type Veredicto } from "@/lib/confirmacion-ia/revision";
 import { MAX_INSTRUCCIONES } from "@/lib/confirmacion-ia/prompt";
 import type { PedidoMuestra, ResultadoPrueba } from "@/lib/confirmacion-ia/prueba-historica";
-import { listarMuestraHistorica, probarPedidoHistorico, analizarOrden, analizarPendientes, armarMensajeAdelanto, armarMensajeDato, cargarConfig, enviarMensajeDato as mandarMensajeDato, evaluarDireccion, MAX_MENSAJES, SIN_MIGRACION_CONFIRMACION, type EstadoMensaje } from "@/lib/confirmacion-ia/servidor";
+import { listarMuestraHistorica, probarPedidoHistorico, analizarOrden, analizarPendientes, armarMensajeAdelanto, armarMensajeDato, cargarConfig, enviarMensajeDato as mandarMensajeDato, evaluarDireccion, MAX_MENSAJES, revisarChatDelPedido, SIN_MIGRACION_CONFIRMACION, type EstadoMensaje } from "@/lib/confirmacion-ia/servidor";
 import { errorDeRegla, normalizarTexto, permiteAdelanto, ZONAS, type Zona } from "@/lib/confirmacion-ia/zonas";
 import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
@@ -491,7 +491,7 @@ export async function revisarAnalisis(
   // Falta un dato: la pantalla le pregunta a la persona si le manda el mensaje al cliente o si ya se lo mandó a mano (no se manda solo).
   if (!veredicto.completa && veredicto.falta) {
     const p = await prepararPedirDato(supabase, analisisId);
-    if (!("error" in p)) return { pedirDato: p };
+    if (!("error" in p)) return { pedirDato: await conLoDelChat(supabase, analisisId, p) };
   }
   return {};
 }
@@ -513,6 +513,8 @@ export interface PedirDato {
   /** Qué pasó antes con el mensaje de este pedido (por ejemplo «enviado»: ya se le había pedido). */
   estado: EstadoMensaje;
   enviados: number;
+  /** Lo que dice el chat de iComfly: `ya` true = el bot o un asesor ya se lo pidió; false = todavía no; null = no se pudo saber. Ausente si no hay chat o no se revisó. */
+  chat?: { ya: boolean | null; motivo: string };
 }
 
 /** Lee el análisis (del país y de las tiendas que la persona ve) y arma la pregunta. Sin migración 0307, lo que falta se toma de lo que dijo la IA. */
@@ -542,12 +544,25 @@ async function prepararPedirDato(supabase: ReturnType<typeof createServiceClient
   return { ...base, tipo: "dato", falta, mensaje: m.mensaje };
 }
 
+/** Le agrega a la pregunta lo que dice el chat de iComfly (si ya se lo pidieron). Nunca falla: sin chat o sin IA, la pregunta queda como estaba. */
+async function conLoDelChat(supabase: ReturnType<typeof createServiceClient>, analisisId: string, p: PedirDato): Promise<PedirDato> {
+  try {
+    const { data: a } = await supabase.from("confirmacion_ia_analisis").select("orden_id").eq("id", analisisId).maybeSingle();
+    if (!a) return p;
+    const v = await revisarChatDelPedido(supabase, a.orden_id as string, { tipo: p.tipo, falta: p.tipo === "dato" ? p.falta : null });
+    return v ? { ...p, chat: v } : p;
+  } catch {
+    return p;
+  }
+}
+
 /** La pregunta «¿le mando el mensaje?» de un pedido que falta un dato (para pedirlo desde su ficha). */
 export async function vistaPreviaMensajeDato(analisisId: string): Promise<{ error?: string; pedirDato?: PedirDato }> {
   await requireModuloEscritura(MODULO);
   if (!UUID.test(String(analisisId))) return { error: "Análisis no válido." };
-  const p = await prepararPedirDato(createServiceClient(), analisisId);
-  return "error" in p ? p : { pedirDato: p };
+  const supabase = createServiceClient();
+  const p = await prepararPedirDato(supabase, analisisId);
+  return "error" in p ? p : { pedirDato: await conLoDelChat(supabase, analisisId, p) };
 }
 
 /**
@@ -620,7 +635,7 @@ export async function listarPedidosParaProbar(d: { tiendaId: string | null; dias
 }
 
 /** Analiza hasta 6 pedidos de la muestra con el mismo análisis del sistema y devuelve cada uno junto a su zona real. */
-export async function probarPedidosReales(ids: string[], opciones: { sinTendencia: boolean }): Promise<{ error: string } | { resultados: ResultadoPrueba[]; omitidos: number }> {
+export async function probarPedidosReales(ids: string[]): Promise<{ error: string } | { resultados: ResultadoPrueba[]; omitidos: number }> {
   const usuario = await requireModuloEscritura(MODULO);
   if (!esAdministrador(usuario)) return { error: SOLO_ADMIN_PRUEBA };
   const lista = (Array.isArray(ids) ? ids : []).filter((x) => UUID.test(String(x))).slice(0, 6);
@@ -629,7 +644,7 @@ export async function probarPedidosReales(ids: string[], opciones: { sinTendenci
   const pais = await getPaisActual(supabase);
   const { config, faltaMigracion } = await cargarConfig(supabase, pais.id);
   if (faltaMigracion) return { error: SIN_MIGRACION_CONFIRMACION };
-  const hechos = await Promise.all(lista.map((id) => probarPedidoHistorico(supabase, id, pais.id, config, { sinTendencia: !!opciones?.sinTendencia }).catch(() => null)));
+  const hechos = await Promise.all(lista.map((id) => probarPedidoHistorico(supabase, id, pais.id, config).catch(() => null)));
   const resultados = hechos.filter((r): r is ResultadoPrueba => r !== null);
   return { resultados, omitidos: lista.length - resultados.length };
 }

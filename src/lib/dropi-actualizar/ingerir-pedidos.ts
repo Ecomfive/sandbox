@@ -14,6 +14,9 @@ export interface PedidoDropi {
   total_order: number;
   created_at: string;
   orderdetails: { product: { id: number; sku: string | null; name: string } }[];
+  /** La bodega de Dropi de la que sale (en Panamá 280 = B280, que cobra comisión) y la guía (migración 0340). */
+  warehouse_id?: number | null;
+  shipping_guide?: string | null;
 }
 
 function* enLotes<T>(items: T[], tamano: number): Generator<T[]> {
@@ -87,12 +90,23 @@ export async function ingerirPedidos(supabase: SupabaseClient, codigoPais: strin
       estado: orden.status,
       fecha: orden.created_at.slice(0, 10),
       fecha_hora: orden.created_at,
+      bodega_id: typeof orden.warehouse_id === "number" ? orden.warehouse_id : null,
+      guia: orden.shipping_guide?.trim() || null,
     });
   }
   const repetidas = conSku.filter((o) => o.sku !== null).length - filasPorReferencia.size;
   const filas = Array.from(filasPorReferencia.values());
+  // Sin la migración 0340 no hay bodega ni guía: se guarda como antes (y se avisa una vez).
+  let sinBodega = false;
+  const sinNuevas = (lote: Record<string, unknown>[]) => lote.map((f) => Object.fromEntries(Object.entries(f).filter(([k]) => k !== "bodega_id" && k !== "guia")));
   for (const lote of enLotes(filas, 500)) {
-    const { error } = await supabase.from("ordenes").upsert(lote, { onConflict: "plataforma_id,referencia_externa" });
+    const filasLote = sinBodega ? sinNuevas(lote) : lote;
+    let { error } = await supabase.from("ordenes").upsert(filasLote, { onConflict: "plataforma_id,referencia_externa" });
+    if (error && !sinBodega && /bodega_id|guia/.test(error.message)) {
+      sinBodega = true;
+      log("Falta correr la migración 0340: los pedidos se guardan sin bodega ni guía.");
+      ({ error } = await supabase.from("ordenes").upsert(sinNuevas(lote), { onConflict: "plataforma_id,referencia_externa" }));
+    }
     if (error) throw new Error(`Error guardando ordenes: ${error.message}`);
   }
 

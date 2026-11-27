@@ -3,7 +3,10 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUsuarioActual } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { hrefDeAviso } from "@/lib/compras/llegadas-avisos";
+import { esAvisoDePuerto, hrefDeAviso, hrefDeListaPuerto, pendientesDeRecibir, totalesDeLlegada } from "@/lib/compras/llegadas-avisos";
+import { cargarFilasDeLlegadas } from "@/lib/compras/llegadas-servidor";
+import { motivoSinAccesoAPuerto } from "../llegadas/acceso-llegadas";
+import type { LlegadasEnAvisos } from "./llegadas-puerto-aviso";
 import { ParaTi, type AvisoParaTi } from "./para-ti";
 import { ActualizacionesAvisos, type ActualizacionAviso } from "./actualizaciones-avisos";
 import { claveNovedad, DIAS_AVISO, recientes } from "@/lib/ayuda/actualizaciones";
@@ -39,6 +42,30 @@ export default async function NotificacionesPage() {
     .order("creado_en", { ascending: false })
     .limit(50);
   const avisos: AvisoParaTi[] = (propios ?? []).map((a) => ({ id: a.id, titulo: a.titulo, texto: a.texto, href: hrefDeAviso(a.titulo, a.href), leida: !!a.leida_en, creadoEn: a.creado_en }));
+  // Los avisos «Llega a puerto» (uno por cambio de etapa) se juntan en una sola tarjeta con la lista completa de lo que sigue por recibir (24 nov 2026, pedido de Logística).
+  const avisosPuerto = avisos.filter((a) => esAvisoDePuerto(a.titulo));
+  let llegadas: LlegadasEnAvisos | null = null;
+  if (avisosPuerto.length > 0 && !(await motivoSinAccesoAPuerto(supabase, usuario))) {
+    const masViejo = avisosPuerto.reduce((m, a) => (a.creadoEn < m ? a.creadoEn : m), avisosPuerto[0].creadoEn);
+    // La llegada se guarda un instante antes que su aviso: se busca desde una hora antes del aviso más viejo.
+    const todas = await cargarFilasDeLlegadas(supabase, "puerto", new Date(Date.parse(masViejo) - 3_600_000).toISOString());
+    const sinAcceso = todas.length > 0 && (await motivoSinAccesoAPuerto(supabase, usuario, todas.map((f) => f.compraId)));
+    if (!sinAcceso) {
+      const porRecibir = pendientesDeRecibir(todas);
+      const t = totalesDeLlegada(porRecibir);
+      llegadas = {
+        avisoIds: avisosPuerto.map((a) => a.id),
+        sinLeer: avisosPuerto.filter((a) => !a.leida).length,
+        creadoEn: avisosPuerto.reduce((m, a) => (a.creadoEn > m ? a.creadoEn : m), avisosPuerto[0].creadoEn),
+        compras: t.compras,
+        unidades: t.unidades,
+        cajas: t.cajas,
+        sinCajas: t.sinCajas,
+        href: hrefDeListaPuerto(hoyPanama(), porRecibir),
+      };
+    }
+  }
+  const avisosSueltos = llegadas ? avisos.filter((a) => !esAvisoDePuerto(a.titulo)) : avisos;
   // Las actualizaciones del sistema de sus módulos de los últimos días, con las que ya vio (migración 0218).
   const vistas = await vistasDe(supabase, usuario.id);
   const actualizaciones: ActualizacionAviso[] = recientes(novedadesPara(usuario.modulos), hoyPanama()).map((n) => ({
@@ -55,7 +82,7 @@ export default async function NotificacionesPage() {
     return (
       <Pagina ancho="media" className="flex flex-col gap-6">
         <EncabezadoPagina titulo="Centro de notificaciones" oculto />
-        <ParaTi avisos={avisos} />
+        <ParaTi avisos={avisosSueltos} llegadas={llegadas} />
         <ActualizacionesAvisos actualizaciones={actualizaciones} dias={DIAS_AVISO} />
       </Pagina>
     );
@@ -145,7 +172,7 @@ export default async function NotificacionesPage() {
         de Dropi siguen vivas — todo en un solo lugar.
       </EncabezadoPagina>
 
-      <ParaTi avisos={avisos} />
+      <ParaTi avisos={avisosSueltos} llegadas={llegadas} />
       <ActualizacionesAvisos actualizaciones={actualizaciones} dias={DIAS_AVISO} />
 
       <CentroNotificaciones

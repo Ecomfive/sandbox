@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useEffect, useState } from "react";
 import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { Badge } from "@/components/ui/badge";
@@ -7,8 +8,9 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { cuantasCajas, textoCaja, unidadesDeCajas } from "@/lib/wms/cajas";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { formatearTiempoRelativo } from "@/lib/formato";
+import { FechaHora } from "@/components/ui/fecha-hora";
 import { CalendarioIcon, ComprasIcon, EnvioIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
+import { SeccionCostoProducto } from "@/components/costos/costo-producto";
 import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
 import { ETIQUETA_PLATAFORMA, type Plataforma } from "@/lib/wms/stock-plataformas";
 import { juntarConVariantes, sumarCubetas, type Cubetas } from "@/lib/wms/stock-con-variantes";
@@ -110,6 +112,7 @@ export function FichaStock({
   bodegasExternas,
   conPlataformas = false,
   esAdmin = false,
+  soloEnBodegas = null,
   puedeComentar = puedeEscribir,
   alCerrar,
   alCambiar,
@@ -127,6 +130,11 @@ export function FichaStock({
   conPlataformas?: boolean;
   /** Es administrador: en los países donde toda salida va con remisión, solo él hace salidas y ajustes a mano. */
   esAdmin?: boolean;
+  /**
+   * Las únicas bodegas que esa persona puede modificar (quien no está a cargo del inventario: la de despacho), sin transferir. `null` = todas. Las remisiones no cambian.
+   * El servidor lo vuelve a comprobar.
+   */
+  soloEnBodegas?: string[] | null;
   /** Si puede escribir notas en el producto (por omisión, quien puede escribir en el inventario). */
   puedeComentar?: boolean;
   alCerrar: () => void;
@@ -139,6 +147,8 @@ export function FichaStock({
   const id = sku?.id;
   // La ficha de Producto encima de esta (11 nov 2026, pedido de Hernán: que Dinora cree variantes, una productos, etc. sin salir del Levantamiento).
   const puedeVerProducto = usePuedeAbrir("producto");
+  // El Levantamiento es del módulo Inventario: quien abre la ficha desde otro lado (Producto, Gestión de IDs) y no lo tiene, no ve el enlace.
+  const puedeVerInventario = usePuedeAbrir("inventario");
   const [productoAbierto, setProductoAbierto] = useState<string | null>(null);
 
   useEffect(() => {
@@ -156,6 +166,8 @@ export function FichaStock({
   const esTest = sku?.clase === "test";
   // Corregir un valor: cualquiera que edite el inventario, en todos los países, siempre con nota (7 nov 2026).
   const puedeCorregir = puedeEscribir && !esCombo && !esTest;
+  const puedeEnBodega = (bodegaId: string) => soloEnBodegas === null || soloEnBodegas.includes(bodegaId);
+  const bodegasQueMueve = bodegasPropias.filter((b) => puedeEnBodega(b.id));
   return (
     <Ventana
       abierto={!!sku}
@@ -193,13 +205,13 @@ export function FichaStock({
 
           {puedeEscribir && !esCombo && !esTest && (
             <div className="flex flex-wrap gap-2 border-y border-border px-5 py-3">
-              {(["entrada", "salida"] as const).filter((tipo) => puedeMoverAMano(tipo, codigoPais, esAdmin)).map((tipo) => (
+              {(["entrada", "salida"] as const).filter((tipo) => bodegasQueMueve.length > 0 && puedeMoverAMano(tipo, codigoPais, esAdmin)).map((tipo) => (
                 <PanelMovimiento
                   key={`${sku.id}-${tipo}`}
                   skuId={sku.id}
                   tipo={tipo}
                   motivoObligatorio={pideMotivo(tipo, codigoPais)}
-                  bodegas={bodegasPropias}
+                  bodegas={bodegasQueMueve}
                   ubicaciones={ubicaciones}
                   manejaVencimiento={sku.manejaVencimiento}
                   lotes={datos && datos !== "error" ? datos.lotes : []}
@@ -214,7 +226,7 @@ export function FichaStock({
                 <CorregirStock
                   key={`${sku.id}-corregir-${version}`}
                   skuId={sku.id}
-                  bodegas={datos && datos !== "error" ? datos.bodegas.filter((b) => b.tipo !== "externa").map((b) => ({ bodegaId: b.bodegaId, nombre: b.nombre, fisico: b.fisico })) : []}
+                  bodegas={datos && datos !== "error" ? datos.bodegas.filter((b) => b.tipo !== "externa" && puedeEnBodega(b.bodegaId)).map((b) => ({ bodegaId: b.bodegaId, nombre: b.nombre, fisico: b.fisico })) : []}
                   lotes={datos && datos !== "error" ? datos.lotes : []}
                   manejaVencimiento={sku.manejaVencimiento}
                   alGuardar={() => {
@@ -227,7 +239,7 @@ export function FichaStock({
               {puedeCorregir && !sku.manejaVencimiento && (
                 <PanelDefectuoso
                   key={`${sku.id}-defectuoso-${version}`}
-                  opciones={opcionesDefectuoso(sku, datos && datos !== "error" ? datos : null)}
+                  opciones={opcionesDefectuoso(sku, datos && datos !== "error" ? datos : null).map((o) => ({ ...o, bodegas: o.bodegas.filter((b) => puedeEnBodega(b.bodegaId)) }))}
                   puedeBaja={puedeMoverAMano("salida", codigoPais, esAdmin)}
                   alGuardar={() => {
                     setVersion((v) => v + 1);
@@ -235,17 +247,20 @@ export function FichaStock({
                   }}
                 />
               )}
-              <PanelTransferencia
-                key={`${sku.id}-transferir`}
-                skuId={sku.id}
-                bodegas={bodegasPropias}
-                manejaVencimiento={sku.manejaVencimiento}
-                lotes={datos && datos !== "error" ? datos.lotes : []}
-                alGuardar={() => {
-                  setVersion((v) => v + 1);
-                  alCambiar();
-                }}
-              />
+              {/* Transferir es de la persona a cargo del inventario y de los administradores (26 nov 2026). */}
+              {soloEnBodegas === null && (
+                <PanelTransferencia
+                  key={`${sku.id}-transferir`}
+                  skuId={sku.id}
+                  bodegas={bodegasPropias}
+                  manejaVencimiento={sku.manejaVencimiento}
+                  lotes={datos && datos !== "error" ? datos.lotes : []}
+                  alGuardar={() => {
+                    setVersion((v) => v + 1);
+                    alCambiar();
+                  }}
+                />
+              )}
               {bodegasExternas.length > 0 && (
                 <PanelRemision
                   key={`${sku.id}-remision`}
@@ -320,7 +335,18 @@ export function FichaStock({
                         <Fragment key={b.bodegaId}>
                         <tr className="border-t border-border">
                           <th scope="row" className="py-1.5 pr-2 text-left font-medium">
-                            {b.nombre}
+                            {/* Una bodega propia abre su levantamiento con este producto (23 nov 2026, pedido de Dinora). Las de plataforma no se cuentan ahí. */}
+                            {b.tipo !== "externa" && puedeVerInventario ? (
+                              <Link
+                                href={`/inventario/levantamiento?bodega=${b.bodegaId}&producto=${sku.id}`}
+                                title={`Abrir el levantamiento de ${b.nombre} con este producto`}
+                                className="underline-offset-2 hover:text-primario hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                              >
+                                {b.nombre}
+                              </Link>
+                            ) : (
+                              b.nombre
+                            )}
                             {b.tipo === "externa" && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">{plataforma ? `según ${ETIQUETA_PLATAFORMA[plataforma]}` : "externa"}</span>}
                             {sinRepartir && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">stock general, sin repartir</span>}
                           </th>
@@ -335,10 +361,20 @@ export function FichaStock({
                             <th scope="row" className="py-1 pr-2 pl-5 text-left text-xs font-normal">
                               <span aria-hidden="true">↳ </span>
                               <span className="sr-only">Incluido en el total de {b.nombre}: </span>
-                              {p.nombre}
+                              {b.tipo !== "externa" && !p.general && puedeVerInventario ? (
+                                <Link
+                                  href={`/inventario/levantamiento?bodega=${b.bodegaId}&producto=${p.clave}`}
+                                  title={`Abrir el levantamiento de ${b.nombre} con esta variante`}
+                                  className="underline-offset-2 hover:text-primario hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                >
+                                  {p.nombre}
+                                </Link>
+                              ) : (
+                                p.nombre
+                              )}
                               {p.general && <span className="ml-1.5 text-[11px]">sin repartir</span>}
                               {/* Corregir el número de esa variante en esa bodega y marcar unidades defectuosas, sin salir de la ficha del principal (19 nov 2026, pedido de Jhokser). El stock general sin repartir es del propio principal. */}
-                              {puedeCorregir && !sku.manejaVencimiento && b.tipo !== "externa" && (
+                              {puedeCorregir && !sku.manejaVencimiento && b.tipo !== "externa" && puedeEnBodega(b.bodegaId) && (
                                 <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                   <CorregirStock
                                     key={`${p.clave}-${b.bodegaId}-corregir-${version}`}
@@ -472,6 +508,9 @@ export function FichaStock({
               </Seccion>
             )}
 
+            {/* El costo viene de la hoja de Costos de producto (0992): aquí solo se ve, no se edita. */}
+            <SeccionCostoProducto skuId={sku.id} />
+
             {!esCombo && (
               <Seccion icono={ComprasIcon} titulo="Compras">
                 <ComprasProducto key={sku.id} id={sku.id} limite={5} pais={codigoPais} />
@@ -515,7 +554,7 @@ export function FichaStock({
                         )}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        Desde {e.desde} · {formatearTiempoRelativo(e.enviadoEn)}
+                        Desde {e.desde} · <FechaHora iso={e.enviadoEn} />
                         {e.referencia ? ` · ${e.referencia}` : ""}
                         {e.motivo ? ` · ${e.motivo}` : ""}
                       </span>
@@ -539,7 +578,7 @@ export function FichaStock({
                         <span className="text-xs text-muted-foreground">
                           {m.bodega}
                           {m.ubicacion ? ` · ${m.ubicacion}` : ""} · {ETIQUETA_ORIGEN[m.origen] ?? m.origen}
-                          {m.usuario ? ` · ${m.usuario}` : ""} · {formatearTiempoRelativo(m.creadoEn)}
+                          {m.usuario ? ` · ${m.usuario}` : ""} · <FechaHora iso={m.creadoEn} />
                           {m.referencia ? ` · ${m.referencia}` : ""}
                           {m.motivo ? ` · ${m.motivo}` : ""}
                         </span>

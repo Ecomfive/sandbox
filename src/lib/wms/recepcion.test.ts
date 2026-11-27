@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { bloqueoDeLinea, diferenciaRecepcion, pideMotivo, puedeMoverAMano, revisarRecepcion } from "./recepcion";
+import { bloqueoDeLinea, diferenciaRecepcion, pideMotivo, puedeMoverAMano, revisarRecepcion, reglaDeRecepcion } from "./recepcion";
 
 const ID = "01a1364c-f839-7da8-b333-121b076154e5";
 const ID2 = "01a1364c-f839-7da8-b333-121b076154e6";
@@ -46,3 +46,20 @@ test("revisa lo que manda la pantalla", () => {
   assert.ok("error" in revisarRecepcion([{ item: ID, cantidad: 1 }, { item: ID, cantidad: 1 }]));
   assert.ok("error" in revisarRecepcion([{ item: ID2, cantidad: 1, vencimiento: "mañana" }]));
 });
+
+test("cómo se recibe en cada país", () => {
+  const pa = reglaDeRecepcion("PA")!;
+  assert.ok(pa.etapas.includes("en_bodega") && pa.etapas.includes("arribo_mercancia") && pa.etapas.includes("llegada_puerto_lote_2"));
+  assert.ok(!pa.etapas.includes("tracking"));
+  assert.equal(pa.vieneEscrita, true);
+  assert.equal(pa.admiteYaContadas, true);
+  assert.equal(pa.completadasDesde, "2026-11-24");
+  const cr = reglaDeRecepcion("CR")!;
+  assert.ok(cr.etapas.includes("tracking"));
+  assert.equal(cr.vieneEscrita, false);
+  assert.equal(cr.admiteYaContadas, false);
+  assert.equal(cr.completadasDesde, null);
+  assert.equal(reglaDeRecepcion("MX"), null);
+  assert.equal(reglaDeRecepcion(null), null);
+});
+

@@ -1,4 +1,4 @@
-// Gestión de tienda › Despacho ciudad y Devoluciones (migración 0970): lo que leen sus páginas de `mon_despachos`, la misma tabla que llenaba Monday y
+// Gestión de tienda › Envíos Delivery y Devoluciones (migración 0970): lo que leen sus páginas de `mon_despachos`, la misma tabla que llenaba Monday y
 // que leen las entregas de los pedidos, Logística y la ficha del pedido. Las etiquetas se muestran limpias (`etiquetaLimpia`) y un pedido que está en el
 // consolidado y en el tablero del repartidor sale una sola vez (`sinDuplicados`).
 
@@ -36,16 +36,28 @@ export interface FilaTablero {
   obsAsesores: string | null;
   /** El día (ciudad, AAAA-MM-DD) o el grupo (devoluciones). */
   dia: string | null;
+  /** Si el repartidor la marcó desde su panel (24 nov 2026, migración 0362) y cuándo. */
+  desdePanel: boolean;
+  marcadoEn: string | null;
   grupo: string;
   posicion: number;
 }
 
-const COLUMNAS =
+export const COLUMNAS_DESPACHO =
   "item_id, tablero_id, origen, editado_en, actualizado_monday, nombre, numero_pedido, orden_id, tienda_texto, courier, estado, edo_pago, forma_pago, por_cobrar, monto_cobrado, coste_envio, turno, comentario, comprobantes, estado_asesores, observaciones_asesores, fecha_despacho, grupo, posicion";
 
 const num = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
 
-function aFila(r: Record<string, unknown>, clase: Clase): FilaTablero {
+/** Las columnas del panel del repartidor (migración 0362); sin la migración, la consulta va sin ellas. */
+export const COLUMNAS_PANEL = ", marcado_desde, marcado_en";
+
+/** Si ya está la migración 0362 (lo marcado desde el panel del repartidor). */
+export async function hayPanelRepartidor(supabase: SupabaseClient): Promise<boolean> {
+  const { error } = await supabase.from("mon_despachos").select("marcado_desde").limit(1);
+  return !error;
+}
+
+export function aFila(r: Record<string, unknown>, clase: Clase): FilaTablero {
   const dia = (r.fecha_despacho as string | null) ?? null;
   return {
     itemId: String(r.item_id),
@@ -71,6 +83,8 @@ function aFila(r: Record<string, unknown>, clase: Clase): FilaTablero {
     estadoAsesores: etiquetaLimpia("estado_asesores", r.estado_asesores as string | null),
     obsAsesores: (r.observaciones_asesores as string | null) ?? null,
     dia,
+    desdePanel: r.marcado_desde === "panel",
+    marcadoEn: (r.marcado_en as string | null) ?? null,
     grupo: clase === "devolucion" ? grupoDevolucion(r.grupo as string | null) : (dia ?? "Sin día"),
     posicion: Number(r.posicion) || 0,
   };
@@ -97,10 +111,15 @@ export async function tableroConsolidado(supabase: SupabaseClient): Promise<stri
  */
 export async function cargarCiudad(supabase: SupabaseClient, desde: string, hasta: string, archivados = false): Promise<{ filas: FilaTablero[]; faltaMigracion: boolean }> {
   let faltaMigracion = false;
+  const columnas = COLUMNAS_DESPACHO + ((await hayPanelRepartidor(supabase)) ? COLUMNAS_PANEL : "");
   const permitidas = await cargarTiendasPermitidas();
   const crudas = await traerTodasLasFilas<Record<string, unknown>>((d, h) => {
-    const q = soloSusTiendas(supabase.from("mon_despachos").select(COLUMNAS).eq("clase", "ciudad"), permitidas);
-    return (archivados ? q.not("archivado_en", "is", null) : q.is("archivado_en", null).gte("fecha_despacho", desde).lte("fecha_despacho", hasta)).order("item_id").range(d, h);
+    const q = soloSusTiendas(supabase.from("mon_despachos").select(columnas).eq("clase", "ciudad"), permitidas);
+    // Las columnas se arman según la migración 0362: el tipo de la respuesta se declara a mano.
+    return (archivados ? q.not("archivado_en", "is", null) : q.is("archivado_en", null).gte("fecha_despacho", desde).lte("fecha_despacho", hasta)).order("item_id").range(d, h) as unknown as PromiseLike<{
+      data: Record<string, unknown>[] | null;
+      error: unknown;
+    }>;
   }).catch(() => {
     faltaMigracion = true;
     return [] as Record<string, unknown>[];
@@ -113,9 +132,10 @@ export async function cargarCiudad(supabase: SupabaseClient, desde: string, hast
 /** Las devoluciones (todas las tiendas), sin las archivadas; con `archivados`, solo las archivadas. */
 export async function cargarDevoluciones(supabase: SupabaseClient, archivados = false): Promise<{ filas: FilaTablero[]; faltaMigracion: boolean }> {
   let faltaMigracion = false;
+  const columnas = COLUMNAS_DESPACHO;
   const permitidas = await cargarTiendasPermitidas();
   const crudas = await traerTodasLasFilas<Record<string, unknown>>((d, h) => {
-    const q = soloSusTiendas(supabase.from("mon_despachos").select(COLUMNAS).eq("clase", "devolucion"), permitidas);
+    const q = soloSusTiendas(supabase.from("mon_despachos").select(columnas).eq("clase", "devolucion"), permitidas);
     return (archivados ? q.not("archivado_en", "is", null) : q.is("archivado_en", null)).order("item_id").range(d, h);
   }).catch(() => {
     faltaMigracion = true;
@@ -126,7 +146,7 @@ export async function cargarDevoluciones(supabase: SupabaseClient, archivados = 
 
 const diaPanama = (ms: number) => new Date(ms).toLocaleDateString("en-CA", { timeZone: "America/Panama" });
 
-/** Los días que muestra Despacho ciudad: los `dias` hasta hoy (en Panamá) y los dos siguientes, para lo programado. */
+/** Los días que muestra Envíos Delivery: los `dias` hasta hoy (en Panamá) y los dos siguientes, para lo programado. */
 export function rangoDespacho(dias: number, ahora = Date.now()): { desde: string; hasta: string; hoy: string } {
   return { desde: diaPanama(ahora - (dias - 1) * 86_400_000), hasta: diaPanama(ahora + 2 * 86_400_000), hoy: diaPanama(ahora) };
 }

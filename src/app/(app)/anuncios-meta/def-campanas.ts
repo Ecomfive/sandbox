@@ -1,7 +1,9 @@
+import { nombreDeAngulo } from "@/lib/meta-ads/angulo-detalle";
 import { confiable, resultado, type Resultados } from "@/lib/meta-ads/metricas";
 import { NOMBRE_ETAPA, NOMBRE_PUJA } from "@/lib/meta-ads/nombre";
 import type { CampanaVista } from "@/lib/meta-ads/vistas";
 import type { DefTabla } from "@/lib/tabla/motor";
+import { campoPrioridad } from "./def-prioridad";
 import { nombreEstado } from "./piezas";
 
 /** Cómo le va a una campaña en el periodo: deja, pierde, o todavía no hay datos para decirlo. */
@@ -14,9 +16,10 @@ const SIN = "__sin_valor__";
 
 export const DEF_CAMPANAS: DefTabla<CampanaVista> = {
   clave: "anuncios-meta-campanas",
-  vistaInicial: { agrupar: "etapa" },
+  vistaInicial: { agrupar: "prioridad" },
   campos: [
     { id: "nombre", etiqueta: "Nombre", tipo: "texto", valor: (c) => c.nombre },
+    campoPrioridad<CampanaVista>((c) => c.pendiente),
     { id: "veredicto", etiqueta: "Cómo le va", tipo: "seleccion", valores: (c) => [veredictoDe(c)], opciones: () => (Object.keys(NOMBRE_VEREDICTO) as Veredicto[]).map((v) => ({ valor: v, etiqueta: NOMBRE_VEREDICTO[v] })), agrupable: true, ordenGrupos: ["pierde", "deja", "poca_data", "sin_gasto"] },
     { id: "etapa", etiqueta: "Etapa", tipo: "seleccion", valores: (c) => [c.etapa ?? SIN], opciones: () => [...(Object.keys(NOMBRE_ETAPA) as (keyof typeof NOMBRE_ETAPA)[]).map((e) => ({ valor: e, etiqueta: NOMBRE_ETAPA[e] })), { valor: SIN, etiqueta: "Sin etapa" }], etiquetaSinValor: "Sin etapa", agrupable: true, ordenGrupos: ["testing", "escala", "retargeting"] },
     { id: "estado", etiqueta: "Estado en Meta", tipo: "seleccion", valores: (c) => [c.activa ? "activa" : "apagada"], opciones: () => [{ valor: "activa", etiqueta: "Activa" }, { valor: "apagada", etiqueta: "Pausada o archivada" }], agrupable: true },
@@ -24,6 +27,7 @@ export const DEF_CAMPANAS: DefTabla<CampanaVista> = {
     { id: "puja", etiqueta: "Puja", tipo: "seleccion", valores: (c) => [c.puja ? NOMBRE_PUJA[c.puja] : SIN], etiquetaSinValor: "Sin dato", agrupable: true },
     { id: "producto", etiqueta: "Producto", tipo: "seleccion", valores: (c) => [c.producto ?? SIN], etiquetaSinValor: "Sin producto", agrupable: true },
     { id: "angulo", etiqueta: "Ángulo", tipo: "seleccion", valores: (c) => [c.angulo ?? SIN], etiquetaSinValor: "Sin ángulo", agrupable: true },
+    { id: "anguloDetalle", etiqueta: "Ángulo con su detalle (de sus videos)", tipo: "seleccion", valores: (c) => (c.angulos.length ? c.angulos.flatMap((a) => (a.detalles?.length ? a.detalles.map((d) => nombreDeAngulo(a.angulo, d)) : [a.angulo])) : [SIN]), etiquetaSinValor: "Sin ángulo", agrupable: true },
     { id: "mercado", etiqueta: "Audiencia y país", tipo: "seleccion", valores: (c) => [c.mercado ?? SIN], etiquetaSinValor: "Sin dato", agrupable: true },
     { id: "videos", etiqueta: "Tanda de videos", tipo: "seleccion", valores: (c) => [c.videos ?? SIN], etiquetaSinValor: "Sin tanda", agrupable: true },
     { id: "cuenta", etiqueta: "Cuenta publicitaria", tipo: "seleccion", valores: (c) => [c.cuentaNombre || SIN], agrupable: true },

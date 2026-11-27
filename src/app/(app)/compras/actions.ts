@@ -5,6 +5,8 @@ import { after } from "next/server";
 import { activarTareasDeLlegada } from "@/lib/crm/tareas-servidor";
 import { rutaPropia, rutaEnCarpeta } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
+import { hoyPanama } from "@/lib/af4/fecha";
+import { sincronizarCostosCompras } from "@/lib/finanzas/sincronizar-costos-compras";
 import { descontinuadoEn } from "@/lib/producto/descontinuado-pais";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { MENSAJE_ACCION_BLOQUEADA, requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
@@ -119,8 +121,8 @@ function leerCambios(formData: FormData) {
     proveedor: proveedorDeLista(textoOptativo(formData, "proveedor")),
     agente_envio: agenteDeLista(textoOptativo(formData, "agente_envio")),
     venta_importacion: formData.get("venta_importacion") === "si",
-    // Una sola tienda por orden (se guarda como lista por las de antes).
-    tiendas: listaDeTexto(textoOptativo(formData, "tiendas")).slice(0, 1),
+    // Una o varias tiendas por orden, como etiquetas (24 nov 2026).
+    tiendas: listaDeTexto(textoOptativo(formData, "tiendas")),
     qty_total: numeroOptativo(formData, "qty_total"),
     monto_total: numeroOptativo(formData, "monto_total"),
     primer_pago: numeroOptativo(formData, "primer_pago"),
@@ -130,6 +132,7 @@ function leerCambios(formData: FormData) {
     financiamiento: formData.get("financiamiento") === "on",
     fecha_limite: fechaOptativa(formData, "fecha_limite"),
     fecha_llegada: fechaOptativa(formData, "fecha_llegada"),
+    fecha_llegada_puerto: fechaOptativa(formData, "fecha_llegada_puerto"),
     fecha_pago_1: fechaOptativa(formData, "fecha_pago_1"),
     fecha_pago_2: fechaOptativa(formData, "fecha_pago_2"),
     fecha_envio: fechaOptativa(formData, "fecha_envio"),
@@ -267,7 +270,11 @@ async function anotarEventos(compraId: string, antes: { etapa: string; estado: s
  * sola llegada. Otra etapa no hace nada.
  */
 async function avisarCambioDeEtapa(etapa: string, compraIds: string[]) {
-  if (!llegadaDeEtapa(etapa) || compraIds.length === 0) return;
+  if (compraIds.length === 0) return;
+  // La hoja de Costos de producto (0992) toma sola las compras de Panamá que pasan a En Bodega o Completado, y suelta las
+  // que salen de ahí. Después de responder: un fallo aquí nunca deshace el cambio de etapa.
+  after(() => sincronizarCostosCompras(createServiceClient(), hoyPanama()).catch(() => undefined));
+  if (!llegadaDeEtapa(etapa)) return;
   const usuario = await getUsuarioActual();
   const autor = { id: usuario?.id ?? null, nombre: usuario?.nombre || usuario?.email || null };
   after(() => avisarLlegada(createServiceClient(), { etapa, compraIds, autor }));

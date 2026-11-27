@@ -33,7 +33,6 @@ export function ProbarHistorico({ tiendas, tiendaElegida }: { tiendas: { id: str
   const [tiendaId, setTiendaId] = useState(tiendaElegida ?? "");
   const [dias, setDias] = useState(60);
   const [max, setMax] = useState(40);
-  const [sinTendencia, setSinTendencia] = useState(true);
   const [corriendo, setCorriendo] = useState(false);
   const [deteniendo, setDeteniendo] = useState(false);
   const [total, setTotal] = useState(0);
@@ -58,7 +57,7 @@ export function ProbarHistorico({ tiendas, tiendaElegida }: { tiendas: { id: str
       setTotal(m.pedidos.length);
       setDisponibles(m.disponibles);
       for (let i = 0; i < m.pedidos.length && !parar.current; i += TANDA) {
-        const r = await probarPedidosReales(m.pedidos.slice(i, i + TANDA).map((p: PedidoMuestra) => p.id), { sinTendencia }).catch(() => ({ error: "Se cortó la conexión. Vuelve a probar." }));
+        const r = await probarPedidosReales(m.pedidos.slice(i, i + TANDA).map((p: PedidoMuestra) => p.id)).catch(() => ({ error: "Se cortó la conexión. Vuelve a probar." }));
         if ("error" in r) return setError(r.error);
         setResultados((x) => [...x, ...r.resultados]);
         setOmitidos((x) => x + r.omitidos);
@@ -110,6 +109,9 @@ export function ProbarHistorico({ tiendas, tiendaElegida }: { tiendas: { id: str
         <label className="flex flex-col gap-1">
           <span className={labelClassSm}>Pedidos de los últimos</span>
           <select value={dias} onChange={(e) => setDias(Number(e.target.value))} disabled={corriendo} className={fieldClassSm}>
+            <option value={2}>2 días (solo los nuevos)</option>
+            <option value={3}>3 días</option>
+            <option value={7}>7 días</option>
             <option value={30}>30 días</option>
             <option value={60}>60 días</option>
             <option value={90}>90 días</option>
@@ -124,10 +126,6 @@ export function ProbarHistorico({ tiendas, tiendaElegida }: { tiendas: { id: str
               </option>
             ))}
           </select>
-        </label>
-        <label className="flex min-h-9 items-center gap-2 text-sm">
-          <input type="checkbox" checked={sinTendencia} onChange={(e) => setSinTendencia(e.target.checked)} disabled={corriendo} />
-          Sin la tendencia de la tienda
         </label>
         <button type="submit" disabled={corriendo} className={`min-h-9 rounded-md bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-50 ${anilloFoco}`}>
           {corriendo ? "Probando…" : resultados.length ? "Probar otra vez" : "Probar"}

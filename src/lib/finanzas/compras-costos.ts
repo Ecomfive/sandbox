@@ -121,6 +121,8 @@ export interface LineaCostoPuesto {
   codigo: string;
   producto: string;
   cantidad: number;
+  /** Lo que llegó según Recepción (null si no se anotó). */
+  recibida?: number | null;
   fob: number;
   gastos: number;
   unitarioReal: number | null;
@@ -203,6 +205,7 @@ export function costoPuestoCompras(
         codigo: i.codigo,
         producto: i.producto,
         cantidad: i.cantidad,
+        recibida: i.recibida,
         fob: r2(fobLinea),
         gastos: r2(gastosLinea),
         unitarioReal,

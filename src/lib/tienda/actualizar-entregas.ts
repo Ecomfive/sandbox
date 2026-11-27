@@ -8,7 +8,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { mismaTiendaUnidad } from "./ordenes-finanzas";
+import { guiaAntesDelPedido } from "./siscore";
 import { formaDePago, esDesintegrado, prioridadDespacho } from "@/lib/monday/columnas";
+import { filasMondayDe } from "./entregas-monday";
 
 export interface OrdenParaEntrega {
   id: string;
@@ -135,21 +137,19 @@ export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sist
   }
   if (!ordenes.length) return { entregadas: 0, devueltas: 0, resumen: "No hay órdenes despachadas." };
   const ids = ordenes.map((o) => o.id);
+  const fechaDe = new Map(ordenes.map((o) => [o.id, o.fecha]));
   const monday = new Map<string, DatoMonday & { clave: string }>();
   const guias = new Map<string, DatoGuia & { clave: string }>();
   for (let i = 0; i < ids.length; i += 200) {
     const parte = ids.slice(i, i + 200);
     const [m, g] = await Promise.all([
-      supabase
-        .from("mon_despachos")
-        .select("orden_id, estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday, estado_asesores, observaciones_asesores, forma_pago, monto_cobrado")
-        .in("orden_id", parte)
-        .then((r) =>
-          // Sin la migración 0295, sin la forma de pago (Monday sigue contando).
-          r.error && /forma_pago|monto_cobrado/.test(r.error.message)
-            ? supabase.from("mon_despachos").select("orden_id, estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday, estado_asesores, observaciones_asesores").in("orden_id", parte)
-            : r,
-        ),
+      // Con las filas que traen varios pedidos (`filasMondayDe`, 0369).
+      filasMondayDe(supabase, parte, "orden_id, estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday, estado_asesores, observaciones_asesores, forma_pago, monto_cobrado").then((r) =>
+        // Sin la migración 0295, sin la forma de pago (Monday sigue contando).
+        r.error && /forma_pago|monto_cobrado/.test(r.error.message)
+          ? filasMondayDe(supabase, parte, "orden_id, estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday, estado_asesores, observaciones_asesores")
+          : r,
+      ),
       supabase.from("tienda_guias").select("orden_id, guia, estado, estado_grupo, fecha_estado, fecha_emision, recaudo, ultimo_motivo").in("orden_id", parte),
     ]);
     // Sin la tabla de una fuente (migración sin correr), esa fuente no cuenta.
@@ -175,6 +175,8 @@ export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sist
       });
     }
     for (const x of (g.error ? [] : (g.data ?? [])) as Record<string, unknown>[]) {
+      // Una guía emitida antes que el pedido es de otro pedido (factura mal escrita en SISCORE, 24 nov 2026): no lo mueve.
+      if (guiaAntesDelPedido(x.fecha_emision as string | null, fechaDe.get(String(x.orden_id)))) continue;
       const clave = `${x.fecha_emision ?? ""}|${x.fecha_estado ?? ""}`;
       const previa = guias.get(String(x.orden_id));
       if (previa && previa.clave >= clave) continue;
@@ -273,7 +275,7 @@ export async function completarDatosEntrega(supabase: SupabaseClient, limite = N
     const parte = faltan.slice(i, i + 200);
     const ids = parte.map((o) => o.id);
     const [m, g] = await Promise.all([
-      supabase.from("mon_despachos").select("orden_id, estado_grupo, fecha_despacho, forma_pago, monto_cobrado, actualizado_monday").in("orden_id", ids),
+      filasMondayDe(supabase, ids, "orden_id, estado_grupo, fecha_despacho, forma_pago, monto_cobrado, actualizado_monday"),
       supabase.from("tienda_guias").select("orden_id, fecha_emision").in("orden_id", ids),
     ]);
     const monday = new Map<string, Record<string, unknown>[]>();

@@ -123,6 +123,16 @@ export function momentoEntrega(historial: PasoGuia[]): string | null {
   return p ? `${p.fecha}${p.hora ? ` ${p.hora}` : ""}` : null;
 }
 
+/**
+ * Una guía emitida antes de que existiera el pedido no es de ese pedido (24 nov 2026): la «Factura» de SISCORE se escribe a mano y un dígito cambiado
+ * (1916 por 1619) la unía a un pedido nuevo, que pasaba a entregado sin haber salido. Fechas «AAAA-MM-DD» (la del pedido, día de Panamá).
+ */
+export function guiaAntesDelPedido(fechaEmision: string | null | undefined, fechaPedido: string | null | undefined): boolean {
+  const e = (fechaEmision ?? "").slice(0, 10);
+  const p = (fechaPedido ?? "").slice(0, 10);
+  return !!e && !!p && e < p;
+}
+
 /** El número de pedido para comparar con `ven_ordenes.numero` («#1521»): con «#» si es solo un número. */
 export function pedidoDeFactura(factura: string | null): string | null {
   const t = (factura ?? "").trim().toUpperCase();

@@ -10,60 +10,43 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { useToast } from "@/components/ui/toast";
 import { BarraAvance } from "@/components/ui/barra-avance";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { ControlAnalisisAutomatico } from "./control-automatico";
+import { CeldasColumnas, EncabezadoColumnas, estiloRejilla, SelectorColumnasMeta, useColumnasMeta } from "./columnas-meta";
+import { CATALOGO_COLUMNAS, PRESETS_COLUMNAS, valorColumna, type ClaveColumna } from "@/lib/meta-ads/columnas";
+import { EVENTO_ABRIR_VIDEO } from "./para-revisar";
+import type { EstadoAnalisisAutomatico } from "@/lib/meta-ads/ajustes";
 import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
-import { formatearFechaHora } from "@/lib/formato";
+import { horaDeMeta } from "@/lib/meta-ads/hora";
 import { Ventana } from "@/components/ui/ventana";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { AnunciosIcon, ChevronRightIcon, EstadoIcon, EtiquetaIcon, FiltroIcon, MargenIcon, ProductoIcon, RobotIcon } from "@/lib/nav-icons";
-import { confiable, cpa, ctr, dolares, holdRate, hookRate, nivelDeCpa, nivelDeCtr, nivelDeHook } from "@/lib/meta-ads/metricas";
-import { CRITERIOS_VIDEO, ordenarVideos, sentidoNatural, type CriterioVideo, type Sentido } from "@/lib/meta-ads/orden-videos";
+import { confiable, dolares } from "@/lib/meta-ads/metricas";
+import { ordenarPor } from "@/lib/meta-ads/orden";
+import { CRITERIOS_VIDEOS, ORDEN_VIDEOS } from "@/lib/meta-ads/orden-listas";
+import { BarraOrden, useOrdenMeta } from "./orden-meta";
 import type { VideoVista } from "@/lib/meta-ads/vistas";
 import { analizarSiguienteMeta, analizarVideoAhoraMeta, corregirAnguloVideoMeta } from "./actions";
 import { anguloDeVideo, DEF_VIDEOS } from "./def-videos";
 import { EstructuraYLlamado } from "./estructura-video";
 import { ReproductorVideo } from "./reproductor-video";
 import { TarjetaVideo } from "./tarjeta-video";
-import { AVISO_POCA_DATA, Cifra, entero, InsigniaEtapa, MetricasEnLinea, Nivel, porcentaje, Resultado, valorCpa } from "./piezas";
+import { AVISO_POCA_DATA, Cifra, InsigniaEtapa, InsigniaPrioridad, MetricasEnLinea, QueHacer } from "./piezas";
+import { nombreDeAngulo } from "@/lib/meta-ads/angulo-detalle";
 
 const urlSegura = (u: string | null) => (u && /^https:\/\//i.test(u) ? u : null);
 
 const NOMBRE: NombreFilas = { singular: "video", plural: "videos" };
 const ICONOS: Record<string, IconoComp> = { nombre: AnunciosIcon, campanaTexto: AnunciosIcon, angulo: EtiquetaIcon, producto: ProductoIcon, campana: AnunciosIcon, etapa: EtiquetaIcon, veredicto: MargenIcon, datos: FiltroIcon, analisis: RobotIcon, gancho: FiltroIcon, formato: FiltroIcon, ctaTipo: FiltroIcon, recurso: FiltroIcon, llegaCta: MargenIcon, activo: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, cpa: MargenIcon, hook: MargenIcon, hold: MargenIcon, ctr: MargenIcon, campanas: AnunciosIcon, anuncios: AnunciosIcon };
 
-const COLUMNAS = "lg:grid-cols-[minmax(0,3fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,1fr)_1rem]";
+/** Las columnas que ve cada persona en Videos (se eligen con «Columnas»): por defecto las de siempre. */
+const COLUMNAS_VIDEOS: ClaveColumna[] = PRESETS_COLUMNAS.find((p) => p.id === "basico")!.columnas;
 
-function EncabezadoFilas() {
-  return (
-    <div aria-hidden="true" className={`hidden gap-3 px-4 py-2 text-xs font-medium text-muted-foreground lg:grid ${COLUMNAS}`}>
-      <span>Video</span>
-      <span className="text-right">Gasto</span>
-      <span className="text-right">Compras</span>
-      <span className="text-right">CPA</span>
-      <span className="text-right">Hook (3 s)</span>
-      <span className="text-right">Pasan 15 s</span>
-      <span className="text-right">CTR</span>
-      <span className="text-right">Resultado estimado</span>
-      <span />
-    </div>
-  );
-}
-
-/** Una cifra de la fila: con su nombre a la vista en pantalla angosta (ahí no hay encabezado) y solo para lectores de pantalla en la ancha. */
-function Celda({ t, children }: { t: string; children: React.ReactNode }) {
-  return (
-    <span className="flex items-baseline justify-between gap-2 text-sm tabular-nums lg:block lg:text-right">
-      <span className="text-xs text-muted-foreground lg:sr-only">{t}</span>
-      <span>{children}</span>
-    </span>
-  );
-}
-
-function FilaVideo({ x, alAbrir }: { x: VideoVista; alAbrir: () => void }) {
+function FilaVideo({ x, alAbrir, columnas }: { x: VideoVista; alAbrir: () => void; columnas: ClaveColumna[] }) {
   const m = urlSegura(x.miniatura);
   const ok = confiable(x.r);
   const angulo = anguloDeVideo(x);
   return (
-    <button type="button" onClick={alAbrir} className={`grid w-full cursor-pointer grid-cols-1 items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${COLUMNAS} ${ok ? "" : "text-muted-foreground"}`}>
+    <button type="button" onClick={alAbrir} style={estiloRejilla(columnas.length)} className={`grid w-full cursor-pointer grid-cols-1 items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground xl:[grid-template-columns:var(--columnas-meta)] ${ok ? "" : "text-muted-foreground"}`}>
       <span className="flex min-w-0 items-center gap-3">
         <span aria-hidden="true" className="relative h-16 w-12 shrink-0 overflow-hidden rounded-md bg-gradient-to-br from-zinc-600 to-zinc-800">
           {m && <img src={m} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
@@ -78,8 +61,13 @@ function FilaVideo({ x, alAbrir }: { x: VideoVista; alAbrir: () => void }) {
             {x.numero && <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-xs font-semibold">{x.numero}</span>}
             {x.nombre}
           </span>
+          {x.pendiente && (
+            <span className="flex">
+              <InsigniaPrioridad pendiente={x.pendiente} />
+            </span>
+          )}
           <span className="truncate text-xs text-muted-foreground">
-            {x.producto ?? "Sin producto"} · {angulo ? `Ángulo: ${angulo}${x.analisis?.estado === "sin_archivo" ? " (provisional)" : ""}` : "Ángulo sin analizar"}
+            {x.producto ?? "Sin producto"} · {angulo ? `Ángulo: ${angulo}${x.analisis?.anguloDetalle ? ` (${x.analisis.anguloDetalle})` : ""}${x.analisis?.estado === "sin_archivo" ? " (provisional)" : ""}` : "Ángulo sin analizar"}
           </span>
           <span className="truncate text-xs text-muted-foreground">
             En {x.anuncios} {x.anuncios === 1 ? "anuncio" : "anuncios"} de {x.campanas} {x.campanas === 1 ? "campaña" : "campañas"}
@@ -87,22 +75,12 @@ function FilaVideo({ x, alAbrir }: { x: VideoVista; alAbrir: () => void }) {
           </span>
         </span>
       </span>
-      <Celda t="Gasto">{dolares(x.r.gasto)}</Celda>
-      <Celda t="Compras">{entero(x.r.compras)}</Celda>
-      <Celda t="CPA">{ok && x.r.compras > 0 ? <Nivel nivel={nivelDeCpa(cpa(x.r), x.tope)}>{valorCpa(x.r)}</Nivel> : valorCpa(x.r)}</Celda>
-      <Celda t="Hook (3 s)">{hookRate(x.r) === null ? "—" : ok ? <Nivel nivel={nivelDeHook(hookRate(x.r))}>{porcentaje(hookRate(x.r), 0)}</Nivel> : porcentaje(hookRate(x.r), 0)}</Celda>
-      <Celda t="Pasan 15 s">{porcentaje(holdRate(x.r), 0)}</Celda>
-      <Celda t="CTR">{ok ? <Nivel nivel={nivelDeCtr(ctr(x.r))}>{porcentaje(ctr(x.r))}</Nivel> : porcentaje(ctr(x.r))}</Celda>
-      <span className="lg:text-right">
-        <span className="sr-only">Resultado estimado: </span>
-        <Resultado r={x.r} tope={x.tope} />
-      </span>
-      <ChevronRightIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground lg:block" />
+      <CeldasColumnas columnas={columnas} r={x.r} ctx={{ tope: x.tope, etapa: "venta", confiable: ok }} />
+      <ChevronRightIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground xl:block" />
     </button>
   );
 }
 
-/** «Ordenar por» y el sentido (de mayor a menor o al revés): la barra común filtra y agrupa, pero no ordena filas. */
 type VistaVideos = "tarjetas" | "lista";
 const CLAVE_VISTA = "anuncios-meta-videos-vista-v1";
 
@@ -144,54 +122,35 @@ function useVistaVideos(): [VistaVideos, (v: VistaVideos) => void] {
   return [vista, elegir];
 }
 
-function OrdenDeVideos({ criterio, sentido, alCambiar, vista, alElegirVista }: { criterio: CriterioVideo; sentido: Sentido; alCambiar: (c: CriterioVideo, s: Sentido) => void; vista: VistaVideos; alElegirVista: (v: VistaVideos) => void }) {
+/** Tarjetas o lista. */
+function SelectorVista({ vista, alElegirVista }: { vista: VistaVideos; alElegirVista: (v: VistaVideos) => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5">
-      <label className="flex items-center gap-2 text-sm">
-        <span className="text-xs font-medium text-muted-foreground">Ordenar por</span>
-        <select value={criterio} onChange={(e) => alCambiar(e.target.value as CriterioVideo, sentidoNatural(e.target.value as CriterioVideo))} className={`${fieldClassSm} w-auto min-w-[14rem]`}>
-          {CRITERIOS_VIDEO.map((c) => (
-            <option key={c.valor} value={c.valor}>
-              {c.etiqueta}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button
-        type="button"
-        onClick={() => alCambiar(criterio, sentido === "asc" ? "desc" : "asc")}
-        aria-label={`Cambiar el orden: ahora va de ${sentido === "asc" ? "menor a mayor" : "mayor a menor"}`}
-        className="min-h-8 rounded-md border border-border-control bg-card px-3 py-1 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
-      >
-        {criterio === "nombre" ? (sentido === "asc" ? "A → Z" : "Z → A") : sentido === "asc" ? "De menor a mayor ↑" : "De mayor a menor ↓"}
-      </button>
-      <div role="group" aria-label="Cómo ver los videos" className="ml-auto flex overflow-hidden rounded-md border border-border-control">
-        {(["tarjetas", "lista"] as const).map((o) => (
-          <button
-            key={o}
-            type="button"
-            aria-pressed={vista === o}
-            onClick={() => alElegirVista(o)}
-            className={`min-h-8 px-3 py-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${vista === o ? "bg-foreground text-background" : "bg-card hover:bg-muted"}`}
-          >
-            {o === "tarjetas" ? "Tarjetas" : "Lista"}
-          </button>
-        ))}
-      </div>
+    <div role="group" aria-label="Cómo ver los videos" className="flex overflow-hidden rounded-md border border-border-control">
+      {(["tarjetas", "lista"] as const).map((o) => (
+        <button
+          key={o}
+          type="button"
+          aria-pressed={vista === o}
+          onClick={() => alElegirVista(o)}
+          className={`min-h-9 px-3 py-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${vista === o ? "bg-foreground text-background" : "bg-card hover:bg-muted"}`}
+        >
+          {o === "tarjetas" ? "Tarjetas" : "Lista"}
+        </button>
+      ))}
     </div>
   );
 }
 
 /**
- * Los videos con gasto en el periodo elegido, cada uno una sola vez, con la barra común (buscar, filtrar y agrupar por ángulo, producto, campaña, etapa…) y un orden a elegir (gasto, CPA, hook…, ascendente o
+ * Los videos con gasto en el periodo elegido, cada uno una sola vez, con la barra común (buscar, filtrar y agrupar por ángulo, producto, campaña, etapa…) y el orden que cada persona elija (cualquier métrica, hasta tres encadenadas, ascendente o
  * descendente). Tocar uno abre su ficha: en qué anuncios y campañas se usa y cómo le fue en cada una; queda en la dirección (`?abrir=<id>`).
  */
-export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirInicial }: { videos: VideoVista[]; escribe: boolean; iaConectada: boolean; sinAnalizar: number; abrirInicial: string | null }) {
+export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirInicial, automatico }: { videos: VideoVista[]; escribe: boolean; iaConectada: boolean; sinAnalizar: number; abrirInicial: string | null; automatico: EstadoAnalisisAutomatico }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
+  const [columnas, guardarColumnas, restablecerColumnas] = useColumnasMeta("videos", COLUMNAS_VIDEOS);
   const [abierto, setAbierto] = useState<string | null>(() => (abrirInicial && videos.some((x) => x.id === abrirInicial) ? abrirInicial : null));
-  const [criterio, setCriterio] = useState<CriterioVideo>("mejor");
-  const [sentido, setSentido] = useState<Sentido>("asc");
+  const [ordenes, guardarOrdenes] = useOrdenMeta("videos", CRITERIOS_VIDEOS, ORDEN_VIDEOS);
   // Cómo se ven los videos (tarjetas o lista): lo elige cada persona y se recuerda en su navegador.
   const [vista, elegirVista] = useVistaVideos();
   // «Reproducir» desde una tarjeta abre la ficha y arranca el video; abrir la ficha con un clic en el cuerpo no lo arranca.
@@ -200,7 +159,16 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
     setReproducirAlAbrir(reproducir);
     setAbierto(id);
   };
-  const ordenados = ordenarVideos(videos, criterio, sentido);
+  const ordenados = ordenarPor(videos, CRITERIOS_VIDEOS, ordenes, (x) => x.r.gasto);
+  // «Abrir este video» de «Para revisar» (arriba, en el resumen) pide abrir la ficha de ese video sin recargar la página.
+  useEffect(() => {
+    const abrirDesdeResumen = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (typeof id === "string") abrirVideo(id, false);
+    };
+    window.addEventListener(EVENTO_ABRIR_VIDEO, abrirDesdeResumen);
+    return () => window.removeEventListener(EVENTO_ABRIR_VIDEO, abrirDesdeResumen);
+  }, []);
   useEffect(() => {
     const url = new URL(window.location.href);
     if (abierto) url.searchParams.set("abrir", abierto);
@@ -269,9 +237,12 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
               <button type="button" onClick={analizarPendientes} disabled={analizando} className="min-h-9 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50">
                 {analizando ? "Analizando…" : "Analizar los pendientes"}
               </button>
-              <span className="text-xs text-muted-foreground">Revisa todo el historial leído. El sistema también los va analizando solo, cada 10 minutos.</span>
+              <span className="text-xs text-muted-foreground">Revisa todo el historial leído.</span>
             </div>
           )}
+          <div className="basis-full border-t border-border pt-3">
+            <ControlAnalisisAutomatico estado={automatico} />
+          </div>
         </div>
       )}
       {avance && (
@@ -289,16 +260,10 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
           }}
         />
       )}
-      <OrdenDeVideos
-        criterio={criterio}
-        sentido={sentido}
-        alCambiar={(c, s) => {
-          setCriterio(c);
-          setSentido(s);
-        }}
-        vista={vista}
-        alElegirVista={elegirVista}
-      />
+      <BarraOrden criterios={CRITERIOS_VIDEOS} ordenes={ordenes} alCambiar={guardarOrdenes}>
+        <SelectorColumnasMeta titulo="Videos" columnas={columnas} alCambiar={guardarColumnas} alRestablecer={restablecerColumnas} sinFrecuencia />
+        <SelectorVista vista={vista} alElegirVista={elegirVista} />
+      </BarraOrden>
       <ListaDatos
         def={DEF_VIDEOS}
         filas={ordenados}
@@ -306,9 +271,9 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
         nombre={NOMBRE}
         claveFila={(x) => x.id}
         variante={vista === "tarjetas" ? "rejilla" : "filas"}
-        encabezado={vista === "lista" ? <EncabezadoFilas /> : undefined}
+        encabezado={vista === "lista" ? <EncabezadoColumnas nombre="Video" columnas={columnas} /> : undefined}
         renderFila={(x, enOrden) =>
-          vista === "tarjetas" ? <TarjetaVideo x={x} posicion={enOrden.indexOf(x) + 1} alAbrir={() => abrirVideo(x.id, false)} alReproducir={() => abrirVideo(x.id, true)} /> : <FilaVideo x={x} alAbrir={() => abrirVideo(x.id, true)} />
+          vista === "tarjetas" ? <TarjetaVideo x={x} columnas={columnas} posicion={enOrden.indexOf(x) + 1} alAbrir={() => abrirVideo(x.id, false)} alReproducir={() => abrirVideo(x.id, true)} /> : <FilaVideo x={x} columnas={columnas} alAbrir={() => abrirVideo(x.id, true)} />
         }
         vacio="Todavía no hay videos con gasto en este periodo."
       />
@@ -333,17 +298,21 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
             <div className="pb-5">
               <ReproductorVideo key={v.id} videoId={v.id} miniatura={v.miniatura} duracion={v.analisis?.duracionS ?? null} titulo={v.nombre} autoReproducir={reproducirAlAbrir} />
             </div>
+            {v.pendiente && (
+              <div className="py-5">
+                <QueHacer pendiente={v.pendiente} />
+              </div>
+            )}
             <Seccion icono={MargenIcon} titulo="Cómo le fue en el periodo">
               <p className="m-0 text-sm text-muted-foreground">
                 {v.producto ?? "Sin producto"}
-                {v.angulo ? ` · ángulo ${v.angulo}` : ""}
+                {v.angulo ? ` · ángulo ${nombreDeAngulo(v.angulo, v.analisis?.anguloDetalle)}` : ""}
               </p>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
-                <Cifra titulo="Gasto" valor={dolares(v.r.gasto)} />
-                <Cifra titulo="Compras" valor={entero(v.r.compras)} />
-                <Cifra titulo="CPA" valor={valorCpa(v.r)} nivel={nivelDeCpa(cpa(v.r), v.tope)} />
-                <Cifra titulo="Hook (3 s)" valor={porcentaje(hookRate(v.r), 0)} nivel={nivelDeHook(hookRate(v.r))} />
-                <Cifra titulo="CTR del enlace" valor={porcentaje(ctr(v.r), 2)} nivel={nivelDeCtr(ctr(v.r))} />
+                {CATALOGO_COLUMNAS.filter((c) => c.clave !== "frecuencia").map((c) => {
+                  const val = valorColumna(c.clave, v.r, { tope: v.tope, etapa: "venta", confiable: confiable(v.r) });
+                  return <Cifra key={c.clave} titulo={c.titulo} valor={val.texto} nivel={val.nivel} />;
+                })}
               </div>
             </Seccion>
             <Seccion icono={RobotIcon} titulo="Lo que vio la IA">
@@ -434,6 +403,7 @@ function AnalisisIA({ v, escribe, iaConectada }: { v: VideoVista; escribe: boole
               <span className="font-medium">{a.angulo ?? "—"}</span>
               {a.anguloManual && <span className="ml-2 text-xs text-muted-foreground">corregido a mano</span>}
             </Fila>
+            {a.anguloDetalle && <Fila t="Detalle del ángulo">{a.anguloDetalle}</Fila>}
             {a.promesa && <Fila t="Promesa">{a.promesa}</Fila>}
             {a.gancho && (
               <Fila t="Gancho (primeros 3 segundos)">
@@ -452,7 +422,7 @@ function AnalisisIA({ v, escribe, iaConectada }: { v: VideoVista; escribe: boole
             </details>
           )}
           <p className="m-0 text-xs text-muted-foreground">
-            Analizado el {formatearFechaHora(a.analizadoEn)}
+            Analizado el {horaDeMeta(a.analizadoEn)}
             {a.duracionS ? ` · ${a.duracionS} s` : ""}
           </p>
         </>

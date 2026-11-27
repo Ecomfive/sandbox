@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUsuarioActual } from "@/lib/auth";
+import { esSeccionUrgente, HREFS_DE_PEDIDOS, type SeccionUrgente } from "@/lib/avisos-urgentes";
 
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 
@@ -33,6 +34,19 @@ export async function marcarAvisoLeido(id: string): Promise<void> {
     .eq("usuario_id", usuario.id)
     .is("leida_en", null);
   revalidatePath("/notificaciones");
+}
+
+/**
+ * Al entrar a la pantalla donde se atienden, marca como leídos los avisos propios de esa sección (pedidos o mercancía en puerto): así el menú deja de estar en rojo. Devuelve cuántos marcó.
+ * En «Ver así» no marca nada.
+ */
+export async function marcarAvisosVistos(seccion: SeccionUrgente): Promise<number> {
+  const usuario = await getUsuarioActual();
+  if (!usuario || usuario.vistaPrevia || !esSeccionUrgente(seccion)) return 0;
+  const sinLeer = createServiceClient().from("notificaciones_usuario").update({ leida_en: new Date().toISOString() }).eq("usuario_id", usuario.id).is("leida_en", null);
+  const { data } = await (seccion === "llegadas" ? sinLeer.like("titulo", "Llega a puerto%") : sinLeer.in("href", [...HREFS_DE_PEDIDOS[seccion]])).select("id");
+  if (data?.length) revalidatePath("/notificaciones");
+  return data?.length ?? 0;
 }
 
 /** Marca como leídos todos los avisos propios. */

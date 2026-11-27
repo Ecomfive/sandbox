@@ -34,12 +34,14 @@ export function mapeoPorTitulos(mapeo: MapeoColumnas, principal: ColumnaTablero[
 export async function sincronizarTablerosExtra(supabase: SupabaseClient, limite: number): Promise<string> {
   if (!mondayConfigurado()) return "";
   // Solo los de despachos: el de cambios y reembolsos (clase «postventa», migración 0290) lo lee `postventa.ts`. Sin la 0290 no hay columna `clase`.
-  const consulta = (conClase: boolean) => {
-    const q = supabase.from("mon_tableros_extra").select("tablero_id, nombre, columnas, cursor_actualizado").eq("activo", true);
+  // `prueba` (migración 0363): el tablero de prueba del panel del repartidor. Sin la 0363, sin esa columna.
+  const consulta = (conClase: boolean, conPrueba: boolean) => {
+    const q = supabase.from("mon_tableros_extra").select(`tablero_id, nombre, columnas, cursor_actualizado${conPrueba ? ", prueba" : ""}`).eq("activo", true);
     return (conClase ? q.eq("clase", "despachos") : q).order("ultima_lectura", { ascending: true, nullsFirst: true });
   };
-  let { data: tableros, error } = await consulta(true);
-  if (error && /clase/.test(error.message)) ({ data: tableros, error } = await consulta(false));
+  let { data: tableros, error } = (await consulta(true, true)) as unknown as { data: Record<string, unknown>[] | null; error: { message: string } | null };
+  if (error && /prueba/.test(error.message)) ({ data: tableros, error } = (await consulta(true, false)) as unknown as { data: Record<string, unknown>[] | null; error: { message: string } | null });
+  if (error && /clase/.test(error.message)) ({ data: tableros, error } = (await consulta(false, false)) as unknown as { data: Record<string, unknown>[] | null; error: { message: string } | null });
   if (error || !tableros?.length) return "";
   const { data: cfg } = await supabase.from("mon_config").select("tablero_id, columnas, estados").eq("id", 1).maybeSingle();
   const mapeoPrincipal = leerMapeo(cfg?.columnas);
@@ -50,7 +52,7 @@ export async function sincronizarTablerosExtra(supabase: SupabaseClient, limite:
   let columnasPrincipal: ColumnaTablero[] | null = null;
 
   const hechos: string[] = [];
-  for (const t of tableros as { tablero_id: string; nombre: string; columnas: unknown; cursor_actualizado: string | null }[]) {
+  for (const t of tableros as unknown as { tablero_id: string; nombre: string; columnas: unknown; cursor_actualizado: string | null; prueba?: boolean }[]) {
     if (Date.now() > limite) break;
     try {
       let mapeo = t.columnas ? leerMapeo(t.columnas) : null;
@@ -86,7 +88,7 @@ export async function sincronizarTablerosExtra(supabase: SupabaseClient, limite:
         primera = false;
         const pagina = leerPagina(json);
         const cambiados = pagina.items.filter((i) => cambioDesde(i, t.cursor_actualizado));
-        guardados += await guardarDespachos(supabase, t.tablero_id, cambiados.map((i) => despachoDeItem(i, mapeo, reglas)), unidades, /^devoluc/i.test(t.nombre) ? "devolucion" : "ciudad");
+        guardados += await guardarDespachos(supabase, t.tablero_id, cambiados.map((i) => despachoDeItem(i, mapeo, reglas)), unidades, /^devoluc/i.test(t.nombre) ? "devolucion" : "ciudad", t.prueba === true);
         leidos += pagina.items.length;
         const max = pagina.items.map((i) => i.updated_at ?? "").filter(Boolean).sort().at(-1) ?? null;
         if (max && (!maximo || max > maximo)) maximo = max;

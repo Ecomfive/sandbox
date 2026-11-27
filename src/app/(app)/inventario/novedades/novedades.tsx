@@ -10,7 +10,7 @@ import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { formatearTiempoRelativo } from "@/lib/formato";
+import { FechaHora } from "@/components/ui/fecha-hora";
 import { supabase } from "@/lib/supabase/client";
 import { ETIQUETA_ESTADO_NOVEDAD, ETIQUETA_TIPO_NOVEDAD, RESULTADOS, type EstadoNovedad, type TipoNovedad } from "@/lib/wms/novedades";
 import { crearNovedad, prepararFotoNovedad, resolverNovedad } from "./actions";
@@ -241,7 +241,7 @@ export function Novedades({ filas, plataformas, productos, puedeEscribir }: { fi
         </p>
         <CodigosProducto numero={f.numeroProducto} barras={f.barras} />
         <p className="m-0 text-xs text-muted-foreground">
-          {f.creadoPor} · {formatearTiempoRelativo(f.creadoEn)}
+          {f.creadoPor} · <FechaHora iso={f.creadoEn} />
           {f.referencia ? ` · ${f.referencia}` : ""}
           {f.retornoOficina ? " · Vuelve a la oficina" : ""}
           {f.nota ? ` · ${f.nota}` : ""}
@@ -254,7 +254,7 @@ export function Novedades({ filas, plataformas, productos, puedeEscribir }: { fi
         {f.resueltoPor && (
           <p className="m-0 text-xs text-muted-foreground">
             Resolvió {f.resueltoPor}
-            {f.resueltoEn ? ` · ${formatearTiempoRelativo(f.resueltoEn)}` : ""}
+            {f.resueltoEn ? <> · <FechaHora iso={f.resueltoEn} /></> : null}
             {f.notaResolucion ? ` · ${f.notaResolucion}` : ""}
           </p>
         )}

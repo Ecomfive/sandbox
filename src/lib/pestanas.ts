@@ -19,18 +19,31 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Confirmación con IA", href: "/tienda-pedidos/confirmacion/ia" },
     { etiqueta: "Logística", href: "/tienda-pedidos/logistica" },
   ],
-  // Comunicación despacho (19 nov 2026, pedido de Hernán): lo que se le pide a despacho; «Preguntar cuánto hay» vino de Pedidos de tienda.
+  // Comunicación despacho (19 nov 2026, pedido de Hernán): lo que se le pide a despacho. Mismos nombres que «Inventario despacho» (25 nov 2026); «Mercancía existente» vino de Pedidos de tienda.
   "/inventario-pedidos-despacho": [
-    { etiqueta: "Solicitudes de despacho", href: "/inventario-pedidos-despacho" },
-    { etiqueta: "Cuánto hay", href: "/inventario-pedidos-despacho/cuanto-hay" },
+    { etiqueta: "Solicitud de inventario", href: "/inventario-pedidos-despacho" },
+    { etiqueta: "Mercancía existente", href: "/inventario-pedidos-despacho/cuanto-hay" },
+    { etiqueta: "Archivos de solicitudes", href: "/inventario-pedidos-despacho/archivo" },
   ],
-  // Despacho ciudad, como el panel de Monday: el día de hoy y, al lado, devoluciones, cambios y reembolsos, y lo demás de despacho.
+  // Envíos Delivery: la gestión de los repartos; el día de hoy y, al lado, devoluciones, cambios y reembolsos.
   "/despacho-ciudad": [
     { etiqueta: "Hoy", href: "/despacho-ciudad" },
     { etiqueta: "Devoluciones", href: "/despacho-ciudad/devoluciones" },
     { etiqueta: "Cambios y reembolsos", href: "/despacho-ciudad/cambios" },
-    { etiqueta: "Cuánto hay", href: "/despacho-ciudad/cuanto-hay" },
-    { etiqueta: "Pedir a inventario", href: "/despacho-ciudad/pedir-inventario" },
+    // Cierres y Control de envíos (25 nov 2026, migración 0366): validar los depósitos de cada día y lo que se le paga a cada delivery en la semana.
+    { etiqueta: "Cierres", href: "/despacho-ciudad/cierres" },
+    { etiqueta: "Control de envíos", href: "/despacho-ciudad/control" },
+  ],
+  // Inventario despacho (25 nov 2026): el stock de despacho, aparte de los envíos.
+  "/inventario-despacho": [
+    { etiqueta: "Mercancía existente", href: "/inventario-despacho" },
+    { etiqueta: "Solicitud de inventario", href: "/inventario-despacho/solicitudes" },
+    { etiqueta: "Archivos de solicitudes", href: "/inventario-despacho/archivo" },
+  ],
+  // Pedidos Dropi › Resumen (20 nov 2026, pedido de María José): la pestaña RESUMEN de su sheet «ECOMFIVE DROPI 2026», un mes por columna.
+  "/pedidos-dropi": [
+    { etiqueta: "Pedidos", href: "/pedidos-dropi" },
+    { etiqueta: "Resumen", href: "/pedidos-dropi/resumen" },
   ],
   "/tienda-tiendas": [
     { etiqueta: "Tiendas", href: "/tienda-tiendas" },
@@ -198,10 +211,9 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Importar Excel", href: "/bienes-de-uso/importar" },
   ],
   "/costos-mercancia": [
-    { etiqueta: "Productos", href: "/costos-mercancia" },
-    { etiqueta: "Lotes", href: "/costos-mercancia/lotes" },
+    { etiqueta: "Costos de producto", href: "/costos-mercancia" },
+    { etiqueta: "Histórico (Excel)", href: "/costos-mercancia/lotes" },
     { etiqueta: "Mapeo con Dropi", href: "/costos-mercancia/mapeo" },
-    { etiqueta: "Importar Excel", href: "/costos-mercancia/importar" },
   ],
   "/libro-movimientos": [
     { etiqueta: "Movimientos", href: "/libro-movimientos" },
@@ -237,6 +249,7 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Traslados", href: "/inventario/traslados" },
     { etiqueta: "Remisiones", href: "/inventario/remisiones" },
     { etiqueta: "Vencimientos", href: "/inventario/vencimientos" },
+    { etiqueta: "Defectuosos", href: "/inventario/defectuosos" },
     { etiqueta: "Pistoleo", href: "/inventario/pistoleo" },
   ],
   "/productos-test": [
@@ -265,9 +278,11 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
   // Anuncios Meta (18 nov 2026, pedido de Alcides): el resumen, las campañas, qué funciona, los videos, el equipo y las cuentas.
   "/anuncios-meta": [
     { etiqueta: "Resumen", href: "/anuncios-meta" },
+    { etiqueta: "Hallazgos", href: "/anuncios-meta/hallazgos" },
     { etiqueta: "Campañas", href: "/anuncios-meta/campanas" },
-    { etiqueta: "Qué funciona", href: "/anuncios-meta/que-funciona" },
+    { etiqueta: "Productos", href: "/anuncios-meta/productos" },
     { etiqueta: "Videos", href: "/anuncios-meta/videos" },
+    { etiqueta: "Qué funciona", href: "/anuncios-meta/que-funciona" },
     { etiqueta: "Equipo", href: "/anuncios-meta/equipo" },
     { etiqueta: "Cuentas", href: "/anuncios-meta/cuentas" },
   ],
@@ -275,6 +290,7 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
   "/compras": [
     { etiqueta: "Compras", href: "/compras/lista" },
     { etiqueta: "Tablero de Shen Zhen", href: "/compras/tablero-chin" },
+    { etiqueta: "Llegadas", href: "/compras/llegadas" },
     { etiqueta: "Dashboard", href: "/compras/dashboard" },
     { etiqueta: "Informe", href: "/compras/informe" },
     { etiqueta: "Planificación", href: "/compras/planificacion" },

@@ -1,9 +1,12 @@
+import { agregarPadres, cargarCatalogoCostos } from "@/lib/finanzas/cargar-hoja-costos";
+import { costoEn } from "@/lib/finanzas/hoja-costos";
+import { PAIS_HOJA_COSTOS } from "@/lib/finanzas/sincronizar-costos-compras";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { obtenerPlataformaDropiId } from "@/lib/plataforma-dropi";
-import { requireModulo } from "@/lib/auth";
+import { requirePanel } from "@/lib/auth";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { contarFiltrado, obtenerResumenPedidos, totalesPedidos } from "@/lib/pedidos/resumen";
 import { formatearMoneda } from "@/lib/formato";
@@ -33,7 +36,8 @@ export default async function PedidosDropiPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  await requireModulo("pedidos-dropi");
+  // Con solo la pestaña Resumen (Finanzas), la lleva ahí en vez de sacarla.
+  const usuario = await requirePanel("/pedidos-dropi", "pedidos-dropi");
   const sp = await searchParams;
   const { desde, hasta } = resolverPeriodo({
     preset: typeof sp.preset === "string" ? sp.preset : undefined,
@@ -58,7 +62,7 @@ export default async function PedidosDropiPage({
   const consultarOrdenes = (referencias?: string[]) => {
     let consulta = supabase
       .from("ordenes")
-      .select("referencia_externa, cantidad, monto, estado, fecha, fecha_hora, productos(sku, nombre)")
+      .select("referencia_externa, cantidad, monto, estado, fecha, fecha_hora, productos(sku, nombre, sku_maestro_id)")
       .eq("pais_id", pais.id)
       .eq("plataforma_id", plataformaId)
       .gte("fecha", desde)
@@ -95,7 +99,19 @@ export default async function PedidosDropiPage({
   // Cuántas órdenes tiene el filtro puesto (la tabla trae como máximo 500 de ellas).
   const totalFiltrado = contarFiltrado(resumen.grupos, estados, soloAlertas);
 
+  // El costo de cada pedido, de la hoja de Costos de producto (0992): solo Panamá, por el producto y la fecha del pedido.
+  type ProductoOrden = { sku: string; nombre: string; sku_maestro_id: string | null } | null;
+  const productoDe = (o: (typeof todas)[number]) => o.productos as unknown as ProductoOrden;
+  let costoDe: (sku: string | null, fecha: string) => number | null = () => null;
+  // Es dinero de Finanzas: solo lo ve quien puede abrir Costos de producto.
+  if (pais.codigo === PAIS_HOJA_COSTOS && todas.length && usuario.modulos.includes("costos-mercancia")) {
+    const cat = await cargarCatalogoCostos(supabase);
+    await agregarPadres(supabase, cat, todas.map((o) => productoDe(o)?.sku_maestro_id).filter((x): x is string => !!x));
+    costoDe = (sku, fecha) => costoEn(cat, sku, fecha);
+  }
+
   const filasPedido: FilaPedido[] = todas.map((o) => ({
+    costoUnitario: costoDe(productoDe(o)?.sku_maestro_id ?? null, String(o.fecha).slice(0, 10)),
     referencia: o.referencia_externa,
     fecha: o.fecha,
     fechaHora: o.fecha_hora,

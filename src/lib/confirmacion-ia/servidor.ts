@@ -3,11 +3,11 @@
 //
 // El camino: iComfly deja el pedido «Confirmada» en Shopify → el webhook (`orders/updated`) lo guarda y llama a `dispararDesdeWebhook` → `analizarOrden` mira la dirección con ChatGPT y
 // Claude y las palabras de zona del país → guarda el análisis (la etiqueta que correspondería: CIUDAD o INTERIOR/SERVIENTREGA) y, si falta un dato de la dirección y el envío del
-// WhatsApp está encendido, se lo pide al cliente por iComfly. Por ahora no cambia etiquetas en Shopify: el sistema solo lee.
+// WhatsApp está encendido, se lo pide al cliente por iComfly. Solo en una tienda con «La IA pone la etiqueta de zona» encendido (`poner-etiqueta.ts`) la pone en Shopify; en las demás solo propone.
 
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { pedirIAEn, proveedoresConectados, type ProveedorIA } from "@/lib/publicaciones/ia/proveedor";
+import { pedirIA, pedirIAEn, proveedoresConectados, type ProveedorIA } from "@/lib/publicaciones/ia/proveedor";
 import { esErrorDeVentana, telefonoParaIcomfly, ventana24 } from "@/lib/tienda/chat-tienda";
 import { leerChat } from "@/lib/tienda/chat-tienda-datos";
 import { herramientaIcomfly, conexionesIcomfly } from "@/lib/tienda/icomfly";
@@ -16,9 +16,10 @@ import { destinatariosDe } from "@/lib/compras/llegadas-servidor";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { cargarTiendas } from "@/lib/tienda/datos";
 import { geografiaDe } from "./geografia";
-import { tendenciaDeTienda, textoTendencia } from "./tendencias";
 import { motivoDeAdelanto, zonasDeAdelanto } from "./adelanto";
 import { combinar, etiquetaDeZona, faltaParaCliente, leerRespuesta, mensajePagoAdelantado, mensajePedirDetalle, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "./combinar";
+import { conversacionParaJuez, leerVeredictoChat, pedidoJuez, puedeEscribirseAlCliente, type TipoPedido, type VeredictoChat } from "./chat-previo";
+import { ponerEtiquetaDeZona } from "./poner-etiqueta";
 import { armarEntrada, type EjemploPrompt } from "./prompt";
 import { muestraBalanceada, type PedidoMuestra, type ResultadoPrueba } from "./prueba-historica";
 import { resultadoFinal, seleccionarEjemplos, type RevisionPedido, type ResultadoPedido } from "./revision";
@@ -135,14 +136,53 @@ async function cargarOrden(supabase: SupabaseClient, ordenId: string): Promise<O
   };
 }
 
-/** Qué pasó con el mensaje que pide el dato que falta. `manual`: una persona dijo que ya se lo mandó a mano. */
-export type EstadoMensaje = "no_aplica" | "apagado" | "enviado" | "manual" | "pendiente_plantilla" | "sin_chat" | "error";
+/**
+ * Qué pasó con el mensaje que pide el dato que falta (o avisa del pago por adelantado). `manual`: una persona dijo que ya se lo mandó a mano. `ya_pedido`: en el chat de iComfly ya se lo habían pedido
+ * y no se repite; `sin_comprobar`: no se pudo saber si ya se lo pidieron (la IA no estuvo segura o falló), así que no se manda solo (migración 0349).
+ */
+export type EstadoMensaje = "no_aplica" | "apagado" | "enviado" | "manual" | "pendiente_plantilla" | "sin_chat" | "error" | "ya_pedido" | "sin_comprobar";
+
+/** Lo que se le pregunta a la IA sobre el chat: qué se le iba a pedir al cliente. */
+export interface PreguntaChat {
+  tipo: TipoPedido;
+  falta: string | null;
+  direccion: string;
+  ciudad: string | null;
+}
+
+/** Los mensajes de un chat de iComfly, en el formato que lee la IA. */
+const paraJuez = (mensajes: { de: "cliente" | "bot" | "equipo"; tipo: string; texto: string }[]) => conversacionParaJuez(mensajes);
+
+/** Le pregunta a la IA si en esa conversación ya se le pidió al cliente lo que se iba a pedir. Nunca lanza: si algo falla, `ya = null`. */
+async function juzgarChat(mensajes: { de: "cliente" | "bot" | "equipo"; tipo: string; texto: string }[], q: PreguntaChat, numero: string | null): Promise<VeredictoChat> {
+  try {
+    const entrada = pedidoJuez({ ...q, conversacion: paraJuez(mensajes) });
+    const r = await pedirIA(entrada, false, { operacion: "confirmacion_chat_previo", modulo: "tienda-confirmacion", referencia: numero }, "crm");
+    if ("error" in r) return { ya: null, motivo: "No se pudo revisar el chat." };
+    return leerVeredictoChat(r.texto);
+  } catch {
+    return { ya: null, motivo: "No se pudo revisar el chat." };
+  }
+}
+
+/** Lee el chat de iComfly del pedido y dice si ya se le pidió al cliente lo que se iba a pedir (para la ventana del asesor). `null` si no hay chat o no se pudo leer. */
+export async function revisarChatDelPedido(supabase: SupabaseClient, ordenId: string, q: Omit<PreguntaChat, "direccion" | "ciudad">): Promise<VeredictoChat | null> {
+  const o = await cargarOrden(supabase, ordenId);
+  if (!o?.tiendaId) return null;
+  const con = await conexionesIcomfly(supabase, [o.tiendaId]);
+  if (!con?.get(o.tiendaId)?.conectado) return null;
+  const telefono = telefonoParaIcomfly(o.cliente.telefono, o.paisCodigo);
+  if (!telefono) return null;
+  const chat = await leerChat(supabase, o.tiendaId, telefono);
+  if ("error" in chat || !chat.mensajes.length) return null;
+  return juzgarChat(chat.mensajes, { ...q, direccion: (o.cliente.direccion ?? "").trim(), ciudad: (o.cliente.corregimiento ?? "").trim() || null }, o.numero);
+}
 
 /**
  * Le pide al cliente por WhatsApp (iComfly) lo que falta de la dirección. Solo escribe libre con la ventana de 24 horas abierta; si no, queda pendiente de una plantilla (nunca escribe
  * libre fuera de ella). No pausa el bot del chat: el cliente va a contestar y esa respuesta le llega.
  */
-async function pedirDatoPorWhatsapp(supabase: SupabaseClient, o: OrdenParaAnalizar, texto: string): Promise<{ estado: EstadoMensaje; error?: string }> {
+async function pedirDatoPorWhatsapp(supabase: SupabaseClient, o: OrdenParaAnalizar, texto: string, antes?: PreguntaChat): Promise<{ estado: EstadoMensaje; error?: string }> {
   if (!o.tiendaId) return { estado: "error", error: "La tienda no está en Gestión de tienda." };
   const con = await conexionesIcomfly(supabase, [o.tiendaId]);
   if (!con?.get(o.tiendaId)?.conectado) return { estado: "error", error: "La tienda no está conectada a iComfly." };
@@ -152,6 +192,12 @@ async function pedirDatoPorWhatsapp(supabase: SupabaseClient, o: OrdenParaAnaliz
   if ("error" in chat) return { estado: "error", error: chat.error };
   if (!chat.mensajes.length) return { estado: "sin_chat" };
   if (ventana24(chat.mensajes, Date.now()) === "cerrada") return { estado: "pendiente_plantilla" };
+  // Escribir solo (el análisis automático): antes se mira la conversación y, si el bot o un asesor ya se lo pidió, o no se puede saber, no se manda nada (21 nov 2026).
+  if (antes) {
+    const v = await juzgarChat(chat.mensajes, antes, o.numero);
+    if (v.ya === true) return { estado: "ya_pedido", error: v.motivo || undefined };
+    if (!puedeEscribirseAlCliente(v)) return { estado: "sin_comprobar", error: v.motivo || undefined };
+  }
   const r = await herramientaIcomfly(supabase, o.tiendaId, "enviar_mensaje_whatsapp", { telefono, mensaje: texto });
   if ("error" in r) return esErrorDeVentana(r.error) ? { estado: "pendiente_plantilla" } : { estado: "error", error: r.error };
   return { estado: "enviado" };
@@ -217,7 +263,7 @@ async function pedirAlModelo(proveedor: ProveedorIA, entrada: ReturnType<typeof 
  */
 export async function evaluarDireccion(
   supabase: SupabaseClient,
-  d: { paisId: string; paisNombre: string; paisCodigo: string; tiendaId: string | null; numero: string | null; direccion: string; ciudad: string | null; config: ConfigConfirmacion; /** Sin la tendencia histórica de la tienda: mide el prompt y los ejemplos solos (la tendencia sale de los mismos pedidos con que se compara). */ sinTendencia?: boolean },
+  d: { paisId: string; paisNombre: string; paisCodigo: string; tiendaId: string | null; numero: string | null; direccion: string; ciudad: string | null; config: ConfigConfirmacion },
 ): Promise<{ combinado: Combinado; modelos: ResultadoModelo[]; coinc: ReglaZona[] }> {
   const { direccion, ciudad, config } = d;
   const reglas = await cargarReglas(supabase, d.paisId);
@@ -233,14 +279,8 @@ export async function evaluarDireccion(
     if (!proveedores.length) modelos = [{ proveedor: "openai", ok: false, error: "Falta conectar ChatGPT o Claude (las claves OPENAI_API_KEY o ANTHROPIC_API_KEY)." }];
     else {
       const ejemplos = await cargarEjemplos(supabase, d.paisId, d.tiendaId);
-      // La tendencia histórica de la tienda (solo Panamá, por ahora): en las zonas dudosas la IA etiqueta como lo viene haciendo esa tienda.
-      let tendencia: string | null = null;
-      if (config.distingueZona && d.paisCodigo.toUpperCase() === "PA" && d.tiendaId && !d.sinTendencia) {
-        const { data: tienda } = await supabase.from("tiendas").select("nombre").eq("id", d.tiendaId).maybeSingle();
-        const t = tendenciaDeTienda((tienda?.nombre as string | undefined) ?? null);
-        tendencia = t ? textoTendencia(t) : null;
-      }
-      const entrada = armarEntrada({ paisNombre: d.paisNombre, distingueZona: config.distingueZona, reglas, ejemplos, direccion, ciudad, coincidencias: coinc, instruccionesExtra: config.instrucciones, geografia: config.distingueZona ? geografiaDe(d.paisCodigo) : null, tendencia });
+      // Sin tendencia por tienda (27 nov 2026): todas las tiendas se etiquetan igual, con los mapas de despacho.
+      const entrada = armarEntrada({ paisNombre: d.paisNombre, distingueZona: config.distingueZona, reglas, ejemplos, direccion, ciudad, coincidencias: coinc, instruccionesExtra: config.instrucciones, geografia: config.distingueZona ? geografiaDe(d.paisCodigo) : null });
       modelos = await Promise.all(proveedores.map((p) => pedirAlModelo(p, entrada, d.numero, permiteAdelanto(d.paisCodigo))));
     }
   }
@@ -294,12 +334,29 @@ export async function analizarOrden(supabase: SupabaseClient, ordenId: string, o
     if (!config.enviarMensajes) mensajeEstado = "apagado";
     else if (enviados >= MAX_MENSAJES) mensajeEstado = (previo?.mensaje_estado as EstadoMensaje | undefined) ?? "enviado";
     else {
-      const r = await pedirDatoPorWhatsapp(supabase, o, mensaje);
+      const r = await pedirDatoPorWhatsapp(supabase, o, mensaje, { tipo: "dato", falta: faltaParaCliente(c.falta), direccion, ciudad });
       mensajeEstado = r.estado;
       mensajeError = r.error ?? null;
       if (r.estado === "enviado") {
         enviados += 1;
         enviadoEn = new Date().toISOString();
+      }
+    }
+  } else if (c.estado === "adelantado") {
+    // Pago por adelantado (21 nov 2026): con el interruptor encendido, también se le avisa del pago, pero solo si en el chat de iComfly todavía no se lo dijeron.
+    const a = await armarMensajeAdelanto(supabase, ordenId);
+    if (!("error" in a)) {
+      mensaje = a.mensaje;
+      if (!config.enviarMensajes) mensajeEstado = "apagado";
+      else if (enviados >= MAX_MENSAJES) mensajeEstado = (previo?.mensaje_estado as EstadoMensaje | undefined) ?? "enviado";
+      else {
+        const r = await pedirDatoPorWhatsapp(supabase, o, mensaje, { tipo: "adelanto", falta: null, direccion, ciudad });
+        mensajeEstado = r.estado;
+        mensajeError = r.error ?? null;
+        if (r.estado === "enviado") {
+          enviados += 1;
+          enviadoEn = new Date().toISOString();
+        }
       }
     }
   }
@@ -333,11 +390,23 @@ export async function analizarOrden(supabase: SupabaseClient, ordenId: string, o
   // Si el cliente corrigió su dirección, lo que el equipo había marcado era de la dirección anterior: ya no vale.
   const sinRevision = previo && previo.huella !== huella ? { rev_completa: null, rev_zona: null, rev_falta: null, rev_ok: null, rev_por: null, rev_por_nombre: null, rev_en: null } : null;
   let { error } = await supabase.from("confirmacion_ia_analisis").upsert(sinRevision ? { ...fila, ...sinRevision } : fila, { onConflict: "orden_id" });
+  // Sin la migración 0349 los estados «ya_pedido» y «sin_comprobar» no caben en la restricción: se guarda igual, como «no_aplica», con el motivo.
+  if (error && /mensaje_estado|check constraint/i.test(error.message) && (mensajeEstado === "ya_pedido" || mensajeEstado === "sin_comprobar")) {
+    const igual = { ...fila, mensaje_estado: "no_aplica" as const, mensaje_error: fila.mensaje_error ?? (mensajeEstado === "ya_pedido" ? "Ya se lo habían pedido en el chat." : "No se pudo saber si ya se lo pidieron.") };
+    ({ error } = await supabase.from("confirmacion_ia_analisis").upsert(sinRevision ? { ...igual, ...sinRevision } : igual, { onConflict: "orden_id" }));
+  }
   // Sin la migración 0307 (revisión del equipo) esas columnas no existen: se guarda igual, sin ellas.
   if (error && sinRevision && /rev_|schema cache/i.test(error.message)) ({ error } = await supabase.from("confirmacion_ia_analisis").upsert(fila, { onConflict: "orden_id" }));
   if (error) return { resultado: "omitida", motivo: /confirmacion_ia|schema cache/i.test(error.message) ? SIN_MIGRACION_CONFIRMACION : "No se pudo guardar el análisis." };
   // Un pedido que entra a «en espera de pago» (no uno que ya lo estaba) se le avisa a quienes estén marcados en Configuración › Avisos a personas (nadie de entrada).
   if (c.estado === "adelantado" && previo?.estado !== "adelantado") await avisarPagoAdelantado(supabase, { numero: o.numero, tienda: o.tiendaNombre, ciudad, direccion });
+  // La etiqueta de zona en Shopify (21 nov 2026, prueba controlada): solo cuando el pedido acaba de confirmarse (aviso de Shopify), nunca desde la pantalla ni desde los pendientes viejos, y solo
+  // en una tienda con «La IA pone la etiqueta de zona» encendido (`ponerEtiquetaDeZona` lo comprueba y nunca lanza).
+  if (opciones.origen === "webhook" && !opciones.forzar && c.estado === "listo" && etiqueta) {
+    const r = await ponerEtiquetaDeZona(supabase, { ordenId, numero: o.numero, tiendaId: o.tiendaId, paisCodigo: o.paisCodigo, etiqueta, zonaYaPuesta: tieneEtiquetaDeZona });
+    if (r.estado === "puesta") await supabase.from("confirmacion_ia_analisis").update({ etiqueta_puesta: r.etiqueta, etiqueta_puesta_en: new Date().toISOString(), etiqueta_error: null }).eq("orden_id", ordenId);
+    else if (r.estado === "error") await supabase.from("confirmacion_ia_analisis").update({ etiqueta_error: r.motivo }).eq("orden_id", ordenId);
+  }
   return { resultado: "analizada", estado: c.estado };
 }
 
@@ -512,7 +581,7 @@ export async function listarMuestraHistorica(supabase: SupabaseClient, d: { pais
 }
 
 /** Analiza un pedido ya etiquetado con el mismo análisis del sistema y lo deja junto a su zona real. Null si el pedido no sirve (sin dirección, sin etiqueta de zona o de otro país). No guarda nada. */
-export async function probarPedidoHistorico(supabase: SupabaseClient, ordenId: string, paisId: string, config: ConfigConfirmacion, opciones: { sinTendencia: boolean }): Promise<ResultadoPrueba | null> {
+export async function probarPedidoHistorico(supabase: SupabaseClient, ordenId: string, paisId: string, config: ConfigConfirmacion): Promise<ResultadoPrueba | null> {
   const o = await cargarOrden(supabase, ordenId);
   if (!o || o.paisId !== paisId) return null;
   const zona = zonaDeEtiquetas(o.etiquetas);
@@ -524,7 +593,7 @@ export async function probarPedidoHistorico(supabase: SupabaseClient, ordenId: s
   const adelanto = zonasDeAdelanto(direccion, ciudad, await cargarReglas(supabase, o.paisId));
   const { combinado: c, modelos, coinc } = adelanto.length
     ? { combinado: { estado: "adelantado", zona: null, zonaPor: null, completa: null, falta: null, acuerdo: null, motivo: motivoDeAdelanto(adelanto) } as Combinado, modelos: [] as ResultadoModelo[], coinc: [] as ReglaZona[] }
-    : await evaluarDireccion(supabase, { paisId: o.paisId, paisNombre: o.paisNombre, paisCodigo: o.paisCodigo, tiendaId: o.tiendaId, numero: o.numero, direccion, ciudad, config, sinTendencia: opciones.sinTendencia });
+    : await evaluarDireccion(supabase, { paisId: o.paisId, paisNombre: o.paisNombre, paisCodigo: o.paisCodigo, tiendaId: o.tiendaId, numero: o.numero, direccion, ciudad, config });
   return {
     id: o.id,
     numero: o.numero,

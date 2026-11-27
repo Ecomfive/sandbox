@@ -3,14 +3,14 @@
 import { soloSinLimite } from "@/lib/tienda/acceso";
 import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
-import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
-import { cargarTiendas } from "@/lib/tienda/datos";
+import { cargarTiendas, type Tienda } from "@/lib/tienda/datos";
 import { fuenteFinanzas } from "@/lib/tienda/datos-finanzas";
 import { tiendaDeClienteSiscore } from "@/lib/tienda/siscore";
-import { grupoDeEstadoGuia, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, sinLoDelRastreo, visitasSinEntregar } from "@/lib/tienda/siscore";
+import { grupoDeEstadoGuia, guiaAntesDelPedido, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, sinLoDelRastreo, visitasSinEntregar } from "@/lib/tienda/siscore";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { actualizarEntregas, completarDatosEntrega } from "@/lib/tienda/actualizar-entregas";
+import { cargarGuiasSolas, type ResultadoGuiasSolas } from "@/lib/tienda/guias-solas";
 
 const RUTA = "/tienda-pedidos/logistica";
 const BUCKET = "wms-compras";
@@ -34,6 +34,21 @@ export interface LecturaEnCurso {
 }
 
 const porcentaje = (hechos: number, total: number) => (total > 0 ? Math.min(99, Math.floor((hechos / total) * 100)) : 0);
+
+/**
+ * Las tiendas de todos los países, con el código de su país. La cuenta de SISCORE es de una tienda, no del país elegido arriba: con Costa Rica
+ * elegido, desde el 25 nov 2026 las lecturas de Kenku, Oferfy y Nuvo quedaban sin tienda (las guías nuevas sin pedido, nada entraba en Shopify y
+ * la tienda de las guías leídas se borraba).
+ */
+async function tiendasDeTodosLosPaises(supabase: ReturnType<typeof createServiceClient>): Promise<{ tienda: Tienda; codigoPais: string }[]> {
+  const { data: paises } = await supabase.from("paises").select("id, codigo");
+  const todas: { tienda: Tienda; codigoPais: string }[] = [];
+  for (const p of paises ?? []) {
+    const { tiendas } = await cargarTiendas(supabase, p.id as string);
+    for (const t of tiendas) todas.push({ tienda: t, codigoPais: String(p.codigo) });
+  }
+  return todas;
+}
 
 /** Las lecturas de SISCORE que siguen avanzando (de cualquier tienda), para mostrar su porcentaje. Las que dejaron de avanzar se cierran. */
 async function lecturasVivas(supabase: ReturnType<typeof createServiceClient>): Promise<LecturaEnCurso[] | null> {
@@ -93,8 +108,7 @@ export async function empezarLecturaSiscore(
     return { error: "Tu rol solo puede ver Logística." };
   }
   const supabase = createServiceClient();
-  const pais = await getPaisActual(supabase);
-  const { tiendas } = await cargarTiendas(supabase, pais.id);
+  const tiendas = (await tiendasDeTodosLosPaises(supabase)).map((x) => x.tienda);
   const deSesion = clienteSesion ? tiendaDeClienteSiscore(clienteSesion, tiendas) : null;
   const elegida = tiendaElegida && UUID.test(tiendaElegida) ? (tiendas.find((t) => t.id === tiendaElegida) ?? null) : null;
   if (elegida && clienteSesion && deSesion?.id !== elegida.id)
@@ -157,11 +171,14 @@ export async function avanceLecturaSiscore(id: string, hechos: number, total: nu
  * Guarda lo que subió la extensión: cada guía con su tienda (el cliente de SISCORE, «KENKU» = Kenku) y su pedido (la «Factura» es el número de Shopify),
  * el grupo de su estado, las visitas sin entregar, cuándo se entregó y el rastreo. Borra el archivo temporal.
  */
-export async function procesarLecturaSiscore(id: string): Promise<{ guias: number; conPedido: number; rastreadas: number; cliente: string } | { error: string }> {
+export async function procesarLecturaSiscore(
+  id: string,
+): Promise<{ guias: number; conPedido: number; rastreadas: number; cliente: string; shopify: ResultadoGuiasSolas | null } | { error: string }> {
   const limite = await soloSinLimite();
   if (limite) return { error: limite };
+  let u;
   try {
-    await requireModuloEscritura("tienda-logistica");
+    u = await requireModuloEscritura("tienda-logistica");
   } catch {
     return { error: "Tu rol solo puede ver Logística." };
   }
@@ -183,27 +200,33 @@ export async function procesarLecturaSiscore(id: string): Promise<{ guias: numbe
   if (!lectura) return fallar("La lectura de SISCORE llegó vacía o con otro formato.");
   try {
     // La tienda del cliente de SISCORE y su unidad de Finanzas (donde están sus órdenes).
-    const pais = await getPaisActual(supabase);
-    const { tiendas } = await cargarTiendas(supabase, pais.id);
-    const tienda = tiendaDeClienteSiscore(lectura.cliente, tiendas);
-    const unidad = tienda ? ((await fuenteFinanzas(supabase, [tienda], pais.codigo)).unidadDe.get(tienda.id) ?? null) : null;
+    const todas = await tiendasDeTodosLosPaises(supabase);
+    // La del cliente de la sesión de SISCORE y, si no se reconoce, la que se eligió al empezar la lectura.
+    const { data: inicio } = await supabase.from("tienda_guias_lecturas").select("tienda_id").eq("id", id).maybeSingle();
+    const tienda = tiendaDeClienteSiscore(lectura.cliente, todas.map((x) => x.tienda)) ?? todas.find((x) => x.tienda.id === inicio?.tienda_id)?.tienda ?? null;
+    // Sin tienda no se guarda nada: guardar borraría la tienda de las guías y dejaría las nuevas sin su pedido.
+    if (!tienda) return fallar(`No se reconoció la tienda de la cuenta «${lectura.cliente}» de SISCORE: no se guardó nada. Avísale a Hernán.`);
+    const codigoPais = todas.find((x) => x.tienda.id === tienda.id)?.codigoPais ?? "PA";
+    const unidad = (await fuenteFinanzas(supabase, [tienda], codigoPais)).unidadDe.get(tienda.id) ?? null;
     // Los pedidos de esas guías, por su número en esa unidad.
     const numeros = [...new Set(lectura.guias.map((g) => pedidoDeFactura(g.factura)).filter((n): n is string => !!n))];
-    const ordenDe = new Map<string, string>();
+    const ordenDe = new Map<string, { id: string; fecha: string | null }>();
     if (unidad)
       for (let i = 0; i < numeros.length; i += 200) {
-        const { data } = await supabase.from("ven_ordenes").select("id, numero").eq("unidad_id", unidad).in("numero", numeros.slice(i, i + 200));
-        for (const o of data ?? []) ordenDe.set(String(o.numero).toUpperCase(), o.id as string);
+        const { data } = await supabase.from("ven_ordenes").select("id, numero, fecha").eq("unidad_id", unidad).in("numero", numeros.slice(i, i + 200));
+        for (const o of data ?? []) ordenDe.set(String(o.numero).toUpperCase(), { id: o.id as string, fecha: (o.fecha as string | null) ?? null });
       }
     const filas = lectura.guias.map((g) => {
       const numero = pedidoDeFactura(g.factura);
       const { visitas, motivo } = visitasSinEntregar(g.historial);
+      // Una guía emitida antes que el pedido es de otro (la factura se escribió mal): queda sin pedido, a la vista en Logística.
+      const orden = numero ? (ordenDe.get(numero) ?? null) : null;
       return {
         guia: g.guia,
         tienda_id: tienda?.id ?? null,
         cliente: g.cliente,
         numero_pedido: numero,
-        orden_id: numero ? (ordenDe.get(numero) ?? null) : null,
+        orden_id: orden && !guiaAntesDelPedido(g.fecha_emision, orden.fecha) ? orden.id : null,
         destino: g.destino,
         servicio: g.servicio,
         proceso: g.proceso,
@@ -219,6 +242,14 @@ export async function procesarLecturaSiscore(id: string): Promise<{ guias: numbe
         leida_en: lectura.leido_en,
       };
     });
+    // Una guía a la que la lectura no le encuentra pedido conserva el que ya tenía (25 nov 2026): la que se unió a mano porque su factura venía mal
+    // escrita (la 7224151768 decía 1916 y era del #1619) no se suelta en la próxima lectura.
+    const sinPedido = filas.filter((f) => !f.orden_id).map((f) => f.guia);
+    for (let i = 0; i < sinPedido.length; i += 200) {
+      const { data } = await supabase.from("tienda_guias").select("guia, orden_id").in("guia", sinPedido.slice(i, i + 200)).not("orden_id", "is", null);
+      const ya = new Map((data ?? []).map((x) => [String(x.guia), String(x.orden_id)]));
+      for (const f of filas) if (!f.orden_id && ya.has(f.guia)) f.orden_id = ya.get(f.guia)!;
+    }
     // Las guías saltadas (ya cerradas, sin abrir su rastreo) se guardan sin lo del rastreo: su historial, visitas y recaudo quedan como estaban.
     const rastreadas = filas.filter((_, i) => !lectura.guias[i].saltada);
     const saltadas = filas.filter((_, i) => lectura.guias[i].saltada).map(sinLoDelRastreo);
@@ -235,8 +266,15 @@ export async function procesarLecturaSiscore(id: string): Promise<{ guias: numbe
     await actualizarEntregas(supabase, "Servientrega (lectura de SISCORE)", Date.now() + 30_000).catch(() => null);
     // La fecha de despacho de los que salieron por Servientrega sin la fecha de Shopify (la emisión de la guía), 14 nov 2026.
     await completarDatosEntrega(supabase, Date.now() + 10_000).catch(() => 0);
+    // Las guías nuevas entran solas en Shopify (24 nov 2026, pedido de Hernán): lo que no entra va a Pedidos de tienda › «Guía sin cargar».
+    // Con tope de tiempo: lo que no alcance entra en la próxima lectura.
+    const persona = { id: u.id, nombre: (u.nombre || u.email || "Alguien").trim() };
+    const shopify = tienda
+      ? await cargarGuiasSolas(supabase, tienda.id, persona, Date.now() + 60_000).catch((e: unknown) => ({ cargadas: 0, yaTenian: 0, pendientes: 0, quedan: 0, aviso: e instanceof Error ? e.message : "No se pudieron cargar las guías en Shopify." }))
+      : null;
     revalidatePath(RUTA);
-    return { guias: resumen.guias, conPedido: resumen.conPedido, rastreadas: resumen.rastreadas, cliente: lectura.cliente };
+    revalidatePath("/tienda-pedidos");
+    return { guias: resumen.guias, conPedido: resumen.conPedido, rastreadas: resumen.rastreadas, cliente: lectura.cliente, shopify };
   } catch (e) {
     return fallar(e instanceof Error ? e.message : "No se pudo guardar la lectura de SISCORE.");
   }

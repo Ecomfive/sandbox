@@ -1,6 +1,6 @@
 "use server";
 
-import { requireModulo } from "@/lib/auth";
+import { requireAlgunModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { tiendasDeLaPersona } from "@/lib/tienda/acceso";
@@ -27,7 +27,7 @@ export interface DetalleTienda {
  * Solo lee, y solo tiendas que la persona puede ver.
  */
 export async function obtenerDetalleTienda(tiendaId: string, sp: { periodo?: string; desde?: string; hasta?: string }): Promise<DetalleTienda | { error: string }> {
-  await requireModulo("tienda-pedidos");
+  await requireAlgunModulo(["tienda-pedidos", "tienda-tablero"]);
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const { tienda } = await tiendasDeLaPersona(supabase, pais.id, String(tiendaId ?? ""));

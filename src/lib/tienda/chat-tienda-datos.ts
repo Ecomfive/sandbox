@@ -303,6 +303,23 @@ export async function enviarTexto(
   return { botPausado };
 }
 
+/**
+ * Un aviso automático del sistema (por ejemplo, la guía cuando el cliente no tiene correo). A diferencia de `enviarTexto`, no pausa el bot: no es una
+ * persona que toma la conversación. Queda anotado con quién lo originó.
+ */
+export async function enviarAviso(
+  supabase: SupabaseClient,
+  tiendaId: string,
+  telefono: string,
+  texto: string,
+  persona: { id: string; nombre: string },
+): Promise<{ error?: string }> {
+  const r = await herramientaIcomfly(supabase, tiendaId, "enviar_mensaje_whatsapp", { telefono, mensaje: texto });
+  if ("error" in r) return { error: r.error };
+  await anotarAutor(supabase, tiendaId, telefono, persona).catch(() => undefined);
+  return {};
+}
+
 export interface PlantillaChat {
   nombre: string;
   idioma: string;
@@ -435,8 +452,8 @@ export async function notaInterna(
 }
 
 /**
- * Los chats de WhatsApp de la tienda con mensajes pendientes, para el numerito de la lista de pedidos: los sin leer de cada chat (o 1 si el cliente espera
- * respuesta y ya se leyó). iComfly da el número oculto: va solo con sus 4 últimos dígitos y el nombre del contacto.
+ * Los chats de WhatsApp de la tienda con mensajes pendientes, para la lista de pedidos: los sin leer de cada chat (el numerito) y, aparte, si el cliente
+ * espera respuesta aunque ya se leyó (un punto sin número). iComfly da el número oculto: va solo con sus 4 últimos dígitos y el nombre del contacto.
  */
 export async function chatsPendientes(
   supabase: SupabaseClient,
@@ -463,12 +480,11 @@ export async function chatsPendientes(
   )?.conversaciones ?? []) {
     if (c.platform && String(c.platform).toLowerCase() !== "whatsapp") continue;
     const cola = colaTelefono(String(c.phone_number ?? ""));
-    const cuenta = Math.max(
-      Number(c.unread_count ?? 0) || 0,
-      c.pendiente_respuesta === true || espera.has(Number(c.id)) ? 1 : 0,
-    );
-    if (cola && cuenta > 0)
-      res.push({ cola, nombre: String(c.display_name ?? ""), cuenta });
+    // Los sin leer, y aparte si el cliente espera respuesta (24 nov 2026: un chat leído sin responder ya no cuenta como «sin leer»).
+    const cuenta = Number(c.unread_count ?? 0) || 0;
+    const esperaRespuesta = c.pendiente_respuesta === true || espera.has(Number(c.id));
+    if (cola && (cuenta > 0 || esperaRespuesta))
+      res.push({ cola, nombre: String(c.display_name ?? ""), cuenta, espera: esperaRespuesta });
   }
   return res;
 }

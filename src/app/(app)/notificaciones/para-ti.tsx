@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { BotonBarra } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
 import { RUTA_LISTA_PUERTO } from "@/lib/compras/llegadas-avisos";
+import { LlegadasPuertoAviso, type LlegadasEnAvisos } from "./llegadas-puerto-aviso";
 import { marcarAvisoLeido, marcarTodosLeidos } from "@/lib/menciones-actions";
 
 export interface AvisoParaTi {
@@ -23,15 +24,22 @@ const fechaHora = (iso: string) =>
  * «Para ti»: los avisos personales (alguien te etiquetó con «@» en un comentario o una nota). Pulsar uno lo marca como
  * leído y lleva al lugar donde te mencionaron; los sin leer van marcados.
  */
-export function ParaTi({ avisos }: { avisos: AvisoParaTi[] }) {
+export function ParaTi({ avisos, llegadas }: { avisos: AvisoParaTi[]; llegadas?: LlegadasEnAvisos | null }) {
   const router = useRouter();
   const [pendiente, start] = useTransition();
-  const sinLeer = avisos.filter((a) => !a.leida).length;
+  const sinLeer = avisos.filter((a) => !a.leida).length + (llegadas?.sinLeer ?? 0);
 
   function abrir(a: AvisoParaTi) {
     start(async () => {
       if (!a.leida) await marcarAvisoLeido(a.id);
       router.push(a.href);
+    });
+  }
+
+  function abrirLlegadas(l: LlegadasEnAvisos) {
+    start(async () => {
+      if (l.sinLeer > 0) await Promise.all(l.avisoIds.map((id) => marcarAvisoLeido(id)));
+      router.push(l.href);
     });
   }
 
@@ -48,9 +56,10 @@ export function ParaTi({ avisos }: { avisos: AvisoParaTi[] }) {
           </BotonBarra>
         )}
       </div>
-      {avisos.length === 0 ? (
+      {llegadas && <LlegadasPuertoAviso datos={llegadas} pendiente={pendiente} alAbrir={() => abrirLlegadas(llegadas)} />}
+      {avisos.length === 0 && !llegadas ? (
         <p className="m-0 text-sm text-muted-foreground">Cuando alguien te etiquete con @ en un comentario o una nota, te avisamos aquí.</p>
-      ) : (
+      ) : avisos.length > 0 ? (
         <ul className="m-0 flex list-none flex-col gap-1 p-0">
           {avisos.map((a) => (
             <li key={a.id}>
@@ -74,7 +83,7 @@ export function ParaTi({ avisos }: { avisos: AvisoParaTi[] }) {
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
     </section>
   );
 }

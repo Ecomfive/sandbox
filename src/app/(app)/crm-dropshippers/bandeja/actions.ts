@@ -17,7 +17,7 @@ import { detectarArchivoWhatsapp, MAX_BYTES_ENVIO } from "@/lib/whatsapp/archivo
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
 import { chatVisibleParaAtencion, mensajeVisibleParaAtencion } from "@/lib/whatsapp/borrados-atencion";
 import { corteDeBorradoEnApp, mensajesEliminadosEnWhatsapp, mensajesOcultos } from "@/lib/whatsapp/ocultos";
-import { rellenar, resolverVariables } from "@/lib/whatsapp/plantillas";
+import { etiquetaDeVariable, rellenar, resolverVariables } from "@/lib/whatsapp/plantillas";
 import { COLUMNAS_PLANTILLA, type PlantillaGuardada } from "@/lib/whatsapp/plantillas-servidor";
 import { claves360, urlWebhook360 } from "@/lib/whatsapp/proveedor";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
@@ -501,8 +501,6 @@ export interface PlantillaParaEnviar {
   /** Qué variables se escriben al enviar, y cómo se llaman. */
   manual: boolean[];
   etiquetas: string[];
-  /** Por qué no se puede mandar a esta persona (le falta un dato en el CRM), o null. */
-  faltante: string | null;
   /** Ya se le mandó esta misma plantilla en las últimas 24 h. */
   yaEnviada: boolean;
   /** La que se ofrece primero: en un «WhatsApp interno», «Primer contacto con permiso» (`primer_contacto`). */
@@ -518,7 +516,10 @@ async function personaDeLaConversacion(supabase: ReturnType<typeof createService
   const { data } = await supabase.from("whatsapp_conversaciones").select("nombre_perfil, dropshippers(nombre, tiendas, tienda)").eq("id", id).maybeSingle();
   const ds = data?.dropshippers as UnoDs<{ nombre: string | null; tiendas: string[] | null; tienda: string | null }> | undefined;
   const d = Array.isArray(ds) ? (ds[0] ?? null) : (ds ?? null);
-  return { nombre: d?.nombre ?? (data?.nombre_perfil as string | null) ?? null, tienda: d?.tiendas?.[0] ?? d?.tienda ?? null };
+  // El nombre que alguien le puso al chat (migración 0179) manda sobre el de la ficha y el del perfil de WhatsApp; aparte porque sin la migración la columna no existe.
+  const { data: propio } = await supabase.from("whatsapp_conversaciones").select("nombre_personalizado").eq("id", id).maybeSingle();
+  const personalizado = ((propio?.nombre_personalizado as string | null | undefined) ?? "").trim() || null;
+  return { nombre: personalizado ?? d?.nombre ?? (data?.nombre_perfil as string | null) ?? null, tienda: d?.tiendas?.[0] ?? d?.tienda ?? null };
 }
 
 /** Las plantillas que Meta aprobó, con sus datos ya llenos para este chat (para «Enviar plantilla»). */
@@ -547,7 +548,12 @@ export async function plantillasParaConversacion(id: string): Promise<{ plantill
   const yaMandadas = new Set((previas ?? []).map((m) => m.plantilla_id as string));
   const lista = aprobadas.map((p) => {
       const variables = p.variables ?? [];
-      const automaticas = resolverVariables(variables.filter((v) => v.campo !== "manual"), persona);
+      // Lo que se llena solo con la ficha; si el chat no tiene ese dato (sin nombre ni ficha), se escribe al enviar en vez de bloquear la plantilla.
+      const delCrm = variables.map((v) => {
+        if (v.campo === "manual") return "";
+        const r = resolverVariables([v], persona);
+        return "valores" in r ? r.valores[0] : "";
+      });
       return {
         id: p.id,
         nombre: p.nombre,
@@ -556,14 +562,9 @@ export async function plantillasParaConversacion(id: string): Promise<{ plantill
         cuerpo: p.cuerpo,
         pie: p.pie,
         botones: p.botones ?? [],
-        valores: variables.map((v) => {
-          if (v.campo === "manual") return "";
-          const r = resolverVariables([v], persona);
-          return "valores" in r ? r.valores[0] : "";
-        }),
-        manual: variables.map((v) => v.campo === "manual"),
-        etiquetas: variables.map((v) => v.etiqueta?.trim() || ""),
-        faltante: "error" in automaticas ? automaticas.error : null,
+        valores: delCrm,
+        manual: variables.map((v, i) => v.campo === "manual" || !delCrm[i]),
+        etiquetas: variables.map((v, i) => (v.campo === "manual" ? v.etiqueta?.trim() || "" : delCrm[i] ? "" : etiquetaDeVariable(v, i))),
         yaEnviada: yaMandadas.has(p.id),
         predeterminada: esPlantillaPredeterminada(p.nombre, interno),
         sugeridos: variables.map((v) => (v.campo === "manual" ? sugeridoParaVariable(v.etiqueta, esPlantillaPredeterminada(p.nombre, interno), u.nombre || "") : "")),

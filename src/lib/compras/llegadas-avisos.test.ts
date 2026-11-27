@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { ETAPAS_COMPRA } from "../../app/(app)/compras/def-compras";
-import { armarAviso, desdeDeLista, diasDeLista, llegadaDeEtapa, unaPorCompra, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, filaSinMontos, type FilaLlegada } from "./llegadas-avisos";
+import { ETAPAS_LLEGADA_PUERTO, esLlegadaPuerto } from "./etapas-puerto";
+import { agruparEnLotes, hrefDeListaPuerto, nombreDeLote, armarAviso, pendientesDeRecibir, yaArchivadas, desdeDeLista, diasDeLista, llegadaDeEtapa, unaPorCompra, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, filaSinMontos, type FilaLlegada } from "./llegadas-avisos";
 
 const fila = (o: Partial<FilaLlegada> = {}): FilaLlegada => ({
   compraId: "c1",
@@ -32,7 +33,7 @@ test("el flujo de etapas queda 04 Producción → 05 Tracking → 06 Llegada a P
 });
 
 test("la migración acepta la etapa nueva y la de las acciones es la misma que la del código", () => {
-  const sql = readFileSync(new URL("../../../supabase/migrations/0304_compras_llegadas.sql", import.meta.url), "utf8");
+  const sql = readFileSync(new URL("../../../supabase/migrations/0359_compras_llegada_puerto_lotes.sql", import.meta.url), "utf8");
   for (const e of ETAPAS_COMPRA) assert.match(sql, new RegExp(`'${e.valor}'`), e.valor);
 });
 
@@ -40,6 +41,17 @@ test("solo Llegada a Puerto y En Bodega avisan", () => {
   assert.deepEqual(llegadaDeEtapa("arribo_mercancia"), { tipo: "puerto", evento: "llegada_puerto" });
   assert.deepEqual(llegadaDeEtapa("en_bodega"), { tipo: "bodega", evento: "llegada_bodega" });
   for (const e of ["tracking", "completado", "produccion", "descartado"]) assert.equal(llegadaDeEtapa(e), null, e);
+});
+
+test("las etapas por lote avisan igual que Llegada a Puerto y están en la lista de etapas", () => {
+  for (const e of ETAPAS_LLEGADA_PUERTO) {
+    assert.deepEqual(llegadaDeEtapa(e), { tipo: "puerto", evento: "llegada_puerto" }, e);
+    assert.ok(ETAPAS_COMPRA.some((x) => x.valor === e), e);
+  }
+  const etiquetas = Object.fromEntries(ETAPAS_COMPRA.map((e) => [e.valor, e.etiqueta]));
+  assert.equal(etiquetas.llegada_puerto_lote_1, "06 - Llegada a Puerto - Lote 1");
+  assert.equal(etiquetas.llegada_puerto_lote_3, "06 - Llegada a Puerto - Lote 3");
+  assert.ok(esLlegadaPuerto("llegada_puerto_lote_2") && !esLlegadaPuerto("en_bodega") && !esLlegadaPuerto(null));
 });
 
 test("totales: unidades, cajas, por pagar y ya pagado", () => {
@@ -120,4 +132,50 @@ test("sin ver el segundo pago, la fila llega sin montos ni día del pago, pero d
   assert.equal(pagada.pagada, true);
   assert.equal(filaSinMontos(fila()).pagada, false);
   assert.equal(totalesDeLlegada([pagada, filaSinMontos(fila())]).pendientes, 1);
+});
+
+test("lo archivado sale de «por recibir» y se ve aparte, sin perder el orden", () => {
+  const lista = [fila({ compraId: "a" }), fila({ compraId: "b", archivadaEn: "2026-11-24T10:00:00Z" }), fila({ compraId: "c", archivadaEn: null }), fila({ compraId: "d", archivadaEn: "2026-11-23T10:00:00Z" })];
+  assert.deepEqual(pendientesDeRecibir(lista).map((f) => f.compraId), ["a", "c"]);
+  assert.deepEqual(yaArchivadas(lista).map((f) => f.compraId), ["b", "d"]);
+});
+
+test("las llegadas se separan en lotes por tandas: las que caen con poco tiempo entre una y otra van juntas", () => {
+  // De la más reciente a la más antigua, como las trae la lista.
+  const lista = [
+    fila({ compraId: "e", llegadaEn: "2026-11-24T13:24:00Z" }),
+    fila({ compraId: "d", llegadaEn: "2026-11-24T13:21:30Z" }),
+    fila({ compraId: "c", llegadaEn: "2026-11-24T12:15:40Z" }),
+    fila({ compraId: "b", llegadaEn: "2026-11-24T12:15:00Z" }),
+    fila({ compraId: "a", llegadaEn: "2026-11-24T12:14:10Z" }),
+  ];
+  const lotes = agruparEnLotes(lista);
+  assert.equal(lotes.length, 2);
+  assert.deepEqual(lotes[0].filas.map((f) => f.compraId), ["e", "d"]);
+  assert.deepEqual(lotes[1].filas.map((f) => f.compraId), ["c", "b", "a"]);
+  assert.equal(lotes[1].desde, "2026-11-24T12:14:10Z");
+  assert.equal(lotes[1].hasta, "2026-11-24T12:15:40Z");
+  assert.equal(lotes[1].clave, "a");
+  // Con una brecha muy corta, cada una es su propio lote; vacío, sin lotes.
+  assert.equal(agruparEnLotes(lista, 0.01).length, 5);
+  assert.deepEqual(agruparEnLotes([]), []);
+});
+
+test("una llegada sin fecha forma su propio lote", () => {
+  const lotes = agruparEnLotes([fila({ compraId: "a", llegadaEn: "2026-11-24T12:00:00Z" }), fila({ compraId: "b" })]);
+  assert.equal(lotes.length, 2);
+});
+
+test("el nombre del lote dice el día y la hora de Panamá", () => {
+  assert.match(nombreDeLote("2026-11-24T12:14:10Z", "2026-11-24T12:14:50Z"), /^24 nov(\.)? 2026 · 7:14\s?a\.\s?m\.$/);
+  assert.match(nombreDeLote("2026-11-24T12:14:10Z", "2026-11-24T12:15:40Z"), /7:14\s?a\.\s?m\. – 7:15\s?a\.\s?m\./);
+  assert.equal(nombreDeLote("", ""), "Sin fecha");
+});
+
+test("el enlace a la lista usa el periodo que alcanza a todo lo que sigue por recibir", () => {
+  const hoy = "2026-11-26";
+  assert.equal(hrefDeListaPuerto(hoy, []), "/llegadas?tipo=puerto&dias=7");
+  assert.equal(hrefDeListaPuerto(hoy, [fila({ llegadaEn: "2026-11-24T12:00:00Z" })]), "/llegadas?tipo=puerto&dias=7");
+  assert.equal(hrefDeListaPuerto(hoy, [fila({ llegadaEn: "2026-11-24T12:00:00Z" }), fila({ llegadaEn: "2026-11-10T12:00:00Z" })]), "/llegadas?tipo=puerto&dias=30");
+  assert.equal(hrefDeListaPuerto(hoy, [fila({ llegadaEn: "2026-01-02T12:00:00Z" })]), "/llegadas?tipo=puerto&dias=90");
 });

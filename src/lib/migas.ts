@@ -39,16 +39,19 @@ const SUBPAGINAS_AYUDA: [string, string][] = [
 
 /** Subpáginas fijas de un módulo (no dinámicas): cuelgan de su módulo y llevan este nombre. */
 const SUBPAGINAS: Record<string, string> = {
-  // Gestión de tienda (17 nov 2026): lo que antes eran módulos sueltos ahora son pestañas de Pedidos, Despacho ciudad y Tiendas Shopify.
+  // Gestión de tienda (17 nov 2026): lo que antes eran módulos sueltos ahora son pestañas de Pedidos, Envíos Delivery y Tiendas Shopify.
   "/tienda-pedidos/confirmacion": "Confirmación",
   "/tienda-pedidos/confirmacion/ia": "Confirmación con IA",
   "/tienda-pedidos/logistica": "Logística",
-  "/inventario-pedidos-despacho/cuanto-hay": "Preguntar cuánto hay",
+  "/tienda-pedidos/asesores": "Asesores",
+  "/inventario-pedidos-despacho/cuanto-hay": "Mercancía existente",
   "/despacho-ciudad/devoluciones": "Devoluciones",
   "/despacho-ciudad/cambios": "Cambios y reembolsos",
-  "/despacho-ciudad/cuanto-hay": "Responder cuánto hay",
-  "/despacho-ciudad/pedir-inventario": "Pedir a inventario",
+  "/inventario-despacho/solicitudes": "Solicitud de inventario",
+  "/inventario-despacho/archivo": "Archivos de solicitudes",
+  "/inventario-pedidos-despacho/archivo": "Archivos de solicitudes",
   "/tienda-tiendas/productos": "Productos de Shopify",
+  "/pedidos-dropi/resumen": "Resumen",
   "/retiros/cuentas": "Cuentas destino",
   "/compras/por-pais": "Gestión por país",
   "/usuarios/auditoria": "Historial de auditoría",
@@ -64,7 +67,7 @@ const SUBPAGINAS: Record<string, string> = {
   "/publicaciones-dropi/consumo": "Consumo de IA",
   "/extractos/patrones": "Diccionario de patrones bancarios",
   "/libro-movimientos/importar": "Importar Excel",
-  "/costos-mercancia/lotes": "Lotes",
+  "/costos-mercancia/lotes": "Histórico (Excel)",
   "/bienes-de-uso/importar": "Importar Excel",
   "/flujo-caja/saldos": "Saldos iniciales",
   "/balance-general/partidas": "Partidas",
@@ -138,7 +141,6 @@ const SUBPAGINAS: Record<string, string> = {
   "/utilidades/participaciones": "Participaciones",
   "/utilidades/retiros": "Retiros",
   "/costos-mercancia/mapeo": "Mapeo con Dropi",
-  "/costos-mercancia/importar": "Importar Excel",
   "/libro-movimientos/pendientes": "Por clasificar",
   "/libro-movimientos/reglas": "Reglas",
   "/libro-movimientos/recurrentes": "Recurrentes",
@@ -156,6 +158,7 @@ const SUBPAGINAS: Record<string, string> = {
   "/compras/reponer": "Reponer",
   "/anuncios-meta/campanas": "Campañas",
   "/anuncios-meta/que-funciona": "Qué funciona",
+  "/anuncios-meta/productos": "Productos",
   "/anuncios-meta/videos": "Videos",
   "/anuncios-meta/equipo": "Equipo",
   "/anuncios-meta/cuentas": "Cuentas",
@@ -175,6 +178,7 @@ const SUBPAGINAS: Record<string, string> = {
   "/crm-dropshippers/direccion": "Dirección",
   "/inventario/pistoleo": "Pistoleo",
   "/inventario/vencimientos": "Vencimientos",
+  "/inventario/defectuosos": "Defectuosos",
   "/inventario/levantamiento": "Levantamiento",
   "/inventario/recepcion": "Recepción",
   "/inventario/cuadro": "Cuadro",
@@ -206,10 +210,11 @@ function modulosDeNav(areas: NavSection[]): ModuloDeNav[] {
 
 /**
  * El nombre de la página principal de un módulo cuando no es el mismo del menú (19 nov 2026, pedido de Hernán): el menú dice «Comunicación despacho» y
- * arriba se lee «Comunicación despacho › Solicitudes de despacho».
+ * arriba se lee «Comunicación despacho › Solicitud de inventario».
  */
 const PAGINA_PRINCIPAL: Record<string, string> = {
-  "/inventario-pedidos-despacho": "Solicitudes de despacho",
+  "/inventario-pedidos-despacho": "Solicitud de inventario",
+  "/inventario-despacho": "Mercancía existente",
 };
 
 function rutaDeModulo(modulo: ModuloDeNav, conEnlace: boolean): Miga[] {
@@ -236,8 +241,7 @@ export function construirMigas(
     return { migas, favoritoHref: null, moduloHref: "/ayuda", moduloEtiqueta: "Centro de ayuda" };
   }
 
-  // Una llegada de compras (el aviso de Llegada a Puerto o de En Bodega) no es un módulo del menú: la abre quien recibe el aviso o tiene Compras.
-  if (ruta === "/llegadas") return { migas: [{ etiqueta: "Compras" }, { etiqueta: "Llegadas a puerto" }], favoritoHref: null, moduloHref: null, moduloEtiqueta: null };
+  // La lista de llegadas a puerto es una entrada del menú (Fulfillment, 20 nov 2026). Una llegada sola (el aviso de En Bodega) no: la abre quien recibe el aviso o tiene Compras.
   if (ruta.startsWith("/llegadas/")) return { migas: [{ etiqueta: "Compras" }, { etiqueta: "Llegada de compras" }], favoritoHref: null, moduloHref: null, moduloEtiqueta: null };
 
   const titulo = TITULOS_APARTE[ruta];

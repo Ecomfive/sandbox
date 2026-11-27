@@ -185,8 +185,8 @@ export const MIGRACIONES_CLAVE: { migracion: string; que: string; prueba: Prueba
   { migracion: "0967", que: "El costo de las órdenes de Shopify entra al EERR por canal", prueba: { tipo: "funcion", nombre: "fin_costos_desde_ordenes" } },
   { migracion: "0968", que: "Etiquetas y franja horaria de las órdenes de tienda", prueba: { tipo: "columna", nombre: "ven_ordenes", columna: "franja" } },
   { migracion: "0969", que: "Tiempo de carga de cada página", prueba: { tipo: "tabla", nombre: "app_metricas" } },
-  { migracion: "0970", que: "Despacho ciudad y Devoluciones: Monday dentro del sistema", prueba: { tipo: "tabla", nombre: "despacho_actividad" } },
-  { migracion: "0971", que: "Despacho ciudad: archivar y restaurar una fila", prueba: { tipo: "columna", nombre: "mon_despachos", columna: "archivado_en" } },
+  { migracion: "0970", que: "Envíos Delivery y Devoluciones: Monday dentro del sistema", prueba: { tipo: "tabla", nombre: "despacho_actividad" } },
+  { migracion: "0971", que: "Envíos Delivery: archivar y restaurar una fila", prueba: { tipo: "columna", nombre: "mon_despachos", columna: "archivado_en" } },
   { migracion: "0972", que: "Cambios y reembolsos: el tablero de Monday dentro del sistema", prueba: { tipo: "tabla", nombre: "postventa_actividad" } },
   { migracion: "0980", que: "Alertas de desvío contra el presupuesto y de gastos fuera de lo normal", prueba: { tipo: "check", nombre: "fin_alertas_tipo_check", valor: "gasto_anomalo" } },
   { migracion: "0981", que: "Movimientos recurrentes del libro (plantillas que se registran solas cada mes)", prueba: { tipo: "tabla", nombre: "fin_recurrentes" } },
@@ -199,7 +199,8 @@ export const MIGRACIONES_CLAVE: { migracion: string; que: string; prueba: Prueba
   { migracion: "0988", que: "Ventas por tienda: ventas por día, por día de la semana y hora, y unidades por pedido", prueba: { tipo: "funcion", nombre: "ven_ventas_diarias" } },
   { migracion: "0989", que: "Préstamos del grupo: aportes, interés entre empresas, conciliación, y caja mínima por empresa", prueba: { tipo: "tabla", nombre: "fin_grupo_confirmaciones" } },
   { migracion: "0990", que: "Inventario contable: provisión por obsoleto, consignación y ajustes de conteo con aprobación", prueba: { tipo: "tabla", nombre: "fin_ajustes_inventario" } },
-  { migracion: "0991", que: "Dropi: la ganancia acreditada se lee de la descripción de la billetera (salía en $0)", prueba: { tipo: "funcion", nombre: "fin_sincronizar_dropi" } },
+  { migracion: "0991", que: "Dropi: la ganancia acreditada se lee de la descripción de la billetera (salía en $0)", prueba: { tipo: "funcion", nombre: "fin_dropi_es_ganancia" } },
+  { migracion: "0992", que: "Costos de producto: hoja única de Panamá por compra, costos asociados y costo por fecha del pedido", prueba: { tipo: "funcion", nombre: "fin_costo_hoja_en" } },
 ];
 
 /** Lo que se muestra de una prueba («Falta …»). */

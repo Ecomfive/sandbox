@@ -1,10 +1,11 @@
 // Lo que llega en los próximos meses (pedido de Alcides, 18 oct 2026): las compras abiertas que todavía no llegan, repartidas por
 // su Planificación («Nov26», el mes en que se espera que lleguen; ver `planificacion.ts`). El mes en curso y los 3 siguientes,
 // más las que ya debían haber llegado y no llegan. Lógica pura: la usa el Dashboard de Compras y su prueba.
+import { ETAPAS_LLEGADA_PUERTO } from "./etapas-puerto";
 import { MESES_PLANIFICACION } from "./planificacion";
 
 /** Las etapas en que la mercancía ya llegó o la compra terminó: no cuentan como «por llegar». */
-const ETAPAS_YA_LLEGO = ["arribo_mercancia", "en_bodega", "completado", "descartado"];
+const ETAPAS_YA_LLEGO = [...ETAPAS_LLEGADA_PUERTO, "en_bodega", "completado", "descartado"];
 
 export interface CompraPorLlegar {
   etapa: string;

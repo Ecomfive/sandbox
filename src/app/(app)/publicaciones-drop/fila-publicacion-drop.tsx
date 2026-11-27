@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- fotos de Drop (Google Cloud Storage) */
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useState, type ReactNode } from "react";
 import { BotonIconoFila } from "@/app/(app)/publicaciones-dropi/boton-icono-fila";
 import { EtapaCotizando, LlegadaCamino } from "@/app/(app)/publicaciones-dropi/llegada-camino";
@@ -145,7 +145,7 @@ export function FilaPublicacionDropLista({ f, moneda, alAbrir }: { f: FilaPublic
           {/* Producto */}
           <span className="flex min-w-0 items-center gap-3">
             {f.fotoUrl ? (
-              <img src={f.fotoUrl} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-lg border border-border object-cover" />
+              <FotoAmpliable src={f.fotoUrl} alt="" className="h-12 w-12 shrink-0 rounded-lg border border-border object-cover" />
             ) : (
               <span aria-hidden="true" className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-border-control" />
             )}

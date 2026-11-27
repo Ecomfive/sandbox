@@ -5,10 +5,10 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
-import { conectarTienda, revisarTienda } from "@/lib/tienda/conectar-shopify";
+import { conectarTienda, registrarAvisos, revisarTienda, urlDelSistema } from "@/lib/tienda/conectar-shopify";
 import { desconectarIcomfly, guardarUrlConector, probarIcomfly } from "@/lib/tienda/icomfly";
 import { leerUrlConector } from "@/lib/tienda/icomfly-oauth";
-import { accesoDeApp, appDeTienda, olvidarAcceso, permisosNoPermitidos, puedeEscribirPedidos } from "@/lib/tienda/shopify-app";
+import { accesoDeApp, appDeTienda, olvidarAcceso, permisosNoPermitidos, puedeEscribirPedidos, puedeManejarEspera } from "@/lib/tienda/shopify-app";
 
 // Gestión de tienda › Tiendas (12 nov 2026): conectar una tienda de Shopify en vivo y revisarla a mano. Solo un administrador: conectar pide a Shopify
 // los avisos de pedidos de la tienda. Desde el 19 nov 2026 un administrador también enciende «Escribir en Shopify» por tienda (las etiquetas del pedido
@@ -49,11 +49,22 @@ export async function revisarTiendaShopify(tiendaId: string): Promise<{ error?: 
   const { data: t } = await supabase.from("tiendas").select("id, nombre, estado").eq("id", tiendaId).maybeSingle();
   if (!t || t.estado !== "conectada") return { error: "La tienda no está conectada." };
   try {
+    // Los avisos de pedidos son de cada app (20 nov 2026: Nuvo pasó a una app nueva para escribir etiquetas): a mano, la revisión vuelve a pedirle a Shopify
+    // los de la app que está en Vercel. Los que ya estaban no se repiten. Sin esto, con otra app los avisos seguían siendo los de la vieja y se rechazaban.
+    let avisos = "";
+    const app = appDeTienda(t.nombre as string);
+    const urlBase = urlDelSistema();
+    if (app && urlBase) {
+      const a = await registrarAvisos(app, (await accesoDeApp(app)).token, urlBase);
+      if (a.creados) avisos = ` Se pidieron ${a.creados} avisos de pedidos a Shopify con la app actual.`;
+      await supabase.from("tiendas").update({ dominio: app.dominio }).eq("id", t.id);
+    }
     // 50 segundos (la página tiene 60): con una tienda recién conectada, cada pulsación trae el doble de historial (14 nov 2026).
     const r = await revisarTienda(supabase, { id: t.id as string, nombre: t.nombre as string }, 50_000);
+    if (avisos) await registrarAuditoria({ accion: "conectar_tienda_shopify", entidad: "tiendas", entidadId: t.id as string, detalle: `${t.nombre}:${avisos} · ${r.texto}` });
     revalidatePath("/tienda-tiendas");
     revalidatePath("/tienda-pedidos");
-    return { resumen: `${r.texto}.${r.completa ? "" : " Falta una parte: vuelve a pulsar «Revisar ahora»."}` };
+    return { resumen: `${r.texto}.${avisos}${r.completa ? "" : " Falta una parte: vuelve a pulsar «Revisar ahora»."}` };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo revisar la tienda." };
   }
@@ -125,7 +136,9 @@ export async function cambiarEscrituraShopify(tiendaId: string, encender: boolea
   const cambio = encender
     ? { escribe_shopify: true, escribe_shopify_por: usuario.id, escribe_shopify_en: new Date().toISOString() }
     : { escribe_shopify: false, escribe_shopify_por: usuario.id, escribe_shopify_en: new Date().toISOString(), quitar_nota_bot: false };
-  const { error } = await supabase.from("tiendas").update(cambio).eq("id", tiendaId);
+  let { error } = await supabase.from("tiendas").update(encender ? cambio : { ...cambio, ia_pone_etiqueta: false, pone_en_espera: false }).eq("id", tiendaId);
+  // Sin la migración 0348 (`ia_pone_etiqueta`) o la 0369 (`pone_en_espera`): se apaga igual lo demás.
+  if (error && !encender && /ia_pone_etiqueta|pone_en_espera|schema cache/i.test(error.message)) ({ error } = await supabase.from("tiendas").update(cambio).eq("id", tiendaId));
   if (error) return { error: "No se pudo guardar." };
   await registrarAuditoria({ accion: encender ? "encender_escritura_shopify" : "apagar_escritura_shopify", entidad: "tiendas", entidadId: tiendaId, detalle: `${t.nombre}: ${encender ? "escribe las etiquetas del pedido en Shopify" : "vuelve a solo lectura"}` });
   revalidatePath("/tienda-tiendas");
@@ -146,4 +159,62 @@ export async function cambiarQuitarNotaBot(tiendaId: string, encender: boolean):
   await registrarAuditoria({ accion: encender ? "encender_quitar_nota_bot" : "apagar_quitar_nota_bot", entidad: "tiendas", entidadId: tiendaId, detalle: `${t.nombre}: ${encender ? "se quita de Shopify la nota del bot" : "la nota del bot se deja en Shopify"}` });
   revalidatePath("/tienda-tiendas");
   return { resumen: encender ? `${t.nombre}: la nota del bot se quitará de los pedidos nuevos.` : `${t.nombre}: la nota del bot ya no se quita.` };
+}
+
+/**
+ * «La IA pone la etiqueta de zona» (21 nov 2026, pedido de Jhokser: prueba controlada, una tienda a la vez): con esto encendido, la confirmación con IA pone en Shopify la etiqueta CIUDAD o
+ * INTERIOR/SERVIENTREGA de un pedido que acaba de confirmarse y quedó «Listo». Solo un administrador, y solo con «Escribir en Shopify» encendido (migración 0348).
+ */
+export async function cambiarIaPoneEtiqueta(tiendaId: string, encender: boolean): Promise<{ error?: string; resumen?: string }> {
+  const usuario = await soloAdmin();
+  if (!usuario) return { error: "Solo un administrador cambia esto." };
+  if (!UUID.test(tiendaId)) return { error: "Tienda no válida." };
+  const supabase = createServiceClient();
+  const { data: t, error: e0 } = await supabase.from("tiendas").select("id, nombre, escribe_shopify, pais_id").eq("id", tiendaId).maybeSingle();
+  if (e0 || !t) return { error: "No se pudo leer la tienda." };
+  if (encender && !t.escribe_shopify) return { error: "Primero enciende «Escribir en Shopify» en esta tienda." };
+  const { error } = await supabase.from("tiendas").update({ ia_pone_etiqueta: encender, ia_pone_etiqueta_por: usuario.id, ia_pone_etiqueta_en: new Date().toISOString() }).eq("id", tiendaId);
+  if (error) return { error: "No se pudo guardar (¿falta la migración 0348?)." };
+  await registrarAuditoria({ accion: encender ? "encender_ia_pone_etiqueta" : "apagar_ia_pone_etiqueta", entidad: "tiendas", entidadId: tiendaId, detalle: `${t.nombre}: ${encender ? "la IA pone la etiqueta de zona en Shopify" : "la IA solo propone la etiqueta de zona"}` });
+  revalidatePath("/tienda-tiendas");
+  // Aviso útil: la IA solo analiza sola si la confirmación automática del país está encendida.
+  let aviso = "";
+  if (encender) {
+    const { data: cfg } = await supabase.from("confirmacion_ia_config").select("activa").eq("pais_id", t.pais_id as string).maybeSingle();
+    if (cfg?.activa !== true) aviso = " Ojo: la «Confirmación automática» del país está apagada; enciéndela en Confirmación con IA para que analice los pedidos que se confirmen.";
+  }
+  return { resumen: encender ? `${t.nombre}: la IA pondrá la etiqueta de zona en los pedidos que se confirmen desde ahora.${aviso}` : `${t.nombre}: la IA ya no pone etiquetas, solo las propone.` };
+}
+
+/**
+ * «Pedidos nuevos en espera» (26 nov 2026, manual ATC; migración 0369): con esto encendido, cada pedido nuevo de la tienda entra «En espera» y con
+ * «por confirmar datos», y despacho no lo prepara hasta que una asesora lo confirma desde la ficha (Confirmar levanta la espera). Solo un administrador,
+ * con «Escribir en Shopify» encendido y con el permiso de envíos aprobado en la app de la tienda. Encenderlo solo cuando las asesoras ya confirmen
+ * desde el sistema: si nadie confirma, los pedidos no salen.
+ */
+export async function cambiarPoneEnEspera(tiendaId: string, encender: boolean): Promise<{ error?: string; resumen?: string }> {
+  const usuario = await soloAdmin();
+  if (!usuario) return { error: "Solo un administrador cambia esto." };
+  if (!UUID.test(tiendaId)) return { error: "Tienda no válida." };
+  const supabase = createServiceClient();
+  const { data: t, error: e0 } = await supabase.from("tiendas").select("id, nombre, escribe_shopify").eq("id", tiendaId).maybeSingle();
+  if (e0 || !t) return { error: "No se pudo leer la tienda." };
+  if (encender) {
+    if (!t.escribe_shopify) return { error: "Primero enciende «Escribir en Shopify» en esta tienda." };
+    const app = appDeTienda(t.nombre as string);
+    if (!app) return { error: `Faltan las claves de ${t.nombre} en Vercel.` };
+    try {
+      olvidarAcceso(app);
+      const { scope } = await accesoDeApp(app);
+      if (!puedeManejarEspera(scope))
+        return { error: `La app de Shopify de ${t.nombre} todavía no tiene el permiso de envíos (write_merchant_managed_fulfillment_orders). Hay que aprobarlo y reinstalar la app en la tienda.` };
+    } catch {
+      return { error: `No se pudo revisar la app de Shopify de ${t.nombre}.` };
+    }
+  }
+  const { error } = await supabase.from("tiendas").update({ pone_en_espera: encender, pone_en_espera_por: usuario.id, pone_en_espera_en: new Date().toISOString() }).eq("id", tiendaId);
+  if (error) return { error: "No se pudo guardar (¿falta la migración 0369?)." };
+  await registrarAuditoria({ accion: encender ? "encender_pedidos_en_espera" : "apagar_pedidos_en_espera", entidad: "tiendas", entidadId: tiendaId, detalle: `${t.nombre}: ${encender ? "los pedidos nuevos entran en espera" : "los pedidos nuevos ya no entran en espera"}` });
+  revalidatePath("/tienda-tiendas");
+  return { resumen: encender ? `${t.nombre}: los pedidos nuevos entran «En espera» y con «por confirmar datos» hasta que una asesora los confirme.` : `${t.nombre}: los pedidos nuevos ya no entran en espera.` };
 }

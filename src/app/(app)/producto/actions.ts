@@ -11,7 +11,7 @@ import { mensajeBloqueos, mensajeBloqueosVariante } from "@/lib/wms/eliminar-pro
 import { esCodigoBarrasValido, esCodigoInterno, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
-import { cantidadEnNombre, primeroLibre, sugerirSku } from "@/lib/wms/sugerir-sku";
+import { cantidadEnNombre, primeroLibre, sugerirSku, sugerirSkuCompuesto } from "@/lib/wms/sugerir-sku";
 import { ETIQUETA_CLASE } from "./def-producto";
 import { crearCompraDesdeProducto } from "@/lib/compras/compra-desde-producto";
 import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
@@ -951,13 +951,42 @@ export async function subirFotoProductoDesdeUrl(id: string, direccion: string): 
   return guardarFotoProducto(id, ruta);
 }
 
-/** El SKU sugerido para un nombre (palabras del nombre con barra), ya libre: si existe, con /2, /3… Vacío si no hay sugerencia. Un compuesto empieza por COMBO. */
-export async function sugerirSkuLibre(nombre: string, compuesto = false): Promise<{ codigo: string }> {
+/** Un id de producto con forma de UUID (el navegador manda los ids elegidos). */
+const UUID_V = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * El SKU sugerido para un nombre (palabras del nombre con barra), ya libre: si existe, con /2, /3… Vacío si no hay sugerencia. Un compuesto (23 nov 2026, pedido de
+ * Jhokser) empieza por PACK la primera promoción por cantidad de un producto, por PACKS una segunda (otra cantidad del mismo producto) y por COMBO si son productos distintos, y con los productos elegidos
+ * (`componentes`: id y cantidad; el servidor lee su SKU, no se confía en lo que mande el navegador) lleva el SKU de cada uno («COMBO/A+B», «PACK/A»).
+ */
+export async function sugerirSkuLibre(nombre: string, compuesto = false, componentes: { id: string; cantidad: number }[] = []): Promise<{ codigo: string }> {
   await requireAlgunModulo(CREAR_PRODUCTO);
-  const base = sugerirSku(String(nombre ?? "").slice(0, 200), 3, { compuesto: compuesto === true });
+  const supabase = createServiceClient();
+  const texto = String(nombre ?? "").slice(0, 200);
+  let base: string;
+  let cantidad: number | null = null;
+  if (compuesto === true) {
+    // Los productos elegidos: ids con forma de UUID, cantidades enteras, hasta 8 (el orden en que se eligieron).
+    const pedidos = (Array.isArray(componentes) ? componentes : [])
+      .slice(0, 8)
+      .map((c) => ({ id: String(c?.id ?? ""), cantidad: Math.max(1, Math.min(99, Math.floor(Number(c?.cantidad) || 1))) }))
+      .filter((c) => UUID_V.test(c.id));
+    const { data: filas } = pedidos.length ? await supabase.from("skus_maestros").select("id, codigo").in("id", pedidos.map((c) => c.id)) : { data: [] };
+    const codigos = new Map(((filas ?? []) as { id: string; codigo: string | null }[]).map((f) => [f.id, f.codigo ?? ""]));
+    const comps = pedidos.map((c) => ({ codigo: codigos.get(c.id) ?? "", cantidad: c.cantidad })).filter((c) => c.codigo);
+    base = sugerirSkuCompuesto({ nombre: texto, componentes: comps });
+    cantidad = comps.length === 1 ? comps[0].cantidad : cantidadEnNombre(texto);
+  } else {
+    base = sugerirSku(texto, 3, { compuesto: false });
+  }
   if (!base) return { codigo: "" };
-  const { data } = await createServiceClient().from("skus_maestros").select("codigo").ilike("codigo", `${base}%`);
-  const usados = new Set((data ?? []).map((p) => String(p.codigo).trim().toUpperCase()));
-  // Un pack que choca con otro del mismo producto lleva la palabra de su cantidad (TRIO…), no un número.
-  return { codigo: primeroLibre(base, (c) => usados.has(c), compuesto === true ? cantidadEnNombre(String(nombre ?? "")) : null) };
+  // Un «PACK/X» que ya existe pasa a «PACKS/X» (segunda promoción del mismo producto): también se miran los que empiezan por PACKS/X.
+  const plural = base.startsWith("PACK/") ? `PACKS/${base.slice(5)}` : null;
+  const [{ data }, { data: dePlural }] = await Promise.all([
+    supabase.from("skus_maestros").select("codigo").ilike("codigo", `${base}%`),
+    plural ? supabase.from("skus_maestros").select("codigo").ilike("codigo", `${plural}%`) : Promise.resolve({ data: [] as { codigo: string }[] }),
+  ]);
+  const usados = new Set([...(data ?? []), ...(dePlural ?? [])].map((p) => String(p.codigo).trim().toUpperCase()));
+  // Un pack que choca con otro del mismo producto lleva la palabra de su cantidad (CUARTETO…), no un número.
+  return { codigo: primeroLibre(base, (c) => usados.has(c), compuesto === true ? cantidad : null) };
 }

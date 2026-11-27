@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { anguloDeCampana, esHostDeVideoMeta, estructuraValida, normalizarAnalisisVideo, pedidoAnalisisVideo, recursosValidos, reutilizarAngulo } from "./video-angulo";
+import { anguloDeCampana, esHostDeVideoMeta, estructuraValida, normalizarAnalisisVideo, pedidoAnalisisVideo, pedidoSoloAngulo, recursosValidos, reutilizarAngulo } from "./video-angulo";
+
+test("el pedido de ángulo pide ser específico y no forzar un ángulo amplio que ya existe", () => {
+  const p = pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: ["Alivio de varices"], soloTexto: false });
+  assert.match(p, /ESPECÍFICO/);
+  assert.match(p, /«Energía», «Gimnasio», «Salud prostática» o «Aumento de libido»/);
+  assert.match(p, /No fuerces un ángulo amplio/);
+});
 
 test("el pedido trae el producto, el texto y los ángulos que ya existen", () => {
   const p = pedidoAnalisisVideo({ producto: "Shampoo anticaspa", copy: "Adiós a la caspa en 7 días", titulo: null, angulosExistentes: ["Dolor de espalda", "Oferta 2x1"], soloTexto: false });
@@ -17,7 +24,8 @@ test("lo que contesta la IA se valida: ángulo obligatorio, textos recortados, f
   assert.equal(a?.formato, "testimonio");
   assert.equal(normalizarAnalisisVideo('{"angulo":"","promesa":"x"}'), null);
   assert.equal(normalizarAnalisisVideo("no es json"), null);
-  assert.equal(normalizarAnalisisVideo('{"angulo":"uno dos tres cuatro cinco seis siete ocho nueve"}'), null);
+  // Un ángulo largo se acorta a sus primeras 8 palabras, no se descarta el análisis.
+  assert.equal(normalizarAnalisisVideo('{"angulo":"uno dos tres cuatro cinco seis siete ocho nueve"}')?.angulo, "Uno dos tres cuatro cinco seis siete ocho");
   assert.equal(normalizarAnalisisVideo('{"angulo":"Ahorro","formato":"raro"}')?.formato, "otro");
   assert.equal(normalizarAnalisisVideo(`{"angulo":"Ahorro","transcripcion":"${"a".repeat(3000)}"}`)?.transcripcion.length, 1200);
 });
@@ -80,4 +88,83 @@ test("sin llamado a la acción, el tipo es «ninguno»; un segundo absurdo es «
   assert.equal(normalizarAnalisisVideo(JSON.stringify({ angulo: "Ahorro", cta: "Compra ya", cta_tipo: "xyz" }))?.ctaTipo, "otro");
   assert.deepEqual(recursosValidos("texto"), []);
   assert.deepEqual(estructuraValida(null), []);
+});
+
+test("el segundo intento tras un bloqueo por recitation no pide transcripción", () => {
+  const normal = pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: [], soloTexto: false });
+  const sin = pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: [], soloTexto: false, sinTranscribir: true });
+  assert.match(normal, /"transcripcion": "lo que se dice/);
+  assert.match(sin, /"transcripcion": "" \(déjala vacía\)/);
+  assert.match(sin, /No copies ni transcribas literalmente/);
+  assert.doesNotMatch(normal, /No copies ni transcribas/);
+});
+
+test("una respuesta cortada a la mitad se rescata en vez de dar error", () => {
+  const cortada = '{"angulo": "Detox en pocas semanas", "promesa": "Limpia el cuerpo", "gancho": "Un hombre muestra el frasco", "gancho_tipo": "curiosidad", "resumen": "Testimonio", "transcripcion": "hola a todos hoy les voy a contar que';
+  const a = normalizarAnalisisVideo(cortada);
+  assert.equal(a?.angulo, "Detox en pocas semanas");
+  assert.equal(a?.promesa, "Limpia el cuerpo");
+  assert.deepEqual(a?.estructura, []);
+  assert.equal(normalizarAnalisisVideo('{"promesa": "x", "resumen": "y"'), null);
+  assert.equal(normalizarAnalisisVideo("no hay json"), null);
+});
+
+test("una coma de más tampoco tira el análisis", () => {
+  assert.equal(normalizarAnalisisVideo('{"angulo": "Ahorro", "promesa": "x",}')?.angulo, "Ahorro");
+});
+
+test("con el video a la vista el ángulo sale del video: el texto del anuncio no se le muestra a la IA", () => {
+  const conVideo = pedidoAnalisisVideo({ producto: "Shilajit", copy: "Energía para todos", titulo: "Oferta", angulosExistentes: [], soloTexto: false });
+  assert.doesNotMatch(conVideo, /Energía para todos/);
+  assert.match(conVideo, /ÚNICAMENTE de lo que se ve y se dice en el video/);
+  const soloTexto = pedidoAnalisisVideo({ producto: "Shilajit", copy: "Energía para todos", titulo: null, angulosExistentes: [], soloTexto: true });
+  assert.match(soloTexto, /Energía para todos/);
+});
+
+test("el reanálisis pide solo el ángulo, con la misma regla específica y sin texto del anuncio", () => {
+  const p = pedidoSoloAngulo({ producto: "Shilajit", angulosExistentes: ["Vitalidad masculina"] });
+  assert.match(p, /ESPECÍFICO/);
+  assert.match(p, /ÚNICAMENTE de lo que se ve y se dice en el video/);
+  assert.match(p, /\{"angulo": "…", "angulo_detalle": "…"\}/);
+  assert.doesNotMatch(p, /transcripcion|estructura|cta_tipo/);
+  assert.match(p, /Vitalidad masculina/);
+});
+
+test("un ángulo vago como «Beneficios clave» no se ofrece para reutilizar y se le dice a la IA que no sirve", async () => {
+  const { esAnguloVago } = await import("./video-angulo");
+  assert.equal(esAnguloVago("Beneficios clave"), true);
+  assert.equal(esAnguloVago(" beneficios  CLAVE. "), true);
+  assert.equal(esAnguloVago("Salud de la próstata"), false);
+  const p = pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: ["Beneficios clave", "Antes y después"], soloTexto: false });
+  const linea = p.split("\n").find((l) => l.startsWith("Estos ángulos ya existen")) ?? "";
+  assert.match(linea, /«Antes y después»/);
+  assert.doesNotMatch(linea, /Beneficios clave/);
+  assert.match(p, /NO sirven: no dicen nada/);
+  assert.doesNotMatch(pedidoSoloAngulo({ producto: null, angulosExistentes: ["Beneficios clave"] }), /Estos ángulos ya existen/);
+});
+
+test("las tácticas generales llevan su detalle aparte y los demás ángulos no", async () => {
+  const { esAnguloTactico } = await import("./video-angulo");
+  assert.equal(esAnguloTactico("Antes y después"), true);
+  assert.equal(esAnguloTactico("testimonio de cliente."), true);
+  assert.equal(esAnguloTactico("Salud de la próstata"), false);
+  const t = normalizarAnalisisVideo('{"angulo": "Antes y después", "angulo_detalle": "«Manchas en la cara»."}');
+  assert.equal(t?.anguloDetalle, "Manchas en la cara");
+  const o = normalizarAnalisisVideo('{"angulo": "Salud de la próstata", "angulo_detalle": "algo que se debe ignorar"}');
+  assert.equal(o?.anguloDetalle, "");
+  assert.match(pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: [], soloTexto: false }), /angulo_detalle/);
+  assert.match(pedidoSoloAngulo({ producto: null, angulosExistentes: [], vagoAnterior: "Beneficios clave" }), /Tu respuesta anterior fue «Beneficios clave»/);
+});
+
+test("el ejemplo de quien lleva las campañas: «vitalidad masculina» y parecidos son vagos; energía, gimnasio, salud prostática y libido, no", async () => {
+  const { esAnguloVago } = await import("./video-angulo");
+  for (const v of ["Vitalidad masculina", "Energía masculina", "salud masculina", "Bienestar femenino", "Rendimiento masculino"]) assert.equal(esAnguloVago(v), true, v);
+  for (const v of ["Energía", "Gimnasio", "Salud prostática", "Aumento de libido", "Bienestar íntimo femenino", "Aclarar zonas íntimas"]) assert.equal(esAnguloVago(v), false, v);
+  const p = pedidoAnalisisVideo({ producto: "Shilajit", copy: null, titulo: null, angulosExistentes: ["Energía masculina", "Salud prostática"], soloTexto: false });
+  assert.match(p, /público masculino/);
+  assert.match(p, /NO se deben resumir en «Vitalidad masculina»/);
+  const linea = p.split("\n").find((l) => l.startsWith("Estos ángulos ya existen")) ?? "";
+  assert.match(linea, /Salud prostática/);
+  assert.doesNotMatch(linea, /Energía masculina/);
+  assert.match(p, /«urólogo, salud prostática»/);
 });

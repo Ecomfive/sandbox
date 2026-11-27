@@ -34,6 +34,8 @@
   --riel-texto: #c4c4c8;
   --riel-hover: #1c1c1f;
   --aviso: #d74c81;
+  /* El rojo de «Avisos» y de una entrada del menú con un pedido o mercancía en puerto sin ver (texto blanco, 6,3:1 en los dos temas). */
+  --riel-alerta: #be123c;
   /* Paleta «neón», tomada del halo del área elegida en el riel. El degradado va en los botones principales (Crear, Agregar)
      y el violeta sólido en lo activo (página actual, filtro aplicado, pestaña, interruptor). Con texto blanco encima:
      ≥ 4.5:1 en todo el degradado. */
@@ -94,6 +96,7 @@
   --color-riel-texto: var(--riel-texto);
   --color-riel-hover: var(--riel-hover);
   --color-aviso: var(--aviso);
+  --color-riel-alerta: var(--riel-alerta);
   --color-primario: var(--primario);
   --color-primario-suave: var(--primario-suave);
   --color-nivel-lectura: var(--nivel-lectura);

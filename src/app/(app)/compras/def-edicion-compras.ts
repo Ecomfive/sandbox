@@ -20,7 +20,7 @@ export interface CampoEditable {
   color?: (valor: string) => string | undefined;
   /** Con productos vinculados la cantidad y el monto se calculan de ellos, así que no se escriben a mano (igual que en la ficha). */
   soloSinProductos?: boolean;
-  /** En una lista guardada como lista (la vía de envío, la tienda): se elige una sola. */
+  /** En una lista guardada como lista (la vía de envío): se elige una sola. */
   unica?: boolean;
   /** En un sí/no: cómo se llama cada lado («Venta de importación» / «Proveeduría»); por defecto «Sí» y «No». */
   siNo?: { si: string; no: string };
@@ -47,8 +47,8 @@ export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
     tipo: "booleano",
     siNo: { si: "Venta de importación", no: "Proveeduría" },
   },
-  // Una sola tienda por orden (pedido de Hernán, 9 oct 2026); se guarda como lista por las de antes.
-  tienda: { etiqueta: "Tienda", prop: "tiendas", columna: "tiendas", tipo: "lista", unica: true },
+  // Una o varias tiendas por orden, como etiquetas (pedido de Hernán, 24 nov 2026; del 9 oct al 24 nov fue una sola).
+  tienda: { etiqueta: "Tienda", prop: "tiendas", columna: "tiendas", tipo: "lista" },
   etiquetas: { etiqueta: "Etiquetas", prop: "etiquetas", columna: "etiquetas", tipo: "lista" },
   qtyTotal: { etiqueta: "Cantidad total", prop: "qtyTotal", columna: "qty_total", tipo: "entero", soloSinProductos: true },
   montoTotal: { etiqueta: "Monto Total", prop: "montoTotal", columna: "monto_total", tipo: "dinero", soloSinProductos: true },
@@ -59,6 +59,7 @@ export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   financiamiento: { etiqueta: "Financiamiento", prop: "financiamiento", columna: "financiamiento", tipo: "booleano" },
   fechaLimite: { etiqueta: "Fecha límite", prop: "fechaLimite", columna: "fecha_limite", tipo: "fecha" },
   fechaLlegada: { etiqueta: "Fecha de llegada", prop: "fechaLlegada", columna: "fecha_llegada", tipo: "fecha" },
+  fechaLlegadaPuerto: { etiqueta: "Fecha llegada a puerto", prop: "fechaLlegadaPuerto", columna: "fecha_llegada_puerto", tipo: "fecha" },
   fechaPago1: { etiqueta: "Fecha de Pago (1)", prop: "fechaPago1", columna: "fecha_pago_1", tipo: "fecha" },
   fechaPago2: { etiqueta: "Fecha de Pago (2)", prop: "fechaPago2", columna: "fecha_pago_2", tipo: "fecha" },
   fechaEnvio: { etiqueta: "Fecha de Envío", prop: "fechaEnvio", columna: "fecha_envio", tipo: "fecha" },

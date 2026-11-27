@@ -112,6 +112,10 @@ export interface EscrituraOrden {
   activa: boolean;
   motivo: string | null;
   sugeridas: string[];
+  /** Manual ATC (24 nov 2026): puede acreditar y pasar a «Pagado» (Finanzas: edita Ventas por tienda o la Reportería de pedidos). */
+  finanzas?: boolean;
+  /** Solo puede hacer lo de Finanzas en este pedido (no edita Pedidos ni Confirmación de tienda). */
+  soloFinanzas?: boolean;
 }
 
 export interface OrdenTienda {
@@ -134,6 +138,8 @@ export interface OrdenTienda {
   eventos: EventoOrden[];
   /** Lo que dicen Monday o Servientrega; null si ninguno lo tiene. */
   entrega: EntregaOrden | null;
+  /** La guía de SISCORE que no entró sola en Shopify, o cuyo aviso al cliente no salió (24 nov 2026): para «Guía sin cargar». */
+  guiaSinCargar?: { guia: string; motivo: string } | null;
   /** Los cambios, reembolsos, retiros y complementos del tablero «CAMBIOS Y REEMBOLSOS» de Monday, del más nuevo al más viejo (14 nov 2026). */
   postventa: CasoPedido[];
   /** El chat de WhatsApp del cliente, si escribió a algún número del sistema. */
@@ -233,6 +239,7 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
     notas: (notas ?? []) as NotaOrden[],
     eventos,
     entrega,
+    guiaSinCargar: await guiaSinCargarDeOrden(supabase, id),
     postventa,
     whatsapp,
     asistente,
@@ -242,8 +249,13 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
 
 /** Quienes editan Pedidos o Confirmación de tienda cambian etiquetas (19 nov 2026); a los demás la ficha se las muestra sin poder tocarlas. */
 export function escrituraParaPersona(orden: OrdenTienda, u: { modulos: string[]; modulosSoloLectura: string[] }): OrdenTienda {
-  const puede = ["tienda-pedidos", "tienda-confirmacion"].some((m) => u.modulos.includes(m) && !u.modulosSoloLectura.includes(m));
-  return puede || !orden.escritura.activa ? orden : { ...orden, escritura: { activa: false, motivo: "Tu rol solo puede leer los pedidos.", sugeridas: [] } };
+  const edita = (ms: string[]) => ms.some((m) => u.modulos.includes(m) && !u.modulosSoloLectura.includes(m));
+  const puede = edita(["tienda-pedidos", "tienda-confirmacion"]);
+  const finanzas = edita(["ventas-tiendas", "tienda-reporteria"]);
+  if (!orden.escritura.activa) return orden;
+  if (puede) return { ...orden, escritura: { ...orden.escritura, finanzas } };
+  if (finanzas) return { ...orden, escritura: { ...orden.escritura, finanzas: true, soloFinanzas: true, sugeridas: [] } };
+  return { ...orden, escritura: { activa: false, motivo: "Tu rol solo puede leer los pedidos.", sugeridas: [] } };
 }
 
 /**
@@ -269,11 +281,36 @@ async function escrituraDeOrden(
   return { activa: true, motivo: null, sugeridas: etiquetasSugeridas((usadas ?? []).map((u) => etiquetasDe(u.etiquetas as string | null)), etiquetasDe(etiquetas), 15) };
 }
 
+/** La guía de SISCORE del pedido que no entró sola en Shopify (o cuyo aviso no salió), con el motivo. Sin la migración 0361, null. */
+async function guiaSinCargarDeOrden(supabase: SupabaseClient, id: string): Promise<{ guia: string; motivo: string } | null> {
+  const { data, error } = await supabase
+    .from("tienda_guias")
+    .select("guia, shopify_estado, shopify_motivo")
+    .eq("orden_id", id)
+    .or("shopify_estado.eq.pendiente,aviso_cliente.eq.a_mano")
+    .order("fecha_emision", { ascending: false })
+    .limit(1);
+  const g = error ? null : data?.[0];
+  if (!g) return null;
+  return { guia: String(g.guia), motivo: String(g.shopify_motivo ?? (g.shopify_estado === "pendiente" ? "no entró en Shopify" : "mandarle la guía al cliente a mano")) };
+}
+
 /** Lo último que tienen Monday o Servientrega del pedido (la guía manda: es de interior). Sin sus tablas, null. */
 async function entregaDeOrden(supabase: SupabaseClient, id: string): Promise<EntregaOrden | null> {
   const [g, m] = await Promise.all([
     supabase.from("tienda_guias").select("guia, estado, estado_grupo, fecha_estado, fecha_emision, ultimo_motivo, visitas_sin_entregar, destino, historial").eq("orden_id", id).order("fecha_emision", { ascending: false }).limit(1),
-    supabase.from("mon_despachos").select("estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday").eq("orden_id", id).order("actualizado_monday", { ascending: false }).limit(1),
+    // También la fila con varios pedidos que lo nombra (`otras_ordenes`, 0369); sin la migración, solo la suya.
+    supabase
+      .from("mon_despachos")
+      .select("estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday")
+      .or(`orden_id.eq.${id},otras_ordenes.cs.{${id}}`)
+      .order("actualizado_monday", { ascending: false })
+      .limit(1)
+      .then((r) =>
+        r.error && /otras_ordenes/.test(r.error.message)
+          ? supabase.from("mon_despachos").select("estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday").eq("orden_id", id).order("actualizado_monday", { ascending: false }).limit(1)
+          : r,
+      ),
   ]);
   const guia = g.error ? null : (g.data?.[0] as Record<string, unknown> | undefined);
   if (guia) {

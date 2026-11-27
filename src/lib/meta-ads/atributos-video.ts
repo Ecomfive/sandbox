@@ -4,6 +4,7 @@
 // Lógica pura, con prueba. Los videos que cuentan son los de gasto en el periodo elegido; cada dimensión dice cuántos no tenían el dato.
 
 import { agrupar, type Elemento } from "./agrupar";
+import { detallesPorAngulo, nombreConTemas, temasDe } from "./angulo-detalle";
 import { sinResultados, sumar, type Resultados } from "./metricas";
 import { VERSION_ANALISIS } from "./video-angulo";
 import type { ComposicionAngulo, Grupo, VideoVista } from "./vistas";
@@ -16,12 +17,13 @@ export const MEZCLA_DE_ANGULOS = "Mezcla de ángulos";
  * De qué ángulos está hecha una campaña: cada video distinto cuenta una vez (aunque esté en varios anuncios de la campaña) con el ángulo que tiene. Los porcentajes suman exactamente 100
  * (el resto del redondeo va a los ángulos con más decimales). Los videos sin ángulo no entran: se cuentan aparte en `sinAngulo`.
  */
-export function composicionDeAngulos(videos: { videoId: string; angulo: string | null; gasto: number }[]): { angulos: ComposicionAngulo[]; videosTotal: number; videosConAngulo: number } {
-  const porVideo = new Map<string, { angulo: string | null; gasto: number }>();
+export function composicionDeAngulos(videos: { videoId: string; angulo: string | null; detalle?: string | null; gasto: number }[]): { angulos: ComposicionAngulo[]; videosTotal: number; videosConAngulo: number } {
+  const porVideo = new Map<string, { angulo: string | null; detalle?: string | null; gasto: number }>();
   for (const v of videos) {
     const x = porVideo.get(v.videoId) ?? { angulo: v.angulo, gasto: 0 };
     x.gasto += v.gasto;
     x.angulo ??= v.angulo;
+    x.detalle ??= v.detalle;
     porVideo.set(v.videoId, x);
   }
   const cuenta = new Map<string, { videos: number; gasto: number }>();
@@ -42,9 +44,17 @@ export function composicionDeAngulos(videos: { videoId: string; angulo: string |
     piso[i]++;
     faltan--;
   }
-  const angulos = crudo.map((c, i) => ({ angulo: c.angulo, videos: c.videos, pct: piso[i], gasto: c.gasto })).sort((a, b) => b.videos - a.videos || b.gasto - a.gasto || a.angulo.localeCompare(b.angulo, "es"));
+  const temas = detallesPorAngulo([...porVideo.values()].map((x) => ({ angulo: x.angulo, detalle: x.detalle, gasto: x.gasto, compras: 0 })));
+  const detalles = (angulo: string) => {
+    const l = [...(temas.get(angulo) ?? [])].filter((d) => d.detalle).sort((a, b) => b.videos - a.videos || b.gasto - a.gasto).map((d) => d.detalle);
+    return l.length ? { detalles: l } : {};
+  };
+  const angulos = crudo.map((c, i) => ({ angulo: c.angulo, videos: c.videos, pct: piso[i], gasto: c.gasto, ...detalles(c.angulo) })).sort((a, b) => b.videos - a.videos || b.gasto - a.gasto || a.angulo.localeCompare(b.angulo, "es"));
   return { angulos, videosTotal: porVideo.size, videosConAngulo: conAngulo };
 }
+
+/** El ángulo con que se clasifica una campaña, y si es una táctica general, con los temas de sus videos. */
+export const anguloDeLaCampana = (c: { angulo: string | null; angulos: ComposicionAngulo[] }): string | null => (c.angulo ? nombreConTemas(c.angulo, c.angulos.find((a) => a.angulo === c.angulo)?.detalles, 3) : null);
 
 /** El ángulo con que se clasifica una campaña a partir de su mezcla: el que domina (60 % o más), «Mezcla de ángulos» si hay varios y ninguno domina, null si no hay ninguno. */
 export function anguloDominante(angulos: ComposicionAngulo[]): string | null {
@@ -53,15 +63,16 @@ export function anguloDominante(angulos: ComposicionAngulo[]): string | null {
   return primero.pct >= UMBRAL_DOMINANTE || angulos.length === 1 ? primero.angulo : MEZCLA_DE_ANGULOS;
 }
 
-/** «Antes y después 50 % · Testimonio 50 %». */
-export const textoDeMezcla = (angulos: ComposicionAngulo[]): string => angulos.map((a) => `${a.angulo} ${a.pct} %`).join(" · ");
+/** «Antes y después (manchas) 50 % · Testimonio de cliente (próstata) 50 %». */
+export const textoDeMezcla = (angulos: ComposicionAngulo[]): string => angulos.map((a) => `${nombreConTemas(a.angulo, a.detalles)} ${a.pct} %`).join(" · ");
 
-export const DIMENSIONES_VIDEO = ["Ángulo", "Gancho", "Formato", "Llamado a la acción", "Recursos", "Estructura", "Duración", "Momento del llamado", "Oferta"] as const;
+export const DIMENSIONES_VIDEO = ["Ángulo", "Detalle del ángulo", "Gancho", "Formato", "Llamado a la acción", "Recursos", "Estructura", "Duración", "Momento del llamado", "Oferta"] as const;
 export type DimensionVideo = (typeof DIMENSIONES_VIDEO)[number];
 
 /** Qué mide cada dimensión de video, en una frase, para quien nunca lo vio. */
 export const EXPLICACION_DIMENSION_VIDEO: Record<DimensionVideo, string> = {
   Ángulo: "El motivo de compra que usa el video para convencer.",
+  "Detalle del ángulo": "De qué es la táctica general: de qué es el antes y después, de qué habla el testimonio, quién es el experto y de qué.",
   Gancho: "Cómo arranca el video, en sus primeros 3 segundos.",
   Formato: "El estilo del video: testimonio, demostración, UGC, animación…",
   "Llamado a la acción": "Qué le pide el video al espectador al final: comprar, aprovechar una oferta, escribir…",
@@ -108,6 +119,12 @@ export function valoresDeVideo(v: VideoVista, dim: DimensionVideo): string[] {
     case "Ángulo": {
       const x = a?.angulo ?? v.angulo;
       return x ? [x] : [];
+    }
+    case "Detalle del ángulo": {
+      // Solo las tácticas generales llevan detalle; se muestra con su ángulo para que se entienda sola («Antes y después · manchas en la cara»).
+      const d = a?.anguloDetalle?.trim();
+      const x = a?.angulo ?? v.angulo;
+      return d && x ? [`${x} · ${d.charAt(0).toLowerCase()}${d.slice(1)}`] : [];
     }
     case "Gancho":
       return a?.ganchoTipo ? [mayuscula(a.ganchoTipo)] : [];
@@ -156,6 +173,14 @@ export function gruposDeVideos(videos: VideoVista[]): GruposDeVideo {
       for (const clave of valores) elementos.push({ clave, r: v.r, tope: v.tope, campana: v.id, video: v.id });
     }
     grupos[dim] = ordenNatural(dim, agrupar(elementos));
+    // Una táctica general sola no dice nada: cada grupo lleva de qué son sus videos.
+    if (dim === "Ángulo") {
+      const conAngulo = conGasto.map((v) => ({ angulo: v.analisis?.angulo ?? v.angulo, detalle: v.analisis?.anguloDetalle, gasto: v.r.gasto, compras: v.r.compras }));
+      grupos[dim] = grupos[dim].map((g) => {
+        const deQue = temasDe(g.nombre, conAngulo);
+        return deQue ? { ...g, deQue } : g;
+      });
+    }
     sinDato[dim] = sin;
   }
   return { grupos, sinDato, videos: conGasto.length };
@@ -172,7 +197,14 @@ function ordenNatural(dim: DimensionVideo, grupos: Grupo[]): Grupo[] {
 export function mejorGrupo(grupos: Grupo[]): Grupo | null {
   const ok = grupos.filter((g) => g.confiable && g.r.compras > 0);
   if (!ok.length) return null;
-  return [...ok].sort((a, b) => a.r.gasto / a.r.compras - b.r.gasto / b.r.compras)[0];
+  // El mejor es el que más lejos queda de su tope (cada producto tiene el suyo); a igualdad, el de CPA más bajo.
+  return [...ok].sort((a, b) => (usoDelTope(a) ?? Infinity) - (usoDelTope(b) ?? Infinity) || a.r.gasto / a.r.compras - b.r.gasto / b.r.compras)[0];
+}
+
+/** Qué parte de su CPA tope cuesta cada compra de un grupo (0.8 = 80 %): lo gastado entre lo que se podía gastar con esas compras. null sin compras. El resultado de un grupo es la suma de compras × tope − gasto. */
+export function usoDelTope(g: { r: { gasto: number; compras: number }; resultado: number }): number | null {
+  const permitido = g.resultado + g.r.gasto;
+  return g.r.compras > 0 && permitido > 0 ? g.r.gasto / permitido : null;
 }
 
 /**

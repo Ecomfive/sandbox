@@ -3,7 +3,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UsuarioActual } from "@/lib/auth";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { tasasUsd } from "@/lib/moneda/tipo-cambio";
-import { margenDrop } from "@/lib/publicaciones-drop/lectura";
+import { leerExclusivosDrop, margenDrop } from "@/lib/publicaciones-drop/lectura";
+import { diaCostaRica, ventas30PorPublicacion, ventasEnCaidaDrop, verificarDropshipperDrop, type VentaDiaDrop } from "@/lib/publicaciones-drop/ventas";
+import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
+import { cargarCompetenciaDrop, masBaratoDrop } from "@/lib/publicaciones-drop/competencia";
 import { monedaPublicaciones, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { fulfillmentEnMoneda, fulfillmentQueCuenta, leerFulfillmentPlataforma, type QuienPagaFulfillment } from "@/lib/publicaciones/fulfillment-pais";
 import { cambiosPrecioEsperando } from "@/lib/publicaciones/cambios-precio-datos";
@@ -21,6 +24,14 @@ export interface DatosDrop {
   fulfillmentPaga: QuienPagaFulfillment;
   /** Falta correr la migración 0221. */
   faltaMigracion: boolean;
+  /** Si ya hay ventas de Drop leídas (sin ellas, «Ventas en caída» y «Verificar dropshipper» siguen en «—»). */
+  conVentas?: boolean;
+  /** Si ya hay una lectura de la competencia de Drop (sin ella, «Bajar precio» sigue en «—»). */
+  conCompetencia?: boolean;
+  /** Cuándo se leyó la competencia de Drop (ISO). */
+  competenciaDel?: string | null;
+  /** Las reglas de Gestión de IDs Dropi que usan esas tarjetas, para su texto. */
+  reglasVentas?: { caida: number; diasNuevo: number };
 }
 
 type Fila = {
@@ -38,6 +49,8 @@ type Fila = {
   precios_leidos_en?: string | null;
   inventario: number | null;
   inventario_exclusivo?: number | null;
+  /** Los exclusivos de cada cliente (migración 0277): cliente, variante, unidades y si está activo. */
+  exclusivos?: unknown;
   foto_url: string | null;
   ultima_vez: string;
   en_drop: boolean;
@@ -68,9 +81,9 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
     // Con los precios que lee «Aplicar precios» (migración 0266); sin la migración, como antes.
     // Y con los exclusivos de clientes (migración 0277); sin ella, sin exclusivos.
     try {
-      filas = await leer(`${columnas}, precio_proveedor, precio_sugerido, con_variantes, precios_leidos_en, inventario_exclusivo`);
+      filas = await leer(`${columnas}, precio_proveedor, precio_sugerido, con_variantes, precios_leidos_en, inventario_exclusivo, exclusivos`);
     } catch (e) {
-      if (!/precio_proveedor|precio_sugerido|con_variantes|precios_leidos_en|inventario_exclusivo/i.test(String((e as { message?: string })?.message ?? e))) throw e;
+      if (!/precio_proveedor|precio_sugerido|con_variantes|precios_leidos_en|inventario_exclusivo|exclusivos/i.test(String((e as { message?: string })?.message ?? e))) throw e;
       try {
         filas = await leer(`${columnas}, precio_proveedor, precio_sugerido, con_variantes, precios_leidos_en`);
       } catch (e2) {
@@ -157,10 +170,29 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
   const fulfillment = fulfillmentQueCuenta(plataforma?.monto == null ? null : fulfillmentEnMoneda(plataforma.monto, plataforma.moneda, pais.codigo, porUsd), fulfillmentPaga);
 
   // Lo que viene en camino y lo que se cotiza de cada producto, en compras del país (lo mismo que muestra Gestión de IDs Dropi).
-  const [{ camino, cotizando, etapasCotizando }, cambiosPrecio] = await Promise.all([
+  // Las ventas de Drop de los últimos 60 días (24 nov 2026): para «Ventas en caída» y «Verificar dropshipper», con las reglas de Gestión de IDs Dropi.
+  const hoy = diaCostaRica(new Date().toISOString());
+  const desdeVentas = new Date(Date.parse(`${hoy}T12:00:00Z`) - 59 * 86_400_000).toISOString().slice(0, 10);
+  const [{ camino, cotizando, etapasCotizando }, cambiosPrecio, filasVentas, { reglas }, competencia] = await Promise.all([
     skuIds.length ? cargarEnCamino(supabase, pais.id, usuario) : { camino: new Map(), cotizando: new Map(), etapasCotizando: new Map() },
     cambiosPrecioEsperando(supabase, "drop", pais.id),
+    traerTodasLasFilas<VentaDiaDrop>((d, h) =>
+      supabase
+        .from("plataforma_ventas_diarias")
+        .select("producto_id, dia, salidas, devueltas")
+        .eq("pais_id", pais.id)
+        .eq("plataforma", "drop")
+        .gte("dia", desdeVentas)
+        .order("dia")
+        .order("producto_id")
+        .range(d, h) as unknown as PromiseLike<{ data: VentaDiaDrop[] | null; error: unknown }>,
+    ).catch(() => null),
+    cargarReglas(supabase),
+    // La competencia del Catálogo de Drop (24 nov 2026): para «Bajar precio».
+    cargarCompetenciaDrop(supabase, pais.id),
   ]);
+  // Sin ninguna venta leída no se sabe nada (las tarjetas siguen en «—»); con la lectura, una publicación sin filas vendió 0.
+  const ventas = filasVentas && filasVentas.length ? ventas30PorPublicacion(filasVentas, hoy) : null;
 
   const publicaciones = filas.map((f): FilaPublicacionDrop => {
     const producto = aProducto(uno(f.producto));
@@ -207,8 +239,21 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
       sinEnvioCamino: viene?.sinEnvio ?? 0,
       enCotizacion: producto ? (cotizando.get(producto.id) ?? 0) : 0,
       etapaCotizacion: producto ? (etapasCotizando.get(producto.id) ?? null) : null,
+      ...(() => {
+        const v = ventas ? (ventas.get(f.drop_id) ?? { netas30: 0, netasAntes: 0 }) : null;
+        const clientesExclusivos = [...new Set((leerExclusivosDrop(f.exclusivos) ?? []).filter((x) => x.activo && x.cantidad > 0).map((x) => x.cliente).filter(Boolean))];
+        return {
+          ventas30: v?.netas30 ?? null,
+          ventasAntes30: v?.netasAntes ?? null,
+          clientesExclusivos,
+          // Solo las que siguen en Drop: una que se eliminó allá ya no se revisa.
+          ventasEnCaida: f.en_drop && ventasEnCaidaDrop(v, reglas),
+          competidorMasBarato: f.en_drop ? masBaratoDrop(competencia.porDropId.get(f.drop_id)) : null,
+          verificarDropshipper: f.en_drop && verificarDropshipperDrop({ clientesExclusivos, creadoEnDrop: f.creado_en_drop, ventas: v }, hoy, reglas),
+        };
+      })(),
     };
   });
   const ultimaLectura = filas.filter((f) => f.en_drop).reduce<string | null>((max, f) => (!max || f.ultima_vez > max ? f.ultima_vez : max), null);
-  return { publicaciones, moneda, ultimaLectura, fulfillment, fulfillmentPaga, faltaMigracion: false };
+  return { publicaciones, moneda, ultimaLectura, fulfillment, fulfillmentPaga, faltaMigracion: false, conVentas: ventas !== null, conCompetencia: competencia.hayLectura, competenciaDel: competencia.ultimaLectura, reglasVentas: { caida: reglas.caida_ventas, diasNuevo: reglas.dias_nuevo } };
 }

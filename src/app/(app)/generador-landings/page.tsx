@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element -- enlaces firmados de Storage y fotos de Selección */
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import Link from "next/link";
 import { Badge, type Tone } from "@/components/ui/badge";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
@@ -103,7 +104,7 @@ export default async function GeneradorLandingsPage() {
           <ul className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card">
             {sinLanding.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                {p.foto_url ? <img src={p.foto_url} alt="" className="h-11 w-11 rounded-md border border-border object-cover" /> : <span aria-hidden="true" className="h-11 w-11 rounded-md border border-dashed border-border-control" />}
+                {p.foto_url ? <FotoAmpliable src={p.foto_url} alt="" className="h-11 w-11 rounded-md border border-border object-cover" /> : <span aria-hidden="true" className="h-11 w-11 rounded-md border border-dashed border-border-control" />}
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate font-medium">{p.nombre}</span>
                   <span className="text-xs text-muted-foreground tabular-nums">

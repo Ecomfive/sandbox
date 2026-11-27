@@ -71,3 +71,6 @@ begin
 end;
 $$;
 revoke all on function fin_sincronizar_dropi() from public, anon, authenticated;
+
+-- La función del filtro ya no la usa nadie.
+drop function if exists fin_dropi_es_ganancia(text, text);

@@ -7,6 +7,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { unidadDeTienda } from "../ventas/matriz";
+import { REPARTIDOR_PRUEBA } from "@/lib/despacho/etiquetas";
 import {
   cambioDesde,
   completarMapeo,
@@ -15,6 +16,7 @@ import {
   CONSULTA_SIGUIENTE,
   despachoDeItem,
   enlazarOrden,
+  enlazarOrdenes,
   errorMonday,
   faltaCompletar,
   ITEMS_POR_PAGINA,
@@ -80,14 +82,22 @@ const leerPendiente = (v: unknown): Pendiente | null => {
   return { cursor: o.cursor, maximo: typeof o.maximo === "string" ? o.maximo : null, inicio: o.inicio, leidos: Number(o.leidos) || 0, guardados: Number(o.guardados) || 0 };
 };
 
-/** Las columnas de la migración 0970 (Despacho ciudad): sin ella, se guarda sin ellas. */
+/** Las columnas de la migración 0970 (Envíos Delivery): sin ella, se guarda sin ellas. */
 const COLUMNAS_0970 = ["grupo", "edo_pago", "por_cobrar", "coste_envio", "turno", "comentario", "comprobantes", "clase"] as const;
 
 /**
  * Enlaza y guarda un lote de despachos. `clase`: de qué tablero son (los repartos de ciudad o las devoluciones). Lo que ya se editó en el sistema
- * (Despacho ciudad, migración 0970: `editado_en`) no se pisa: desde ahí manda el sistema.
+ * (Envíos Delivery, migración 0970: `editado_en`) no se pisa: desde ahí manda el sistema.
  */
-export async function guardarDespachos(supabase: SupabaseClient, tableroId: string, todo: Despacho[], unidades: { id: string; nombre: string }[], clase: "ciudad" | "devolucion" = "ciudad"): Promise<number> {
+export async function guardarDespachos(
+  supabase: SupabaseClient,
+  tableroId: string,
+  todo: Despacho[],
+  unidades: { id: string; nombre: string }[],
+  clase: "ciudad" | "devolucion" = "ciudad",
+  /** Tablero de prueba (migración 0363): sus filas van con el repartidor de prueba, sin tienda ni pedido enlazado. */
+  prueba = false,
+): Promise<number> {
   if (!todo.length) return 0;
   const editados = new Set<string>();
   for (let i = 0; i < todo.length; i += 200) {
@@ -97,7 +107,7 @@ export async function guardarDespachos(supabase: SupabaseClient, tableroId: stri
   }
   const lote = todo.filter((d) => !editados.has(d.item_id));
   if (!lote.length) return 0;
-  const variantes = [...new Set(lote.flatMap((d) => variantesPedido(d.numero_pedido)))];
+  const variantes = prueba ? [] : [...new Set(lote.flatMap((d) => variantesPedido(d.numero_pedido)))];
   const candidatas: OrdenCandidata[] = [];
   for (let i = 0; i < variantes.length; i += 200) {
     const { data, error } = await supabase.from("ven_ordenes").select("id, unidad_id, numero, periodo").in("numero", variantes.slice(i, i + 200));
@@ -106,14 +116,28 @@ export async function guardarDespachos(supabase: SupabaseClient, tableroId: stri
   }
   const ahora = new Date().toISOString();
   const filas = lote.map((d) => {
+    if (prueba) return { ...d, courier: REPARTIDOR_PRUEBA, clase, tablero_id: tableroId, unidad_id: null, orden_id: null, otras_ordenes: null, periodo: d.fecha_despacho ? `${d.fecha_despacho.slice(0, 7)}-01` : null, leido_en: ahora };
     const unidad = unidadDeTexto(d.tienda_texto, unidades, unidadDeTienda);
-    const orden = enlazarOrden(d.numero_pedido, unidad, candidatas);
+    // Una fila con varios pedidos (dos tiendas, un solo reparto) se une a todos: el principal en `orden_id` y los demás en `otras_ordenes` (0369).
+    const { principal: orden, otras } = enlazarOrdenes(d.numero_pedido, unidad, candidatas, d.fecha_despacho);
     const periodo = orden?.periodo ?? (d.fecha_despacho ? `${d.fecha_despacho.slice(0, 7)}-01` : null);
-    return { ...d, clase, tablero_id: tableroId, unidad_id: unidad ?? orden?.unidad_id ?? null, orden_id: orden?.id ?? null, periodo, leido_en: ahora };
+    return {
+      ...d,
+      clase,
+      tablero_id: tableroId,
+      unidad_id: unidad ?? orden?.unidad_id ?? null,
+      orden_id: orden?.id ?? null,
+      otras_ordenes: otras.length ? otras.map((o) => o.id) : null,
+      periodo,
+      leido_en: ahora,
+    };
   });
   for (let i = 0; i < filas.length; i += 500) {
     let { error } = await supabase.from("mon_despachos").upsert(filas.slice(i, i + 500), { onConflict: "item_id" });
-    // Sin la migración 0970, sin las columnas de Despacho ciudad.
+    // Sin la migración 0369, sin los otros pedidos de la fila.
+    if (error && /otras_ordenes/.test(error.message))
+      ({ error } = await supabase.from("mon_despachos").upsert(filas.slice(i, i + 500).map(({ otras_ordenes: _o, ...resto }) => resto), { onConflict: "item_id" }));
+    // Sin la migración 0970, sin las columnas de Envíos Delivery.
     if (error && new RegExp(COLUMNAS_0970.join("|")).test(error.message))
       ({ error } = await supabase.from("mon_despachos").upsert(
         filas.slice(i, i + 500).map((f) => Object.fromEntries(Object.entries(f).filter(([k]) => !(COLUMNAS_0970 as readonly string[]).includes(k)))),
@@ -201,11 +225,11 @@ export async function enlazarSinPedido(supabase: SupabaseClient, dias = 120): Pr
     ["mon_despachos", "actualizado_monday"],
     ["mon_postventa", "creado_monday"],
   ] as const) {
-    const filas: { item_id: string; numero_pedido: string; unidad_id: string }[] = [];
+    const filas: { item_id: string; numero_pedido: string; unidad_id: string; fecha_despacho?: string | null }[] = [];
     for (let d = 0; d < 20_000; d += 1000) {
       const { data, error } = await supabase
         .from(tabla)
-        .select("item_id, numero_pedido, unidad_id")
+        .select(tabla === "mon_despachos" ? "item_id, numero_pedido, unidad_id, fecha_despacho" : "item_id, numero_pedido, unidad_id")
         .is("orden_id", null)
         .not("numero_pedido", "is", null)
         .not("unidad_id", "is", null)
@@ -213,7 +237,7 @@ export async function enlazarSinPedido(supabase: SupabaseClient, dias = 120): Pr
         .order("item_id")
         .range(d, d + 999);
       if (error) break;
-      filas.push(...((data ?? []) as typeof filas));
+      filas.push(...((data ?? []) as unknown as typeof filas));
       if ((data ?? []).length < 1000) break;
     }
     if (!filas.length) continue;
@@ -225,15 +249,24 @@ export async function enlazarSinPedido(supabase: SupabaseClient, dias = 120): Pr
       for (const o of data ?? []) candidatas.push({ id: o.id as string, unidad_id: o.unidad_id as string, numero: o.numero as string, periodo: String(o.periodo).slice(0, 10) });
     }
     const cambios = filas.flatMap((f) => {
-      const orden = enlazarOrden(f.numero_pedido, f.unidad_id, candidatas);
-      return orden ? [{ item_id: f.item_id, orden }] : [];
+      if (tabla !== "mon_despachos") {
+        const orden = enlazarOrden(f.numero_pedido, f.unidad_id, candidatas);
+        return orden ? [{ item_id: f.item_id, orden, otras: [] as OrdenCandidata[] }] : [];
+      }
+      const { principal, otras } = enlazarOrdenes(f.numero_pedido, f.unidad_id, candidatas, f.fecha_despacho ?? null);
+      return principal ? [{ item_id: f.item_id, orden: principal, otras }] : [];
     });
     for (let i = 0; i < cambios.length; i += 20) {
       await Promise.all(
-        cambios.slice(i, i + 20).map(async ({ item_id, orden }) => {
+        cambios.slice(i, i + 20).map(async ({ item_id, orden, otras }) => {
           const cambio: Record<string, unknown> = { orden_id: orden.id };
           if (tabla === "mon_despachos") cambio.periodo = orden.periodo;
-          const { error } = await supabase.from(tabla).update(cambio).eq("item_id", item_id).is("orden_id", null);
+          if (otras.length) cambio.otras_ordenes = otras.map((o) => o.id);
+          let { error } = await supabase.from(tabla).update(cambio).eq("item_id", item_id).is("orden_id", null);
+          if (error && /otras_ordenes/.test(error.message)) {
+            delete cambio.otras_ordenes;
+            ({ error } = await supabase.from(tabla).update(cambio).eq("item_id", item_id).is("orden_id", null));
+          }
           if (!error) enlazadas++;
         }),
       );

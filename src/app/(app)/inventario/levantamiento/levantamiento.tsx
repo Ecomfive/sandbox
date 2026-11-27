@@ -1,7 +1,8 @@
 "use client";
 
 import { quedaDespues, repartirFilas, type FilaConteo } from "@/lib/wms/levantamiento";
-import { Fragment, useMemo, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { claveBorrador, hayAlgo, leerBorrador } from "@/lib/wms/borrador-levantamiento";
 import { usePathname, useRouter } from "next/navigation";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
@@ -13,7 +14,7 @@ import { coincideCodigo } from "@/lib/wms/codigos-producto";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { formatearTiempoRelativo } from "@/lib/formato";
+import { FechaHora } from "@/components/ui/fecha-hora";
 import type { Ambito } from "@/lib/imagen/buscar";
 import { BuscarIcon, CamaraIcon, ChevronRightIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { FichaStock } from "../ficha-stock";
@@ -23,6 +24,7 @@ import { ImportarLista } from "./importar-lista";
 import { LineasCajas, unidadesFormulario, type LineaCajasForm, type UbicacionConteo } from "./lineas-cajas";
 import { CAJAS_ACTIVAS } from "@/lib/wms/cajas";
 import { codigoLote, PEDIR_CODIGO_LOTE } from "@/lib/wms/vencimiento";
+import { agruparPorColor } from "@/lib/wms/color-variante";
 import { ordenarVariantes } from "@/lib/wms/orden-variantes";
 import { compararOpciones } from "@/lib/wms/talla";
 import { BotonOrdenVariantes, useOrdenVariantes } from "@/components/ui/orden-variantes";
@@ -65,13 +67,6 @@ interface LineaLote {
 
 const AMBITOS_PRODUCTO: Ambito[] = ["producto"];
 
-/** Las variantes de un producto juntas por color, en el orden en que salen; las que no tienen color (o solo color) van sueltas, primero. */
-function porColor(hijos: ProductoConteo[]): { color: string | null; hijos: ProductoConteo[] }[] {
-  const sueltas = hijos.filter((h) => !h.color);
-  const grupos = new Map<string, ProductoConteo[]>();
-  for (const h of hijos) if (h.color) grupos.set(h.color, [...(grupos.get(h.color) ?? []), h]);
-  return [...(sueltas.length ? [{ color: null, hijos: sueltas }] : []), ...[...grupos].map(([color, lista]) => ({ color, hijos: lista }))];
-}
 const ETIQUETA_CLASE: Record<string, string> = { inactivo: "Inactivo", descontinuado: "Descontinuado" };
 const sinAcentos = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const numero = (t: string) => (t.trim() === "" ? null : Number(t));
@@ -107,6 +102,7 @@ export function Levantamiento({
   puedeRestar,
   restarPideMotivo,
   codigoPais,
+  productoInicial = null,
 }: {
   bodegas: { id: string; nombre: string }[];
   bodegaElegida: string;
@@ -120,6 +116,11 @@ export function Levantamiento({
   restarPideMotivo: boolean;
   /** El país que se está viendo: la ficha muestra sus compras. */
   codigoPais: string;
+  /**
+   * El producto con que se abre (23 nov 2026, pedido de Dinora: desde la ficha de stock, un clic en la bodega trae su levantamiento con ese producto): sale ya
+   * buscado y, si es una variante (o un producto con variantes), desplegado.
+   */
+  productoInicial?: string | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -129,7 +130,9 @@ export function Levantamiento({
   const [lotes, setLotes] = useState<Record<string, LineaLote[]>>({});
   // Las cajas que se tocaron; un producto sin tocar conserva las suyas.
   const [cajas, setCajas] = useState<Record<string, LineaCajasForm[]>>({});
-  const [buscar, setBuscar] = useState("");
+  // El producto pedido en la dirección: una fila suya (la variante o, si es un principal, una de sus variantes).
+  const inicial = productoInicial ? (productos.find((p) => p.id === productoInicial) ?? productos.find((p) => p.padre?.id === productoInicial) ?? null) : null;
+  const [buscar, setBuscar] = useState(() => (!inicial ? "" : inicial.padre && inicial.padre.id === productoInicial ? inicial.padre.codigo : inicial.codigo));
   const [verTodos, setVerTodos] = useState(false);
   // Los productos que encontró la foto, de más a menos parecido (null = sin filtro por imagen).
   const [porImagen, setPorImagen] = useState<string[] | null>(null);
@@ -143,10 +146,59 @@ export function Levantamiento({
   // La ficha del producto (7 nov 2026, pedido de Hernán): al tocar su nombre, para ver lo último que pasó y dejar notas.
   const [ficha, setFicha] = useState<string | null>(null);
   // Los productos con variantes que están desplegados (se cuentan las variantes, no el principal).
-  const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
+  const [abiertos, setAbiertos] = useState<Set<string>>(() => new Set(inicial?.padre ? [inicial.padre.id] : []));
   const { descendente } = useOrdenVariantes();
   // Los colores desplegados dentro de un producto («idPrincipal|Azul»): nacen plegados (11 nov 2026, pedido de Hernán).
-  const [coloresAbiertos, setColoresAbiertos] = useState<Set<string>>(new Set());
+  const [coloresAbiertos, setColoresAbiertos] = useState<Set<string>>(() => new Set(inicial?.padre && inicial.color && inicial.id === productoInicial ? [`${inicial.padre.id}|${inicial.color}`] : []));
+
+  // Borrador (23 nov 2026): lo escrito sin guardar se queda en este navegador, por país y bodega, y vuelve al abrir el levantamiento de esa bodega.
+  // `cargada` es la bodega cuyo borrador ya se leyó: hasta entonces no se escribe nada (si no, lo vacío del arranque pisaría el borrador).
+  const clave = claveBorrador(codigoPais, bodegaElegida);
+  const cargada = useRef<string | null>(null);
+  const [recuperado, setRecuperado] = useState<string | null>(null);
+  useEffect(() => {
+    let leido: ReturnType<typeof leerBorrador> = null;
+    try {
+      leido = leerBorrador(localStorage.getItem(clave));
+    } catch {
+      leido = null;
+    }
+    // Al cambiar de bodega, lo de la otra no pasa a esta: cada una tiene su borrador.
+    void Promise.resolve().then(() => {
+      setContados(leido?.contados ?? {});
+      setLotes((leido?.lotes ?? {}) as Record<string, LineaLote[]>);
+      setCajas((leido?.cajas ?? {}) as Record<string, LineaCajasForm[]>);
+      setSumas(leido?.sumas ?? {});
+      setRestas(leido?.restas ?? {});
+      setTraslados(leido?.traslados ?? {});
+      setReferencia(leido?.referencia ?? "");
+      setRecuperado(leido ? leido.guardadoEn : null);
+      cargada.current = clave;
+    });
+  }, [clave]);
+  useEffect(() => {
+    if (cargada.current !== clave) return;
+    const t = setTimeout(() => {
+      const datos = { contados, lotes, cajas, sumas, restas, traslados, referencia };
+      try {
+        if (hayAlgo(datos)) localStorage.setItem(clave, JSON.stringify({ version: 1, guardadoEn: new Date().toISOString(), ...datos }));
+        else localStorage.removeItem(clave);
+      } catch {
+        // Sin espacio o sin permiso en este navegador: se sigue sin borrador.
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [clave, contados, lotes, cajas, sumas, restas, traslados, referencia]);
+  const descartarBorrador = () => {
+    setContados({});
+    setLotes({});
+    setCajas({});
+    setSumas({});
+    setRestas({});
+    setTraslados({});
+    setReferencia("");
+    setRecuperado(null);
+  };
   const alternar = (set: (f: (x: Set<string>) => Set<string>) => void, clave: string) =>
     set((x) => {
       const y = new Set(x);
@@ -219,7 +271,10 @@ export function Levantamiento({
       if (verTodos || q || orden) return true;
       return p.clase === "fisico" || p.enSistema !== 0 || contados[p.id] !== undefined || lotes[p.id] !== undefined || cajas[p.id] !== undefined || sumas[p.id] !== undefined || restas[p.id] !== undefined || traslados[p.id] !== undefined;
     });
-    return orden ? lista.sort((a, b) => (orden.get(a.id) ?? orden.get(a.padre?.id ?? "") ?? 0) - (orden.get(b.id) ?? orden.get(b.padre?.id ?? "") ?? 0)) : lista;
+    if (orden) return lista.sort((a, b) => (orden.get(a.id) ?? orden.get(a.padre?.id ?? "") ?? 0) - (orden.get(b.id) ?? orden.get(b.padre?.id ?? "") ?? 0));
+    // Primero lo que tiene stock en la bodega, de más a menos (27 nov 2026, pedido de Hernán); con el mismo stock, en el orden de siempre. Se ordena por lo que dice el
+    // sistema, no por lo que se va contando, para que las filas no salten mientras se escribe. Un producto con variantes sale donde está su variante con más stock.
+    return lista.sort((a, b) => b.enSistema - a.enSistema);
   }, [productos, buscar, verTodos, porImagen, contados, lotes, cajas, sumas, restas, traslados]);
 
   // Cada producto con variantes sale como una sola fila que se despliega; los demás, como siempre.
@@ -332,6 +387,7 @@ export function Levantamiento({
       setRestas({});
       setTraslados({});
       setReferencia("");
+      setRecuperado(null);
       router.refresh();
     });
   };
@@ -617,6 +673,16 @@ export function Levantamiento({
 
   return (
     <div className="flex flex-col gap-4">
+      {recuperado && hayQueGuardar && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primario/40 bg-primario-suave px-4 py-2.5 text-sm">
+          <span>
+            Recuperamos lo que llevabas en <strong>{nombreBodega}</strong> sin guardar (lo último, <FechaHora iso={recuperado} />). Revísalo y pulsa «Guardar levantamiento» cuando termines.
+          </span>
+          <button type="button" onClick={descartarBorrador} className={`rounded px-2 py-1 text-xs font-semibold text-muted-foreground hover:bg-card hover:text-foreground ${anilloFoco}`}>
+            Descartar
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-muted-foreground">Bodega</span>
@@ -687,7 +753,7 @@ export function Levantamiento({
         </button>
         {ultimo && (
           <p className="text-xs text-muted-foreground">
-            Último levantamiento: {formatearTiempoRelativo(ultimo.fecha)}
+            Último levantamiento: <FechaHora iso={ultimo.fecha} />
             {ultimo.referencia ? ` · ${ultimo.referencia}` : ""} · {ultimo.productos} productos
           </p>
         )}
@@ -776,7 +842,7 @@ export function Levantamiento({
                     </td>
                   </tr>
                   {abierto &&
-                    porColor(ordenarVariantes(g.hijos, descendente)).map((c) => {
+                    agruparPorColor(ordenarVariantes(g.hijos, descendente)).map((c) => {
                       if (!c.color) return c.hijos.map((h) => filaDe(h, true));
                       const clave = `${g.padre.id}|${c.color}`;
                       const colorAbierto = coloresAbiertos.has(clave);

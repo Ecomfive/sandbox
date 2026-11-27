@@ -7,7 +7,7 @@ export type EstadoFuente = "aldia" | "atrasada" | "error" | "nunca" | "corriendo
 export type GrupoFuente = "plataformas" | "tiendas" | "entregas" | "finanzas" | "marketing" | "archivos";
 
 export const GRUPOS_FUENTE: { id: GrupoFuente; titulo: string; subtitulo: string }[] = [
-  { id: "plataformas", titulo: "Plataformas", subtitulo: "Dropi, Drop, Dunamixfy y Effi" },
+  { id: "plataformas", titulo: "Plataformas", subtitulo: "Dropi, Drop (proveedor y dropshipper), Dunamixfy y Effi" },
   { id: "tiendas", titulo: "Tiendas", subtitulo: "Shopify y la Matriz de administración" },
   { id: "entregas", titulo: "Entregas", subtitulo: "Servientrega y Monday" },
   { id: "finanzas", titulo: "Finanzas", subtitulo: "Dropi, retiros y QuickBooks" },
@@ -23,6 +23,7 @@ export type VentanaFuente =
   | { tipo: "dropi"; sitio: "pa" | "cr" | "mx" | "drop" | "duna" | null }
   | { tipo: "siscore" }
   | { tipo: "tuwinner" }
+  | { tipo: "competencia-drop" }
   | { tipo: "excel"; modulo: string }
   | { tipo: "conteo" };
 

@@ -42,6 +42,9 @@ export interface FilaStock {
   /** Lo que el producto **principal** tiene como stock general en cada bodega propia (el de una variante repartida no cuenta). Lo llevan el principal y sus variantes: la etiqueta «sin repartir» solo sale donde de verdad queda stock general (19 nov 2026). */
   generalPorBodega?: { bodegaId: string; fisico: number }[];
   opciones: string;
+  /** Si la variante tiene color y otra opción (talla…): el color con que se agrupan las variantes de su producto (como en el Levantamiento), y `resto` es lo demás («M»). */
+  color?: string | null;
+  resto?: string;
   /** Si es un producto con variantes: sus variantes (sus cifras ya suman las de ellas). Vacío en un producto sin variantes. */
   variantes: FilaStock[];
 }

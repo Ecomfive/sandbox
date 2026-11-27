@@ -1,18 +1,72 @@
+import { GuiaEnLinea } from "./aviso-tope";
+import { BotonesDecidir } from "./decidir";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Badge, type Tone } from "@/components/ui/badge";
 import { claseMetrica, type NivelMetrica } from "@/lib/metricas-meta-ads";
-import { GASTO_MINIMO_CONFIABLE, conSigno, confiable, cpa, ctr, dolares, hookRate, nivelDeCpa, nivelDeCtr, nivelDeHook, nivelDeResultado, resultado, type Resultados } from "@/lib/meta-ads/metricas";
+import { GASTO_MINIMO_CONFIABLE, METRICAS_CAMPANA, conSigno, confiable, cpa, cpm, ctr, cvr, dolares, efectividad, hookRate, nivelDeCpa, nivelDeCtr, nivelDeHook, nivelDeResultado, nivelesDeMetricas, nivelFrecuencia, nivelTiempo, resultado, tiempoPromedio, type ClaveMetrica, type Resultados } from "@/lib/meta-ads/metricas";
+import { NOMBRE_PRIORIDAD, type Pendiente } from "@/lib/meta-ads/prioridad";
+import type { CifraSugerencia, Prioridad } from "@/lib/meta-ads/sugerencias";
 import { NOMBRE_ETAPA, NOMBRE_PUJA, type Estructura, type Etapa, type Puja } from "@/lib/meta-ads/nombre";
+import { VideoDeEjemplo } from "./ver-video-ejemplo";
+import { AvisoRentable } from "./aviso-rentable";
 
 export const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
 export const porcentaje = (n: number | null, decimales = 1) => (n === null ? "—" : `${n.toFixed(decimales)} %`);
 export const valorCpa = (r: Resultados) => {
   const v = cpa(r);
-  return v === null ? "—" : dolares(v);
+  // Sin compras no hay CPA (gasto ÷ compras): si ya gastó, se dice «Sin compras» y no un guion que parece un dato que falta.
+  return v === null ? (r.gasto > 0 ? "Sin compras" : "—") : dolares(v);
 };
 
-const TONO_ETAPA: Record<Etapa, Tone> = { testing: "azul", escala: "success", retargeting: "warning" };
+const TONO_ETAPA: Record<Etapa, Tone> = { testing: "azul", venta: "info", escala: "success", retargeting: "warning" };
+
+const TONO_PRIORIDAD: Record<Prioridad, Tone> = { apagar: "destructive", actuar: "warning", oportunidad: "success", observar: "azul", historial: "neutral" };
+
+/** Lo más urgente de una fila («Apagar», «Actuar hoy»…); con varias de lo mismo, cuántas. Sin nada pendiente no se dibuja. */
+export function InsigniaPrioridad({ pendiente }: { pendiente: Pendiente | null | undefined }) {
+  if (!pendiente) return null;
+  return (
+    <Badge tone={TONO_PRIORIDAD[pendiente.prioridad]}>
+      {NOMBRE_PRIORIDAD[pendiente.prioridad]}
+      {pendiente.cuantas > 1 ? ` · ${pendiente.cuantas}` : ""}
+    </Badge>
+  );
+}
+
+/** El «Qué hacer» de una fila, dentro de su ficha: la prioridad, las cifras que la explican y la acción. */
+export function QueHacer({ pendiente }: { pendiente: Pendiente }) {
+  return (
+    <section aria-label="Qué hacer" className="flex flex-col gap-2 rounded-lg border border-border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="m-0 text-sm font-semibold">Qué hacer</h3>
+        <InsigniaPrioridad pendiente={{ ...pendiente, cuantas: 1 }} />
+      </div>
+      {pendiente.cifras && pendiente.cifras.length > 0 && <CifrasEnLinea cifras={pendiente.cifras} />}
+      <AvisoRentable aviso={pendiente.rentabilidad} />
+      <p className="m-0 text-sm">{pendiente.accion}</p>
+      <VideoDeEjemplo video={pendiente.video} texto={pendiente.accion} />
+      {pendiente.guia && <GuiaEnLinea guia={pendiente.guia} />}
+      {pendiente.clave && <BotonesDecidir clave={pendiente.clave} titulo={pendiente.titulo} accion={pendiente.accion} />}
+    </section>
+  );
+}
+
+const TONO_CIFRA = { bueno: "bg-success-soft text-success", medio: "bg-warning-soft text-warning", malo: "bg-destructive-soft text-destructive" } as const;
+
+/** El CPA de una campaña de un vistazo (7 días, últimos 3, semana anterior y tope), coloreado frente al tope. */
+export function CifrasEnLinea({ cifras }: { cifras: CifraSugerencia[] }) {
+  return (
+    <dl className="m-0 flex flex-wrap gap-1.5">
+      {cifras.map((c) => (
+        <div key={c.etiqueta} className={`flex items-baseline gap-1.5 rounded-md px-2 py-1 text-xs ${c.tono ? TONO_CIFRA[c.tono] : "bg-muted text-foreground"}`}>
+          <dt>{c.etiqueta}</dt>
+          <dd className="m-0 font-semibold tabular-nums">{c.valor}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 /** La etapa de una campaña; sin etapa en el nombre ni corregida a mano, «Sin etapa». */
 export function InsigniaEtapa({ etapa }: { etapa: Etapa | null }) {
@@ -75,8 +129,75 @@ export function Cifra({ titulo, valor, apoyo, nivel }: { titulo: string; valor: 
   );
 }
 
-/** Las métricas de un resultado en una línea (CPA, CTR, hook): para filas y fichas. */
-export function MetricasEnLinea({ r, tope }: { r: Resultados; tope: number }) {
+/** Tiempo promedio de reproducción («7.4 s») y frecuencia de los últimos 7 días («1.85»); «—» si todavía no se leen de Meta. */
+export const textoTiempo = (r: Resultados): string => (tiempoPromedio(r) === null ? "—" : `${tiempoPromedio(r)!.toFixed(1)} s`);
+export const textoFrecuencia = (f: number | null): string => (f === null ? "—" : f.toFixed(2));
+
+/** El texto de cada una de las ocho cifras de una campaña («$4.20», «49.12 %», «Sin compras»). */
+export function textoMetrica(clave: ClaveMetrica, r: Resultados): string {
+  const pct = (n: number | null) => porcentaje(n, 2);
+  switch (clave) {
+    case "cpm":
+      return cpm(r) === null ? "—" : dolares(cpm(r)!);
+    case "efectividad":
+      return pct(efectividad(r));
+    case "hook":
+      return pct(hookRate(r));
+    case "ctr":
+      return pct(ctr(r));
+    case "cpa":
+      return valorCpa(r);
+    case "gasto":
+      return r.gasto > 0 ? dolares(r.gasto) : "—";
+    case "compras":
+      return r.gasto > 0 || r.compras > 0 ? entero(r.compras) : "—";
+    case "cvr":
+      return pct(cvr(r));
+  }
+}
+
+/**
+ * Las ocho cifras de la hoja de Control de Testing (CPM, % Efectividad, Hook Rate, CTR, CPA, Gasto, Compras y CVR) como celdas de una fila de campaña: en pantalla ancha cada una es una columna (su título
+ * lo dice el encabezado) y en una angosta van en una línea con su nombre. Con la etapa «testing» llevan el color de las escalas de la hoja.
+ */
+export function CeldasMetricas({ r, etapa, tope }: { r: Resultados; etapa: string | null; tope: number }) {
+  const niveles = nivelesDeMetricas(r, etapa, tope);
+  return (
+    <span className="col-span-full flex flex-wrap gap-x-4 gap-y-0.5 xl:contents">
+      {METRICAS_CAMPANA.map((m) => (
+        <span key={m.clave} className="text-sm tabular-nums xl:text-right">
+          <span className="text-xs text-muted-foreground xl:sr-only">{m.titulo} </span>
+          <Nivel nivel={niveles[m.clave]}>{textoMetrica(m.clave, r)}</Nivel>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Las métricas de un resultado en una línea: para filas y fichas. Con `completa`, las ocho de la hoja de Testing (con sus colores según la etapa); sin ella, solo CPA, CTR y Hook. */
+export function MetricasEnLinea({ r, tope, etapa = null, completa = false, frecuencia = null }: { r: Resultados; tope: number; etapa?: string | null; completa?: boolean; frecuencia?: number | null }) {
+  if (completa) {
+    const niveles = nivelesDeMetricas(r, etapa, tope);
+    return (
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+        {METRICAS_CAMPANA.filter((m) => textoMetrica(m.clave, r) !== "—").map((m) => (
+          <span key={m.clave}>
+            {m.titulo} <Nivel nivel={niveles[m.clave]}>{textoMetrica(m.clave, r)}</Nivel>
+          </span>
+        ))}
+        {tiempoPromedio(r) !== null && (
+          <span>
+            Tiempo prom. <Nivel nivel={nivelTiempo(tiempoPromedio(r))}>{textoTiempo(r)}</Nivel>
+          </span>
+        )}
+        {frecuencia !== null && (
+          <span>
+            Frecuencia <Nivel nivel={nivelFrecuencia(frecuencia)}>{textoFrecuencia(frecuencia)}</Nivel>
+          </span>
+        )}
+      </span>
+    );
+  }
   const c = cpa(r);
   const t = ctr(r);
   const h = hookRate(r);

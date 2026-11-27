@@ -3,12 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { alcanceInventario, aumentoDeConteo, bloqueoDeBodega, estaACargoDelInventario, PAISES_CON_LIMITE, revisarLimite, SOLO_A_CARGO } from "@/lib/permisos/inventario";
 import { autorizadaParaSalidaManual } from "@/lib/permisos/salida-manual";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { indexar, parecidos, todasLasCoincidencias } from "@/lib/scraping/cruces";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { revisarCajas } from "@/lib/wms/cajas";
+import { comprasDe, completarCompras, existenciasEnPais, faltantesDeCompras, leerBodega, NO_SE_PUDO_COMPROBAR, ultimasCompras, type BodegaDeInventario } from "@/lib/wms/existencia-servidor";
+import { margenDeCompras, type LineaConFaltante } from "@/lib/permisos/inventario";
 import { pideMotivo, puedeMoverAMano, SOLO_ADMIN_MOVIMIENTO } from "@/lib/wms/recepcion";
 import { numeroTraslado } from "@/lib/wms/traslado";
 import { itemsParaSumar, MAX_LINEAS_IMPORTADAS, revisarConteo, revisarTransferencias, varianteDeLinea, type ItemConteo } from "@/lib/wms/levantamiento";
@@ -16,6 +19,62 @@ import { itemsParaSumar, MAX_LINEAS_IMPORTADAS, revisarConteo, revisarTransferen
 const ES_ID = /^[0-9a-fA-F-]{8,64}$/;
 
 const revisarLista = (lista: unknown): { items: ItemConteo[] } | { error: string } => (Array.isArray(lista) && lista.length === 0 ? { items: [] } : revisarConteo(lista));
+
+const unidadesDe = (i: ItemConteo): number => ("cantidad" in i ? i.cantidad : i.lotes.reduce((t, l) => t + l.cantidad, 0));
+
+/** Lo que sube cada producto con un levantamiento y lo que faltó de sus compras: al guardar, eso completa la compra (ver `completarCompras`). */
+interface Subidas {
+  suben: { sku: string; aumento: number }[];
+  faltantes: Map<string, LineaConFaltante[]>;
+}
+
+/**
+ * El límite de existencia sobre todo un levantamiento: por producto, lo que sube con lo contado y lo añadido (lo restado no compensa, ver `aumentoDeConteo`). Lo que faltó al recibir sus compras
+ * se suma sin motivo (27 nov 2026). Devuelve el mensaje del primer producto que lo supere sin poder hacerlo, o lo que sube cada uno para completar las compras al guardar.
+ */
+async function revisarLimiteDeConteo(
+  supabase: ReturnType<typeof createServiceClient>,
+  bodegaId: string,
+  bodega: BodegaDeInventario,
+  d: { contados: ItemConteo[]; sumas: ItemConteo[]; aCargo: boolean; motivo: string },
+): Promise<{ mensaje: string } | Subidas> {
+  const nada: Subidas = { suben: [], faltantes: new Map() };
+  if (!PAISES_CON_LIMITE.includes(bodega.pais ?? "") || (!d.contados.length && !d.sumas.length)) return nada;
+  const { data: stock, error } = await traerTodasConError<{ sku_maestro_id: string; fisico: number }>((de, hasta) =>
+    supabase.from("wms_stock").select("sku_maestro_id, fisico").eq("bodega_id", bodegaId).order("sku_maestro_id").range(de, hasta),
+  );
+  if (error || !stock) return { mensaje: NO_SE_PUDO_COMPROBAR };
+  const enBodega = new Map(stock.map((s) => [s.sku_maestro_id, Number(s.fisico)]));
+  const contado = new Map(d.contados.map((i) => [i.sku, unidadesDe(i)]));
+  const sumar = new Map(d.sumas.map((i) => [i.sku, unidadesDe(i)]));
+  const suben = [...new Set([...contado.keys(), ...sumar.keys()])]
+    .map((sku) => ({ sku, aumento: aumentoDeConteo({ enBodega: enBodega.get(sku) ?? 0, contado: contado.get(sku) ?? null, sumar: sumar.get(sku) ?? 0 }) }))
+    .filter((x) => x.aumento > 0);
+  if (!suben.length) return nada;
+  const skus = suben.map((x) => x.sku);
+  const [faltantes, ultimas, existencias] = await Promise.all([
+    faltantesDeCompras(supabase, skus, bodega.paisId, bodega.pais),
+    ultimasCompras(supabase, skus, bodega.paisId, bodega.pais),
+    existenciasEnPais(supabase, skus, bodega.paisId),
+  ]);
+  if (!faltantes || !ultimas || !existencias) return { mensaje: NO_SE_PUDO_COMPROBAR };
+  const pasan = suben.filter((x) => x.aumento > margenDeCompras(comprasDe(faltantes, ultimas, x.sku), existencias.get(x.sku) ?? 0));
+  if (!pasan.length || (d.aCargo && d.motivo)) return { suben, faltantes };
+  const primero = pasan[0];
+  const { data: producto } = await supabase.from("skus_maestros").select("codigo").eq("id", primero.sku).maybeSingle();
+  const mensaje = revisarLimite({
+    pais: bodega.pais,
+    existencia: existencias.get(primero.sku) ?? 0,
+    aumento: primero.aumento,
+    aCargo: d.aCargo,
+    motivo: d.motivo,
+    dondeVaElMotivo: "en «Referencia»",
+    producto: (producto?.codigo as string | undefined) ?? undefined,
+    compras: comprasDe(faltantes, ultimas, primero.sku),
+  });
+  if (!mensaje) return { suben, faltantes };
+  return { mensaje: pasan.length > 1 ? `${mensaje} Hay ${pasan.length - 1} más en la misma situación.` : mensaje };
+}
 
 const refrescar = () => {
   revalidatePath("/inventario");
@@ -87,13 +146,20 @@ export async function guardarLevantamiento(
   const conConteo = conCajas || revisado.items.length > 0;
   if (!conConteo && !porSumar.length && !porRestar.length && !porTrasladar.length) return { error: "No hay nada que guardar." };
 
+  // Quien no está a cargo del inventario solo cuenta la bodega de despacho y no transfiere; y una existencia no sube a mano sin más (26 nov 2026).
+  const bodega = await leerBodega(supabase, bodegaId);
+  if (!bodega) return { error: "La bodega no existe." };
+  const alcance = alcanceInventario(usuario);
+  const bloqueo = bloqueoDeBodega(alcance, bodega);
+  if (bloqueo) return { error: bloqueo };
+  if (porTrasladar.length && alcance !== "total") return { error: SOLO_A_CARGO };
+  const limite = await revisarLimiteDeConteo(supabase, bodegaId, bodega, { contados: revisado.items, sumas: porSumar, aCargo: estaACargoDelInventario(usuario), motivo: ref });
+  if ("mensaje" in limite) return { error: limite.mensaje };
+
   // Restar es una salida a mano: donde toda salida va con remisión (Costa Rica), es de un administrador y lleva motivo (la referencia).
   if (porRestar.length) {
-    const { data: bodegaFila } = await supabase.from("wms_bodegas").select("paises(codigo)").eq("id", bodegaId).maybeSingle();
-    const pais = bodegaFila?.paises as { codigo: string } | { codigo: string }[] | null | undefined;
-    const codigoPais = (Array.isArray(pais) ? pais[0] : pais)?.codigo;
-    if (!puedeMoverAMano("salida", codigoPais, autorizadaParaSalidaManual(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
-    if (pideMotivo("salida", codigoPais) && !ref) return { error: "Para restar, escribe el motivo en «Referencia»." };
+    if (!puedeMoverAMano("salida", bodega.pais, autorizadaParaSalidaManual(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
+    if (pideMotivo("salida", bodega.pais) && !ref) return { error: "Para restar, escribe el motivo en «Referencia»." };
   }
 
   const hecho: HechoLevantamiento = { contados: false, sumas: false, restas: false, trasladados: [] };
@@ -133,6 +199,11 @@ export async function guardarLevantamiento(
     hecho.sumas = true;
     await registrarAuditoria({ accion: "levantamiento_inventario", entidad: "wms_bodegas", entidadId: bodegaId, detalle: `Suma al inventario${ref ? ` «${ref}»` : ""}: ${sumados} productos` });
   }
+
+  // Lo que subió completa primero lo que faltó de sus compras (27 nov 2026): la compra queda al día y no se vuelve a sumar sin motivo.
+  let compras = false;
+  for (const x of limite.suben) if (limite.faltantes.has(x.sku) && (await completarCompras(supabase, limite.faltantes.get(x.sku), x.aumento, "Levantamiento")) > 0) compras = true;
+  if (compras) revalidatePath("/compras", "layout");
 
   let restados = 0;
   if (porRestar.length) {

@@ -2,7 +2,9 @@
 // deja, el registro de actividad. Solo consulta Meta y guarda aquí; no escribe nada en Meta. Los problemas no tumban la lectura: lo que sí se pudo leer se guarda y lo demás queda dicho en `ultimo_error`.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { pedirMeta, pedirPorIds, pedirTodo, tokenDeMeta } from "./api";
+import { partirTramo } from "./cobertura";
 import { etiquetasDeNombre } from "./nombre";
 import { actividadDe, anuncioDe, campanaDe, conjuntoDe, esCreacionDeCampana, resultadoDiaDe, type ActividadMeta, type AnuncioMeta, type CampanaMeta, type ConjuntoMeta, type ResultadoDia } from "./normalizar";
 
@@ -24,6 +26,8 @@ export interface ResumenLectura {
   hasta: string;
   avisos: string[];
   error: string | null;
+  /** Con `rango`: el tramo trae más datos de los que caben en una lectura o Meta tardó demasiado; no se guardó nada y conviene leerlo en partes más chicas. */
+  partir?: boolean;
 }
 
 const DIA = 86_400_000;
@@ -37,7 +41,7 @@ export const DIAS_LECTURA = 7;
 const CAMPOS_CAMPANA = "id,name,objective,status,effective_status,daily_budget,lifetime_budget,bid_strategy,created_time";
 const CAMPOS_CONJUNTO = "id,name,campaign_id,status,effective_status,daily_budget,bid_strategy";
 const CAMPOS_ANUNCIO = "id,name,campaign_id,adset_id,status,effective_status,creative{video_id,thumbnail_url,body,title,link_url,object_story_spec}";
-const CAMPOS_RESULTADOS = "ad_id,adset_id,campaign_id,spend,impressions,inline_link_clicks,actions,action_values,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions";
+const CAMPOS_RESULTADOS = "ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,spend,impressions,inline_link_clicks,actions,action_values,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_play_actions,video_avg_time_watched_actions";
 
 const TROZO = 200;
 async function guardarPorTrozos<T>(filas: T[], guardar: (trozo: T[]) => PromiseLike<{ error: { message: string } | null }>): Promise<string | null> {
@@ -54,6 +58,10 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   const hasta = opciones.rango?.hasta ?? hoyEnPanama();
   const desde = opciones.rango?.desde ?? restarDias(hasta, (cuenta.ultima_lectura_en ? DIAS_LECTURA : DIAS_PRIMERA_LECTURA) - 1);
   const r: ResumenLectura = { cuenta: cuenta.nombre, ok: false, campanas: 0, anuncios: 0, filas: 0, actividad: 0, desde, hasta, avisos: [], error: null };
+  // El reloj de la lectura (20 nov 2026: un mes de una cuenta grande pedía más páginas de las que caben en una llamada y quedaba colgado hasta que Vercel la cortaba, sin decir nada):
+  // los resultados se piden hasta el 55 % del tiempo y la estructura hasta el 90 %; lo que no cabe se avisa en vez de seguir.
+  const finResultados = inicio + Math.round(limite * 0.55);
+  const finEstructura = inicio + Math.round(limite * 0.9);
 
   const token = tokenDeMeta();
   const terminar = async (error: string | null) => {
@@ -65,8 +73,16 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   if (!token) return terminar("Falta el acceso a Meta (META_ADS_ACCESS_TOKEN) en el servidor: ver «Cuentas».");
 
   // 1. Resultados por anuncio y día.
-  const resultados = await pedirTodo(`/${cuenta.act_id}/insights`, { level: "ad", time_increment: 1, time_range: JSON.stringify({ since: desde, until: hasta }), fields: CAMPOS_RESULTADOS, limit: 500 }, token, 60);
-  if (resultados.error && !resultados.filas.length) return terminar(resultados.error);
+  const resultados = await pedirTodo(`/${cuenta.act_id}/insights`, { level: "ad", time_increment: 1, time_range: JSON.stringify({ since: desde, until: hasta }), fields: CAMPOS_RESULTADOS, limit: 500 }, token, 60, finResultados);
+  if (resultados.error && !resultados.filas.length) {
+    if (opciones.rango && /tardó demasiado|esperar/i.test(resultados.error)) r.partir = true;
+    return terminar(resultados.error);
+  }
+  // Un tramo del historial se guarda entero o no se guarda: si no cupo, no se guarda y se lee en partes más chicas.
+  if (opciones.rango && (resultados.incompleta || resultados.error)) {
+    r.partir = true;
+    return terminar(resultados.error ? `Meta no terminó de entregar los resultados de ${desde} a ${hasta}: ${resultados.error}` : `Los resultados de ${desde} a ${hasta} son demasiados para una sola lectura.`);
+  }
   if (resultados.error) r.avisos.push(`La lectura de resultados quedó a medias: ${resultados.error}`);
   const dias: ResultadoDia[] = [];
   const campanaDeAnuncio = new Map<string, string>();
@@ -85,7 +101,7 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   const idsAnuncios = [...new Set(dias.map((d) => d.anuncioMetaId))];
   const idsCampanas = new Set(campanaDeAnuncio.values());
   const idsConjuntos = new Set(conjuntoDeAnuncio.values());
-  const recientes = await pedirTodo(`/${cuenta.act_id}/campaigns`, { fields: CAMPOS_CAMPANA, filtering: JSON.stringify([{ field: "updated_time", operator: "GREATER_THAN", value: Math.floor(new Date(`${desde}T00:00:00Z`).getTime() / 1000) }]), limit: 200 }, token, 10);
+  const recientes = await pedirTodo(`/${cuenta.act_id}/campaigns`, { fields: CAMPOS_CAMPANA, filtering: JSON.stringify([{ field: "updated_time", operator: "GREATER_THAN", value: Math.floor(new Date(`${desde}T00:00:00Z`).getTime() / 1000) }]), limit: 200 }, token, 10, finEstructura);
   if (recientes.error) r.avisos.push(`No se leyeron las campañas nuevas: ${recientes.error}`);
   const campanasRaw = new Map<string, unknown>();
   for (const c of recientes.filas) {
@@ -94,7 +110,7 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
     if (typeof id === "string") idsCampanas.add(id);
   }
   const faltanCampanas = [...idsCampanas].filter((id) => !campanasRaw.has(id));
-  const [porCampana, porConjunto, porAnuncio] = await Promise.all([pedirPorIds(faltanCampanas, CAMPOS_CAMPANA, token), pedirPorIds([...idsConjuntos], CAMPOS_CONJUNTO, token), pedirPorIds(idsAnuncios, CAMPOS_ANUNCIO, token)]);
+  const [porCampana, porConjunto, porAnuncio] = await Promise.all([pedirPorIds(faltanCampanas, CAMPOS_CAMPANA, token, finEstructura), pedirPorIds([...idsConjuntos], CAMPOS_CONJUNTO, token, finEstructura), pedirPorIds(idsAnuncios, CAMPOS_ANUNCIO, token, finEstructura)]);
   for (const e of [porCampana.error, porConjunto.error, porAnuncio.error]) if (e) r.avisos.push(`No se pudo leer parte de la estructura: ${e}`);
   for (const [id, v] of porCampana.objetos) campanasRaw.set(id, v);
   if (Date.now() - inicio > limite) r.avisos.push("Se acabó el tiempo de esta lectura: el resto sigue en la próxima.");
@@ -116,10 +132,11 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   }
 
   // 3. Campañas: lo corregido a mano no se pisa; la puja de una ABO sale de sus conjuntos.
-  const { data: existentes } = await supabase.from("meta_campanas").select("meta_id, producto, angulo, etapa, manual").eq("cuenta_id", cuenta.id);
-  const previas = new Map((existentes ?? []).map((e) => [e.meta_id as string, e as { producto: string | null; angulo: string | null; etapa: string | null; manual: string[] | null }]));
+  // Supabase entrega como mucho 1000 filas por consulta: una cuenta con historial largo tiene más campañas, conjuntos y anuncios que eso, así que se leen por páginas (20 nov 2026: «24 filas sin anuncio» que nunca se completaban).
+  const existentes = await traerTodasLasFilas<{ meta_id: string; producto: string | null; angulo: string | null; etapa: string | null; manual: string[] | null }>((a, b) => supabase.from("meta_campanas").select("meta_id, producto, angulo, etapa, manual").eq("cuenta_id", cuenta.id).order("id").range(a, b));
+  const previas = new Map(existentes.map((e) => [e.meta_id as string, e as { producto: string | null; angulo: string | null; etapa: string | null; manual: string[] | null }]));
   const pujaDeConjuntos = (idCampana: string) => [...conjuntos.values()].find((c) => c.campanaMetaId === idCampana && c.puja)?.puja ?? null;
-  const filasCampana = [...campanas.values()].map((c) => {
+  const aFilaCampana = (c: CampanaMeta) => {
     const e = etiquetasDeNombre(c.nombre);
     const p = previas.get(c.metaId);
     const manual = p?.manual ?? [];
@@ -141,49 +158,132 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
       etapa: manual.includes("etapa") ? (p?.etapa ?? null) : e.etapa,
       actualizado_en: new Date().toISOString(),
     };
-  });
+  };
+  const filasCampana = [...campanas.values()].map(aFilaCampana);
   let falla = await guardarPorTrozos(filasCampana, (t) => supabase.from("meta_campanas").upsert(t, { onConflict: "cuenta_id,meta_id" }));
   if (falla) return terminar(`No se pudieron guardar las campañas: ${falla}`);
-  r.campanas = filasCampana.length;
-  const { data: idsC } = await supabase.from("meta_campanas").select("id, meta_id").eq("cuenta_id", cuenta.id);
-  const idDeCampana = new Map((idsC ?? []).map((c) => [c.meta_id as string, c.id as string]));
+  // Las campañas que Meta no dejó leer (borradas o sin permiso) se guardan con lo que dice el reporte de resultados, para que ningún resultado quede sin dónde colgarse. Solo si no existen: nunca pisan una campaña ya leída bien.
+  const provisionalesC: CampanaMeta[] = [];
+  for (const d of dias) {
+    if (d.campanaMetaId && d.campanaNombre && !campanas.has(d.campanaMetaId) && !provisionalesC.some((c) => c.metaId === d.campanaMetaId)) {
+      provisionalesC.push({ metaId: d.campanaMetaId, nombre: d.campanaNombre, objetivo: null, estado: "DESCONOCIDO", estructura: null, puja: null, presupuestoDiario: null, creadaEn: null });
+    }
+  }
+  if (provisionalesC.length) {
+    const e = await guardarPorTrozos(provisionalesC.map(aFilaCampana), (t) => supabase.from("meta_campanas").upsert(t, { onConflict: "cuenta_id,meta_id", ignoreDuplicates: true }));
+    if (e) r.avisos.push(`No se pudieron guardar ${provisionalesC.length} campañas que Meta no dejó leer: ${e}`);
+  }
+  r.campanas = filasCampana.length + provisionalesC.length;
+  const idsC = await traerTodasLasFilas<{ id: string; meta_id: string }>((a, b) => supabase.from("meta_campanas").select("id, meta_id").eq("cuenta_id", cuenta.id).order("id").range(a, b));
+  const idDeCampana = new Map(idsC.map((c) => [c.meta_id as string, c.id as string]));
 
   // 4. Conjuntos y anuncios (solo los que tienen campaña guardada).
   const filasConjunto = [...conjuntos.values()].filter((c) => idDeCampana.has(c.campanaMetaId)).map((c) => ({ cuenta_id: cuenta.id, campana_id: idDeCampana.get(c.campanaMetaId)!, meta_id: c.metaId, nombre: c.nombre, estado: c.estado, presupuesto_diario: c.presupuestoDiario, puja: c.puja }));
   falla = await guardarPorTrozos(filasConjunto, (t) => supabase.from("meta_conjuntos").upsert(t, { onConflict: "cuenta_id,meta_id" }));
   if (falla) r.avisos.push(`No se pudieron guardar los conjuntos: ${falla}`);
-  const { data: idsJ } = await supabase.from("meta_conjuntos").select("id, meta_id").eq("cuenta_id", cuenta.id);
-  const idDeConjunto = new Map((idsJ ?? []).map((c) => [c.meta_id as string, c.id as string]));
+  // Los conjuntos y anuncios que Meta no entregó se guardan, solo si no existen, con lo que dice el reporte de resultados.
+  const provisionalesJ = new Map<string, (typeof filasConjunto)[number]>();
+  for (const d of dias) {
+    if (d.conjuntoMetaId && d.conjuntoNombre && d.campanaMetaId && !conjuntos.has(d.conjuntoMetaId) && idDeCampana.has(d.campanaMetaId) && !provisionalesJ.has(d.conjuntoMetaId)) {
+      provisionalesJ.set(d.conjuntoMetaId, { cuenta_id: cuenta.id, campana_id: idDeCampana.get(d.campanaMetaId)!, meta_id: d.conjuntoMetaId, nombre: d.conjuntoNombre, estado: "DESCONOCIDO", presupuesto_diario: null, puja: null });
+    }
+  }
+  if (provisionalesJ.size) {
+    const e = await guardarPorTrozos([...provisionalesJ.values()], (t) => supabase.from("meta_conjuntos").upsert(t, { onConflict: "cuenta_id,meta_id", ignoreDuplicates: true }));
+    if (e) r.avisos.push(`No se pudieron guardar ${provisionalesJ.size} conjuntos que Meta no dejó leer: ${e}`);
+  }
+  const idsJ = await traerTodasLasFilas<{ id: string; meta_id: string }>((a, b) => supabase.from("meta_conjuntos").select("id, meta_id").eq("cuenta_id", cuenta.id).order("id").range(a, b));
+  const idDeConjunto = new Map(idsJ.map((c) => [c.meta_id as string, c.id as string]));
 
   const filasAnuncio = [...anuncios.values()]
     .filter((a) => idDeCampana.has(a.campanaMetaId))
     .map((a) => ({ cuenta_id: cuenta.id, campana_id: idDeCampana.get(a.campanaMetaId)!, conjunto_id: a.conjuntoMetaId ? (idDeConjunto.get(a.conjuntoMetaId) ?? null) : null, meta_id: a.metaId, nombre: a.nombre, estado: a.estado, video_id: a.videoId, miniatura: a.miniatura, copy: a.copy, titulo: a.titulo, landing: a.landing }));
   falla = await guardarPorTrozos(filasAnuncio, (t) => supabase.from("meta_anuncios").upsert(t, { onConflict: "cuenta_id,meta_id" }));
   if (falla) return terminar(`No se pudieron guardar los anuncios: ${falla}`);
-  r.anuncios = filasAnuncio.length;
-  const { data: idsA } = await supabase.from("meta_anuncios").select("id, meta_id, campana_id").eq("cuenta_id", cuenta.id);
-  const anuncioPorMeta = new Map((idsA ?? []).map((a) => [a.meta_id as string, { id: a.id as string, campana: a.campana_id as string }]));
+  const provisionalesA = new Map<string, (typeof filasAnuncio)[number]>();
+  for (const d of dias) {
+    if (d.anuncioNombre && d.campanaMetaId && !anuncios.has(d.anuncioMetaId) && idDeCampana.has(d.campanaMetaId) && !provisionalesA.has(d.anuncioMetaId)) {
+      provisionalesA.set(d.anuncioMetaId, { cuenta_id: cuenta.id, campana_id: idDeCampana.get(d.campanaMetaId)!, conjunto_id: d.conjuntoMetaId ? (idDeConjunto.get(d.conjuntoMetaId) ?? null) : null, meta_id: d.anuncioMetaId, nombre: d.anuncioNombre, estado: "DESCONOCIDO", video_id: null, miniatura: null, copy: null, titulo: null, landing: null });
+    }
+  }
+  if (provisionalesA.size) {
+    const e = await guardarPorTrozos([...provisionalesA.values()], (t) => supabase.from("meta_anuncios").upsert(t, { onConflict: "cuenta_id,meta_id", ignoreDuplicates: true }));
+    if (e) r.avisos.push(`No se pudieron guardar ${provisionalesA.size} anuncios que Meta no dejó leer: ${e}`);
+  }
+  r.anuncios = filasAnuncio.length + provisionalesA.size;
+  const idsA = await traerTodasLasFilas<{ id: string; meta_id: string; campana_id: string }>((a, b) => supabase.from("meta_anuncios").select("id, meta_id, campana_id").eq("cuenta_id", cuenta.id).order("id").range(a, b));
+  const anuncioPorMeta = new Map(idsA.map((a) => [a.meta_id as string, { id: a.id as string, campana: a.campana_id as string }]));
 
   // 5. Resultados por día.
   const filasDia = dias
     .map((d) => {
       const a = anuncioPorMeta.get(d.anuncioMetaId);
-      return a ? { anuncio_id: a.id, cuenta_id: cuenta.id, campana_id: a.campana, fecha: d.fecha, gasto: d.gasto, impresiones: d.impresiones, clics: d.clics, video_3s: d.video3s, video_15s: d.video15s, video_25: d.video25, video_50: d.video50, video_75: d.video75, video_95: d.video95, vio_landing: d.vioLanding, carrito: d.carrito, pago: d.pago, compras: d.compras, valor: d.valor } : null;
+      return a ? { anuncio_id: a.id, cuenta_id: cuenta.id, campana_id: a.campana, fecha: d.fecha, gasto: d.gasto, impresiones: d.impresiones, clics: d.clics, video_3s: d.video3s, video_15s: d.video15s, video_25: d.video25, video_50: d.video50, video_75: d.video75, video_95: d.video95, video_reproducciones: d.reproducciones, video_segundos: Math.round(d.segundosVistos * 100) / 100, vio_landing: d.vioLanding, carrito: d.carrito, pago: d.pago, compras: d.compras, valor: d.valor } : null;
     })
     .filter((f): f is NonNullable<typeof f> => f !== null);
   falla = await guardarPorTrozos(filasDia, (t) => supabase.from("meta_resultados_dia").upsert(t, { onConflict: "anuncio_id,fecha" }));
+  // Sin la migración 0356 no existen las columnas del tiempo de reproducción: se guarda lo demás igual.
+  let filasGuardar: Record<string, unknown>[] = filasDia;
+  if (falla && /video_reproducciones|video_segundos|schema cache/i.test(falla)) {
+    filasGuardar = filasDia.map(({ video_reproducciones: _a, video_segundos: _b, ...resto }) => (void [_a, _b], resto));
+    falla = await guardarPorTrozos(filasGuardar, (t) => supabase.from("meta_resultados_dia").upsert(t, { onConflict: "anuncio_id,fecha" }));
+    if (!falla) r.avisos.push("Falta correr la migración 0356 para guardar el tiempo promedio de reproducción y la frecuencia.");
+  }
   // Sin la migración 0326 no existen las columnas de retención: se guarda lo demás igual.
   if (falla && /video_25|video_50|video_75|video_95|schema cache/i.test(falla)) {
-    const sinRetencion = filasDia.map(({ video_25: _a, video_50: _b, video_75: _c, video_95: _d, ...resto }) => (void [_a, _b, _c, _d], resto));
+    const sinRetencion = filasGuardar.map(({ video_25: _a, video_50: _b, video_75: _c, video_95: _d, ...resto }) => (void [_a, _b, _c, _d], resto));
     falla = await guardarPorTrozos(sinRetencion, (t) => supabase.from("meta_resultados_dia").upsert(t, { onConflict: "anuncio_id,fecha" }));
     if (!falla) r.avisos.push("Falta correr la migración 0326 para guardar la retención del video (25, 50, 75 y 95 %).");
   }
   if (falla) return terminar(`No se pudieron guardar los resultados: ${falla}`);
   r.filas = filasDia.length;
-  if (filasDia.length < dias.length) r.avisos.push(`${dias.length - filasDia.length} filas de resultados quedaron sin anuncio (se completan en la próxima lectura).`);
+  if (filasDia.length < dias.length) {
+    const sinAnuncio = [...new Set(dias.filter((d) => !anuncioPorMeta.has(d.anuncioMetaId)).map((d) => d.anuncioMetaId))];
+    // Por qué no se pudo guardar cada anuncio: Meta no lo entregó, no trajo su campaña o su campaña no se guardó.
+    const sinLeer = sinAnuncio.filter((id) => !porAnuncio.objetos.has(id)).length;
+    const sinCampana = sinAnuncio.filter((id) => { const a = anuncios.get(id); return !!a && !idDeCampana.has(a.campanaMetaId); }).length;
+    const motivo = [sinLeer ? `Meta no entregó ${sinLeer} ${sinLeer === 1 ? "anuncio" : "anuncios"} (borrados o sin permiso)` : "", sinCampana ? `${sinCampana} ${sinCampana === 1 ? "anuncio" : "anuncios"} de campañas que no se pudieron guardar` : ""].filter(Boolean).join("; ");
+    r.avisos.push(`${dias.length - filasDia.length} filas de resultados de ${sinAnuncio.length} ${sinAnuncio.length === 1 ? "anuncio" : "anuncios"} no se guardaron${motivo ? ` (${motivo})` : ""}. Ids: ${sinAnuncio.slice(0, 5).join(", ")}${sinAnuncio.length > 5 ? "…" : ""}.`);
+  }
+
+  // 5b. Frecuencia: personas distintas alcanzadas y veces que vieron en promedio el anuncio o la campaña en los últimos 7 días. No se puede sumar día por día, así que se pide aparte y se guarda la última lectura.
+  // Solo en la lectura de siempre (no al traer historial) y si todavía queda tiempo.
+  if (!opciones.rango && Date.now() < finEstructura) {
+    const desde7 = restarDias(hasta, 6);
+    const hoyIso = new Date().toISOString();
+    for (const [nivel, tipo, campoId] of [["ad", "anuncio", "ad_id"], ["campaign", "campana", "campaign_id"]] as const) {
+      const f = await pedirTodo(`/${cuenta.act_id}/insights`, { level: nivel, time_range: JSON.stringify({ since: desde7, until: hasta }), fields: `${campoId},reach,frequency`, limit: 500 }, token, 30, finEstructura);
+      const filas = f.filas
+        .map((x) => {
+          const o = x as Record<string, unknown>;
+          const id = typeof o[campoId] === "string" ? (o[campoId] as string) : null;
+          const frecuencia = Number(o.frequency);
+          return id && Number.isFinite(frecuencia) ? { cuenta_id: cuenta.id, tipo, meta_id: id, alcance: Math.round(Number(o.reach) || 0), frecuencia: Math.round(frecuencia * 100) / 100, desde: desde7, hasta, leida_en: hoyIso } : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+      if (f.error && !filas.length) {
+        r.avisos.push(`No se pudo leer la frecuencia: ${f.error}`);
+        break;
+      }
+      const e = await guardarPorTrozos(filas, (t) => supabase.from("meta_frecuencia").upsert(t, { onConflict: "cuenta_id,tipo,meta_id" }));
+      if (e) {
+        if (!/meta_frecuencia|schema cache|does not exist/i.test(e)) r.avisos.push(`No se pudo guardar la frecuencia: ${e}`);
+        break;
+      }
+    }
+  }
 
   // 6. Registro de actividad: quién creó o cambió qué. Si Meta no lo deja con este acceso, se avisa y todo lo demás sigue.
-  const actividad = await pedirTodo(`/${cuenta.act_id}/activities`, { fields: "event_type,event_time,actor_id,actor_name,object_id,object_name,object_type,extra_data", since: `${desde}`, until: `${hasta}`, limit: 200 }, token, 10);
+  // Si Meta falla con todo el rango (suele pasar con muchos días y muchos cambios), se vuelve a pedir partido en mitades hasta 3 veces (8 pedazos); solo es error lo que ningún pedazo pudo traer.
+  const leerActividad = async (t: { desde: string; hasta: string }, nivel = 0): Promise<{ filas: unknown[]; error: string | null; incompleta: boolean }> => {
+    const r = await pedirTodo(`/${cuenta.act_id}/activities`, { fields: "event_type,event_time,actor_id,actor_name,object_id,object_name,object_type,extra_data", since: t.desde, until: t.hasta, limit: 200 }, token, 10, inicio + limite);
+    const mitades = r.error && nivel < 3 && Date.now() < finEstructura ? partirTramo(t) : null;
+    if (!mitades) return r;
+    const partes = [await leerActividad(mitades[0], nivel + 1), await leerActividad(mitades[1], nivel + 1)];
+    const falla = partes.find((x) => x.error);
+    return { filas: partes.flatMap((x) => x.filas), error: falla ? falla.error : null, incompleta: partes.some((x) => x.incompleta) };
+  };
+  const actividad = Date.now() > finEstructura ? { filas: [] as unknown[], error: "Se acabó el tiempo de esta lectura.", incompleta: false } : await leerActividad({ desde, hasta });
   if (actividad.error) r.avisos.push(`No se pudo leer el registro de actividad (Equipo queda sin datos de quién montó qué): ${actividad.error}`);
   const eventos = actividad.filas.map(actividadDe).filter((a): a is ActividadMeta => a !== null);
   if (eventos.length) {
@@ -196,6 +296,12 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
       const id = idDeCampana.get(a.objetoMetaId!);
       if (id) await supabase.from("meta_campanas").update({ creada_por: a.actorNombre }).eq("id", id).is("creada_por", null);
     }
+  }
+
+  // El registro de lo leído (migración 0346): dice con certeza qué fechas de esta cuenta ya se trajeron de Meta. Solo cuando los resultados llegaron completos; sin la migración se ignora.
+  if (!resultados.incompleta && !resultados.error) {
+    await supabase.from("meta_lecturas_tramos").delete().eq("cuenta_id", cuenta.id).gte("desde", desde).lte("hasta", hasta);
+    await supabase.from("meta_lecturas_tramos").insert({ cuenta_id: cuenta.id, desde, hasta, filas: r.filas });
   }
 
   return terminar(null);

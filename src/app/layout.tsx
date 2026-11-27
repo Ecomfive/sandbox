@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { headers } from "next/headers";
+import { SinRuedaEnNumeros } from "@/components/sin-rueda-en-numeros";
 import "./globals.css";
 
 const inter = Inter({
@@ -32,7 +33,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             del DOM, de ahí `suppressHydrationWarning`. */}
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: SCRIPT_TEMA }} />
       </head>
-      <body className="min-h-full bg-background text-foreground">{children}</body>
+      <body className="min-h-full bg-background text-foreground">
+        <SinRuedaEnNumeros />
+        {children}
+      </body>
     </html>
   );
 }

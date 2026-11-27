@@ -26,6 +26,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "dashboard", etiqueta: "Hoy" },
       { clave: "ventas-dropi", etiqueta: "Ventas Proveeduría" },
       { clave: "tienda-dashboard", etiqueta: "Dashboard de tienda" },
+      { clave: "tienda-tablero", etiqueta: "Tablero de tiendas" },
       { clave: "notificaciones", etiqueta: "Centro de notificaciones" },
     ],
   },
@@ -72,12 +73,16 @@ export const AREAS_ACCESO: AreaAcceso[] = [
     color: "#b45309",
     modulos: [
       { clave: "pedidos-dropi", etiqueta: "Pedidos Dropi" },
+      { clave: "pedidos-dropi-resumen", etiqueta: "Resumen mensual de Dropi" },
       { clave: "alertas", etiqueta: "Alertas de inventario" },
       { clave: "inventario", etiqueta: "Inventario" },
+      { clave: "encargado-inventario", etiqueta: "A cargo del inventario (todas las bodegas, transferir y recibir)" },
       { clave: "salida-manual", etiqueta: "Salida a mano donde va con remisión" },
+      { clave: "anular-remision", etiqueta: "Anular una remisión en camino sin autorización" },
       { clave: "wms-bodegas", etiqueta: "Bodegas" },
       { clave: "wms-ubicaciones", etiqueta: "Ubicaciones" },
       { clave: "compras", etiqueta: "Compras" },
+      { clave: "llegadas", etiqueta: "Llegadas a puerto" },
       { clave: "compras-por-pais", etiqueta: "Gestión por país (Compras)" },
       { clave: "producto", etiqueta: "Producto" },
       { clave: "unir-productos", etiqueta: "Unir productos duplicados" },
@@ -90,16 +95,17 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "publicaciones-dunamixfy", etiqueta: "Gestión de IDs Dunamixfy" },
       { clave: "uso-sistema", etiqueta: "Uso del sistema (IDs Dropi)" },
       { clave: "tienda-pedidos", etiqueta: "Pedidos de tienda" },
+      { clave: "tienda-asesores", etiqueta: "Asesores de tienda (rendimiento)" },
       { clave: "tienda-reporteria", etiqueta: "Reportería de pedidos" },
       { clave: "tienda-confirmacion", etiqueta: "Confirmación de tienda" },
       { clave: "tienda-logistica", etiqueta: "Logística de tienda" },
-      { clave: "despacho-ciudad", etiqueta: "Despacho ciudad" },
+      { clave: "despacho-ciudad", etiqueta: "Envíos Delivery" },
       { clave: "despacho-devoluciones", etiqueta: "Devoluciones" },
       { clave: "despacho-cambios", etiqueta: "Cambios y reembolsos" },
       { clave: "despacho-cambios-cuentas", etiqueta: "Cambios y reembolsos: datos para reembolsar" },
-      { clave: "tienda-cuanto-hay", etiqueta: "Preguntar cuánto hay" },
-      { clave: "despacho-cuanto-hay", etiqueta: "Responder cuánto hay" },
-      { clave: "despacho-pedir-inventario", etiqueta: "Pedir a inventario" },
+      { clave: "tienda-cuanto-hay", etiqueta: "Mercancía existente: preguntar" },
+      { clave: "despacho-cuanto-hay", etiqueta: "Mercancía existente: responder" },
+      { clave: "despacho-pedir-inventario", etiqueta: "Solicitud de inventario" },
       { clave: "inventario-pedidos-despacho", etiqueta: "Comunicación despacho (inventario)" },
       { clave: "tienda-productos", etiqueta: "Productos de Shopify" },
       { clave: "tienda-tiendas", etiqueta: "Tiendas Shopify" },
@@ -131,7 +137,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "cierre-mes", etiqueta: "Cierre de mes" },
       { clave: "libro-movimientos", etiqueta: "Libro de movimientos" },
       { clave: "balance-general", etiqueta: "Balance general" },
-      { clave: "costos-mercancia", etiqueta: "Costos de mercancía" },
+      { clave: "costos-mercancia", etiqueta: "Costos de producto" },
       { clave: "bienes-de-uso", etiqueta: "Bienes de uso" },
       { clave: "ventas-tiendas", etiqueta: "Ventas por tienda" },
       { clave: "clientes-marketing", etiqueta: "Clientes y marketing" },
@@ -158,7 +164,7 @@ export const MODULOS_ACCESO: ModuloAcceso[] = AREAS_ACCESO.flatMap((a) => a.modu
 export const etiquetaDeModulo = (clave: string): string => MODULOS_ACCESO.find((m) => m.clave === clave)?.etiqueta ?? clave;
 
 /** Los módulos con datos sensibles (nómina, bancos, retiros, márgenes) y los que dan poder de administración: llevan su marca en la matriz. */
-export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "usuarios", "configuracion", "rendimiento", "unir-productos", "salida-manual", "nomina", "utilidades", "tesoreria", "conciliacion-bancaria", "libro-movimientos"]);
+export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "usuarios", "configuracion", "rendimiento", "unir-productos", "encargado-inventario", "salida-manual", "anular-remision", "nomina", "utilidades", "tesoreria", "conciliacion-bancaria", "libro-movimientos"]);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Lo que se puede afinar dentro de un módulo
@@ -221,6 +227,7 @@ export const CATALOGO_COMPRAS: CatalogoModulo = {
   pestanas: [
     { clave: "lista", etiqueta: "Compras", href: "/compras/lista" },
     { clave: "tablero-chin", etiqueta: "Tablero de Shen Zhen", href: "/compras/tablero-chin" },
+    { clave: "llegadas", etiqueta: "Llegadas", href: "/compras/llegadas" },
     { clave: "informe", etiqueta: "Informe", href: "/compras/informe" },
     { clave: "dashboard", etiqueta: "Dashboard", href: "/compras/dashboard" },
     { clave: "tiempos", etiqueta: "Tiempos y fallas", href: "/compras/tiempos" },

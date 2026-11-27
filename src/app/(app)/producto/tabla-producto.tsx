@@ -70,6 +70,12 @@ export function TablaProducto({
   const [abierto, setAbierto] = useState<{ id: string; orden: string[] } | null>(() =>
     abrirInicial && productos.some((p) => p.id === abrirInicial) ? { id: abrirInicial, orden: principales.map((p) => p.id) } : null,
   );
+  // Si la página ya está abierta y llega otro `?abrir=` (un resultado de «Buscar por imagen» de esta misma lista), la ficha se abre también: el estado inicial solo se lee al montar (24 nov 2026).
+  const [abrirVisto, setAbrirVisto] = useState(abrirInicial);
+  if (abrirInicial !== abrirVisto) {
+    setAbrirVisto(abrirInicial);
+    if (abrirInicial && productos.some((p) => p.id === abrirInicial)) setAbierto({ id: abrirInicial, orden: principales.map((p) => p.id) });
+  }
   // La ficha se dibuja en `<body>` (portal): con `?abrir=` arranca abierta, así que solo se monta ya en el navegador.
   const enNavegador = useSyncExternalStore(
     () => () => {},

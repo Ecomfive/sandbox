@@ -1,6 +1,7 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
+import { alcanceInventario, esBodegaDeDespacho } from "@/lib/permisos/inventario";
 import { autorizadaParaSalidaManual } from "@/lib/permisos/salida-manual";
 import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
 import { getPaisActual } from "@/lib/pais";
@@ -8,6 +9,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { leerStockPlataformas } from "../datos-plataformas";
 import { etiquetaTalla } from "@/lib/wms/talla";
+import { colorDeVariante } from "@/lib/wms/color-variante";
 import { Levantamiento, type ProductoConteo } from "./levantamiento";
 
 export const metadata = { title: "Levantamiento" };
@@ -21,32 +23,25 @@ const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
  * cada producto y, al guardar, cada uno queda en lo contado (la diferencia se anota como ajuste en el libro). Un producto con
  * variantes no sale: no lleva stock propio y la base rechazaría todo el conteo; se cuenta cada variante.
  */
-/**
- * El color de una variante que además tiene otra opción (talla…): con él se agrupan sus variantes en el Levantamiento (11 nov 2026, pedido de Hernán), y `resto`
- * es lo demás («M», «43»). Una variante solo de color, o sin color, no se agrupa.
- */
-function colorDeVariante(opciones: Record<string, string> | null): { color: string | null; resto: string } {
-  const pares = Object.entries(opciones ?? {}).filter(([, v]) => String(v ?? "").trim() !== "");
-  const color = pares.find(([k]) => /^(colou?r|tono)$/i.test(k.trim()));
-  if (!color || pares.length < 2) return { color: null, resto: "" };
-  return { color: String(color[1]).trim(), resto: etiquetaTalla(pares.filter((x) => x !== color).map(([, v]) => v).join(" / ")) };
-}
-
 export default async function LevantamientoPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("inventario");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const { bodega } = await searchParams;
+  const { bodega, producto } = await searchParams;
 
   const { data: bodegasPais } = await supabase
     .from("wms_bodegas")
-    .select("id, nombre")
+    .select("id, nombre, codigo")
     .eq("pais_id", pais.id)
     .eq("tipo", "propia")
     .eq("activa", true)
     .order("orden")
     .order("nombre");
-  const bodegas = (bodegasPais ?? []).map((b) => ({ id: b.id as string, nombre: b.nombre as string }));
+  // Quien no está a cargo del inventario solo cuenta la bodega de despacho (26 nov 2026); en un país sin ella ve las demás sin poder guardar.
+  const alcance = alcanceInventario(usuario);
+  const suyas = (bodegasPais ?? []).filter((b) => alcance === "despacho" && esBodegaDeDespacho({ codigo: b.codigo as string, tipo: "propia", pais: pais.codigo }));
+  const bodegas = (suyas.length ? suyas : (bodegasPais ?? [])).map((b) => ({ id: b.id as string, nombre: b.nombre as string }));
+  const puedeGuardar = alcance === "total" || suyas.length > 0;
   const pedida = typeof bodega === "string" && ES_ID(bodega) ? bodega : "";
   const elegida = bodegas.some((b) => b.id === pedida) ? pedida : (bodegas[0]?.id ?? "");
 
@@ -136,10 +131,11 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
           bodegaElegida={elegida}
           productos={filas}
           ultimo={ultimoConteo ? { fecha: ultimoConteo.creado_en, referencia: ultimoConteo.referencia, productos: ultimoConteo.productos } : null}
-          puedeEscribir={!usuario.modulosSoloLectura.includes("inventario")}
+          puedeEscribir={puedeGuardar}
           puedeRestar={puedeMoverAMano("salida", pais.codigo, autorizadaParaSalidaManual(usuario))}
           restarPideMotivo={pideMotivo("salida", pais.codigo)}
           codigoPais={pais.codigo}
+          productoInicial={typeof producto === "string" && ES_ID(producto) ? producto : null}
         />
       )}
     </Pagina>

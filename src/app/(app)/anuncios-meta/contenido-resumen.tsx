@@ -1,23 +1,28 @@
 import Link from "next/link";
-import { conSigno, confiable, cpa, ctr, dolares, dolaresEnteros, hookRate, nivelDeCtr, nivelDeHook, resultado } from "@/lib/meta-ads/metricas";
+import { conSigno, confiable, CPA_TOPE_PREDETERMINADO, cpa, ctr, dolares, dolaresEnteros, hookRate, nivelDeCtr, nivelDeHook, resultado } from "@/lib/meta-ads/metricas";
 import { NOMBRE_ETAPA } from "@/lib/meta-ads/nombre";
 import type { CampanaVista } from "@/lib/meta-ads/vistas";
 import type { DatosMeta } from "@/lib/meta-ads/datos";
 import { NOMBRE_VEREDICTO, veredictoDe, type Veredicto } from "./def-campanas";
 import { Anillo, BarraProgreso, ColumnasApiladas, Columnas, Leyenda, partesConColor, TarjetaMeta, Tendencia, Variacion } from "./graficas";
+import { InterpretacionVista } from "./interpretacion-vista";
 import { ListaSugerencias } from "./lista-sugerencias";
 import { Cifra, entero, InsigniaEtapa, porcentaje, Resultado, valorCpa } from "./piezas";
+import { temasPorTactica } from "@/lib/meta-ads/angulo-detalle";
+import { TemasDeTacticas } from "./cuales";
+import { TopesMasBajos } from "./topes-mas-bajos";
 
 const COLOR_VEREDICTO: Record<Veredicto, string> = { deja: "var(--success)", pierde: "var(--destructive)", poca_data: "var(--warning)", sin_gasto: "var(--grafica-5)" };
 
 /** El contenido de la pestaña Resumen (separado de la página para poder armarlo con datos de ejemplo). */
-export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe: boolean }) {
+export function ContenidoResumen({ datos }: { datos: DatosMeta }) {
   const t = datos.totales;
   const ant = datos.anteriores;
   const activas = datos.campanas.filter((c) => c.activa).length;
   const resultadoTotal = datos.campanas.reduce((s, c) => s + resultado(c.r, c.tope), 0);
   const conGasto = datos.campanas.filter((c) => c.r.gasto > 0);
-  const confiables = conGasto.filter((c) => confiable(c.r)).sort((a, b) => resultado(b.r, b.tope) - resultado(a.r, a.tope));
+  // Cómo van y cuáles dejan o pierden: solo las que están en marcha (de una apagada no hay nada que decidir). Las cifras de arriba son de todo el periodo.
+  const confiables = conGasto.filter((c) => c.enMarcha && confiable(c.r)).sort((a, b) => resultado(b.r, b.tope) - resultado(a.r, a.tope));
   const mejores = confiables.filter((c) => resultado(c.r, c.tope) > 0).slice(0, 5);
   const peores = [...confiables].reverse().filter((c) => resultado(c.r, c.tope) < 0).slice(0, 5);
   const sinTope = [...new Set(conGasto.filter((c) => !c.topeDefinido).map((c) => c.producto ?? "sin producto"))];
@@ -31,10 +36,11 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
   ];
   const sinEmbudo = pasos.slice(1).every((p) => p.valor === 0);
   const veredictos: Record<Veredicto, number> = { deja: 0, pierde: 0, poca_data: 0, sin_gasto: 0 };
-  for (const c of datos.campanas.filter((x) => x.r.gasto > 0 || x.activa)) veredictos[veredictoDe(c)]++;
+  for (const c of datos.campanas.filter((x) => x.enMarcha)) veredictos[veredictoDe(c)]++;
   const totalVeredictos = Object.values(veredictos).reduce((s, n) => s + n, 0);
   const etapaDia = [
     { nombre: NOMBRE_ETAPA.testing, color: "var(--azul)" },
+    { nombre: NOMBRE_ETAPA.venta, color: "var(--primario)" },
     { nombre: NOMBRE_ETAPA.escala, color: "var(--success)" },
     { nombre: NOMBRE_ETAPA.retargeting, color: "var(--warning)" },
     { nombre: "Sin etapa en el nombre", color: "var(--grafica-5)" },
@@ -66,24 +72,26 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
       {sinTope.length > 0 && (
         <p className="-mt-3 text-xs text-muted-foreground">
           <span aria-hidden="true" className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-warning" />
-          {sinTope.length === 1 ? "1 producto usa" : `${sinTope.length} productos usan`} el CPA tope de $3 por defecto ({sinTope.slice(0, 4).join(", ")}
-          {sinTope.length > 4 ? "…" : ""}): defínelo en <Link href="/anuncios-meta/cuentas" className="underline underline-offset-2">Cuentas</Link> para que el resultado sea real.
+          {sinTope.length === 1 ? "1 producto usa" : `${sinTope.length} productos usan`} el CPA tope general de {dolares(CPA_TOPE_PREDETERMINADO)}, que baja en los que envían o entregan peor que la tienda ({sinTope.slice(0, 4).join(", ")}
+          {sinTope.length > 4 ? "…" : ""}). Si alguno necesita otro, ponlo en <Link href="/anuncios-meta/cuentas" className="underline underline-offset-2">Cuentas</Link>.
         </p>
       )}
 
+      <ListaSugerencias sugerencias={datos.sugerencias} decididas={datos.decididas} />
+
+      <TopesMasBajos productos={datos.productosVista.filter((p) => p.enMarcha)} />
+
+      <InterpretacionVista guardada={datos.interpretacion} preparando={datos.analisisPendiente} enlace />
+
       <div className="grid min-w-0 gap-6 lg:grid-cols-2">
-        <TarjetaMeta titulo={porSemana ? "Gasto por semana" : "Gasto por día"} derecha={rangoFechas} id="gasto-dia">
-          {t.gasto === 0 ? <p className="m-0 text-sm text-muted-foreground">No hubo gasto en este periodo.</p> : <Columnas datos={datos.serie.map((p) => ({ etiqueta: p.etiqueta, valor: Math.round(p.gasto) }))} formato={(n) => `$${n}`} color="var(--meta-1)" etiquetaGrafica="Gasto por día" alto={140} />}
-        </TarjetaMeta>
-        <TarjetaMeta titulo={porSemana ? "Compras por semana" : "Compras por día"} derecha={`${entero(t.compras)} en total`} id="compras-dia">
-          {t.compras === 0 ? <p className="m-0 text-sm text-muted-foreground">Todavía no hay compras en este periodo.</p> : <Columnas datos={datos.serie.map((p) => ({ etiqueta: p.etiqueta, valor: p.compras }))} color="var(--success)" etiquetaGrafica="Compras por día" alto={140} />}
-        </TarjetaMeta>
+        <ListaCampanas titulo="En marcha: las que más dejan" vacio="Ninguna campaña en marcha con más de $100 gastados en el periodo deja ganancia." campanas={mejores} color="var(--success)" />
+        <ListaCampanas titulo="En marcha: las que más pierden" vacio="Ninguna campaña en marcha con más de $100 gastados en el periodo está perdiendo." campanas={peores} color="var(--destructive)" />
       </div>
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <TarjetaMeta titulo="Cómo van las campañas" derecha={`${totalVeredictos} con gasto o encendidas`} id="veredictos">
+        <TarjetaMeta titulo="Cómo van las campañas en marcha" derecha={`${totalVeredictos} en marcha`} id="veredictos">
           {totalVeredictos === 0 ? (
-            <p className="m-0 text-sm text-muted-foreground">Todavía no hay campañas con gasto en este periodo.</p>
+            <p className="m-0 text-sm text-muted-foreground">No hay campañas en marcha ahora mismo.</p>
           ) : (
             <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
               <Anillo
@@ -136,14 +144,22 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
         </TarjetaMeta>
       </div>
 
-      <ListaSugerencias sugerencias={datos.sugerencias} decididas={datos.decididas} escribe={escribe} />
+
+      <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+        <TarjetaMeta titulo={porSemana ? "Gasto por semana" : "Gasto por día"} derecha={rangoFechas} id="gasto-dia">
+          {t.gasto === 0 ? <p className="m-0 text-sm text-muted-foreground">No hubo gasto en este periodo.</p> : <Columnas datos={datos.serie.map((p) => ({ etiqueta: p.etiqueta, valor: Math.round(p.gasto) }))} formato={(n) => `$${n}`} color="var(--meta-1)" etiquetaGrafica="Gasto por día" alto={140} />}
+        </TarjetaMeta>
+        <TarjetaMeta titulo={porSemana ? "Compras por semana" : "Compras por día"} derecha={`${entero(t.compras)} en total`} id="compras-dia">
+          {t.compras === 0 ? <p className="m-0 text-sm text-muted-foreground">Todavía no hay compras en este periodo.</p> : <Columnas datos={datos.serie.map((p) => ({ etiqueta: p.etiqueta, valor: p.compras }))} color="var(--success)" etiquetaGrafica="Compras por día" alto={140} />}
+        </TarjetaMeta>
+      </div>
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-2">
         <TarjetaMeta titulo="Campañas montadas por día" derecha="Últimos 14 días, todas las cuentas" id="por-dia">
           <ColumnasApiladas
             etiquetaGrafica="Campañas montadas por día"
             series={etapaDia}
-            datos={datos.creadasPorDia.map((d) => ({ etiqueta: d.fecha.slice(8), valores: [d.testing, d.escala, d.retargeting, d.otras] }))}
+            datos={datos.creadasPorDia.map((d) => ({ etiqueta: d.fecha.slice(8), valores: [d.testing, d.venta, d.escala, d.retargeting, d.otras] }))}
           />
           <div className="mt-3">
             <Leyenda partes={etapaDia} />
@@ -180,15 +196,15 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
                   </li>
                 ))}
               </ul>
+              <div className="w-full">
+                <TemasDeTacticas temas={temasPorTactica(datos.videos.filter((v) => v.r.gasto > 0))} />
+              </div>
             </div>
           )}
         </TarjetaMeta>
       </div>
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-2">
-        <ListaCampanas titulo="Las que más dejan" vacio="Ninguna campaña con más de $100 gastados deja ganancia todavía." campanas={mejores} color="var(--success)" />
-        <ListaCampanas titulo="Las que más pierden" vacio="Ninguna campaña con más de $100 gastados está perdiendo." campanas={peores} color="var(--destructive)" />
-      </div>
+
     </>
   );
 }

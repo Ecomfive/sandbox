@@ -27,8 +27,7 @@ export function MapaComponentes({ componentes, nombre, compacto = false, titulo 
                 {/* La línea que une este componente con la de todos. */}
                 <span aria-hidden="true" className={`absolute top-1/2 left-full h-0.5 bg-primario/50 ${compacto ? "w-5" : "w-7"}`} />
                 {c.foto ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.foto} alt="" className={`shrink-0 rounded-md border border-border object-cover ${compacto ? "h-7 w-7" : "h-9 w-9"}`} />
+                  <FotoAmpliable src={c.foto} alt="" className={`shrink-0 rounded-md border border-border object-cover ${compacto ? "h-7 w-7" : "h-9 w-9"}`} />
                 ) : (
                   <span aria-hidden="true" className={`shrink-0 rounded-md border border-dashed border-border ${compacto ? "h-7 w-7" : "h-9 w-9"}`} />
                 )}
@@ -57,4 +56,5 @@ export function MapaComponentes({ componentes, nombre, compacto = false, titulo 
       </div>
     </figure>
   );
-}
+}import { FotoAmpliable } from "@/components/ui/foto-ampliable";
+

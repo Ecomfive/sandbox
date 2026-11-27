@@ -2,8 +2,21 @@
 --
 -- `fin_sincronizar_dropi()` (0938) buscaba «GANANCIA» en `historial_cartera.tipo`, pero la cartera de Dropi trae el tipo
 -- del movimiento (ENTRADA, SALIDA…) y «ENTRADA POR GANANCIA» va en la descripción: es lo que ya usan Pedidos Dropi
--- (0037) y `src/lib/pedidos/resumen.ts`. Ahora mira las dos columnas. Solo cambia la función; al final la corre una vez
--- para rellenar `fin_dropi_mensual` (la tarea «dropi-finanzas» la sigue corriendo cada día). Se puede correr dos veces.
+-- (0037) y `src/lib/pedidos/resumen.ts`. Ahora mira las dos columnas. Solo cambia ese filtro, que pasa a la función
+-- `fin_dropi_es_ganancia` (es también lo que Estado del sistema revisa para saber si la 0991 se corrió: la de
+-- sincronizar existe desde la 0938). Al final la corre una vez para rellenar `fin_dropi_mensual` (la tarea
+-- «dropi-finanzas» la sigue corriendo cada día). Se puede correr dos veces.
+
+create or replace function fin_dropi_es_ganancia(p_tipo text, p_descripcion text)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select (coalesce(p_tipo, '') || ' ' || coalesce(p_descripcion, '')) ilike '%ganancia%';
+$$;
+
+revoke all on function fin_dropi_es_ganancia(text, text) from public, anon, authenticated;
 
 create or replace function fin_sincronizar_dropi()
 returns table (meses integer, paises integer, documentos integer)
@@ -28,7 +41,7 @@ begin
   ), g as (
     select date_trunc('month', fecha)::date as periodo, pais_id, coalesce(sum(monto), 0) as ganancias
     from historial_cartera
-    where (coalesce(tipo, '') || ' ' || coalesce(descripcion, '')) ilike '%ganancia%' and monto > 0 group by 1, 2
+    where fin_dropi_es_ganancia(tipo, descripcion) and monto > 0 group by 1, 2
   ), r as (
     select date_trunc('month', fecha)::date as periodo, pais_id, coalesce(sum(monto), 0) as retiros
     from retiros where estado_dropi = 'aprobado' group by 1, 2

@@ -11,7 +11,7 @@ import { fulfillmentDePais } from "@/lib/publicaciones/fulfillment-pais";
 import { ESTADOS_PUBLICACION, TIPOS, UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import { codigoBodega, idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { unidadesEnBodegaDropi } from "@/lib/publicaciones/traslado-b280";
-import { UNIDADES_TEMPORALES_B280 } from "@/lib/publicaciones/republicar-dropi";
+import { MAX_SUMAR_REPUBLICAR, UNIDADES_TEMPORALES_B280 } from "@/lib/publicaciones/republicar-dropi";
 import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
 import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, encolarReserva, encolarStock, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { faltantesReserva, normalizarDatosReserva, reservasGuardadas } from "@/lib/publicaciones/reservas-dropi";
@@ -233,6 +233,8 @@ async function leerDatosDropi(
     sku: sku || null,
     codigoBarras: texto(f, "dd_codigo_barras", 60) || base.producto?.codigoBarras || null,
     bodegas: Number.isInteger(bodega) && bodega > 0 && Number.isInteger(unidades) ? [{ id: bodega, unidades }] : [],
+    // La casilla «Dejar en 0 después de publicar»: una casilla sin marcar no viaja, así que se mira también su marca de que estaba en el formulario (sin ella, queda en 0).
+    quitarTemporal: texto(f, "dd_quitar_temporal_v", 2) ? texto(f, "dd_quitar_temporal", 4) === "on" : true,
     fotos: fotos.fotos,
   });
 }
@@ -862,7 +864,12 @@ async function esPrivada(p: { pais_id: string; dropi_id?: unknown; tipo_publicac
  * de «Aplicar en Dropi», que crea el producto de nuevo en Dropi (datos, fotos y stock), le saca el stock al viejo y lo archiva; al
  * terminar, el sistema crea la publicación nueva y archiva esta (`guardarResultadosDropi`).
  */
-export async function republicarPublicacion(id: string, precio: number): Promise<{ error?: string; detalle?: string }> {
+export async function republicarPublicacion(
+  id: string,
+  precio: number,
+  /** «Sumar unidades al republicar» (20 nov 2026, pedido del equipo): las que llegaron y en qué bodega de ECOMFIVE; null = ninguna. */
+  sumar: { unidades: number; bodega: number } | null = null,
+): Promise<{ error?: string; detalle?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
   // El precio del producto nuevo se elige al republicar (27 oct 2026: el 11446 salió con el precio viejo porque nadie lo cambió).
   if (typeof precio !== "number" || !Number.isFinite(precio) || precio <= 0 || precio >= 100_000) return { error: "Pon el precio de venta del producto nuevo." };
@@ -878,12 +885,24 @@ export async function republicarPublicacion(id: string, precio: number): Promise
     ? await createServiceClient().from("dropi_productos_proveedor").select("tipo, bodegas").eq("pais_id", antes.pais_id).eq("dropi_producto_id", primerId).maybeSingle()
     : { data: null };
   const enBodegaDropi = unidadesEnBodegaDropi(lectura?.bodegas);
+  // Las unidades que llegaron se suman en una bodega de ECOMFIVE que el producto ya tiene en Dropi (la última lectura), y solo en productos simples que no son de la B280.
+  let suma: { sumar: number; bodega: number; nombreBodega: string } | null = null;
+  if (sumar && Number(sumar.unidades) !== 0) {
+    const unidades = Number(sumar.unidades);
+    if (!Number.isInteger(unidades) || unidades < 1 || unidades > MAX_SUMAR_REPUBLICAR) return { error: `Las unidades que llegaron van de 1 a ${MAX_SUMAR_REPUBLICAR.toLocaleString("es-PA")}, sin decimales.` };
+    if (enBodegaDropi > 0) return { error: "Su stock está en la bodega de Dropi: republícala sin sumar y suma las unidades con el lápiz de stock del ID nuevo." };
+    if (lectura?.tipo === "VARIABLE") return { error: "Tiene variaciones: republícala sin sumar y suma las unidades con el lápiz de stock del ID nuevo." };
+    const bodega = (Array.isArray(lectura?.bodegas) ? (lectura.bodegas as { id?: unknown; nombre?: unknown }[]) : []).find((b) => Number(b.id) === Number(sumar.bodega));
+    if (!bodega || esBodegaDropi(Number(bodega.id))) return { error: "Esa bodega no es de ECOMFIVE o el producto no la tiene en Dropi: actualiza los datos de Dropi y vuelve a intentar." };
+    suma = { sumar: unidades, bodega: Number(bodega.id), nombreBodega: typeof bodega.nombre === "string" ? bodega.nombre : `B${Number(bodega.id)}` };
+  }
   const r = await encolarRepublicar(
     createServiceClient(),
     { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null },
     { id: usuario.id, nombre: usuario.nombre || usuario.email },
     { precio: precioNuevo, precioAntes },
     enBodegaDropi > 0 ? { temporal: UNIDADES_TEMPORALES_B280, unidades: enBodegaDropi, variable: lectura?.tipo === "VARIABLE" } : undefined,
+    suma,
   );
   if ("error" in r) return { error: r.error };
   const codigoRep = await codigoDePais(antes.pais_id);
@@ -893,7 +912,7 @@ export async function republicarPublicacion(id: string, precio: number): Promise
     accion: "dropi_republicar_pendiente",
     entidad: "dropi_publicaciones",
     entidadId: id,
-    detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: pendiente para «Aplicar en Dropi»${cambioPrecio}${enBodegaDropi > 0 ? ` · de la bodega de Dropi (${enBodegaDropi} u.): el ID nuevo nace con ${UNIDADES_TEMPORALES_B280} temporales que se sacan, y Dropi traslada las suyas` : ""}` ,
+    detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: pendiente para «Aplicar en Dropi»${cambioPrecio}${suma ? `, sumando ${suma.sumar.toLocaleString("es-PA")} u. que llegaron en ${suma.nombreBodega}` : ""}${enBodegaDropi > 0 ? ` · de la bodega de Dropi (${enBodegaDropi} u.): el ID nuevo nace con ${UNIDADES_TEMPORALES_B280} temporales que se sacan, y Dropi traslada las suyas` : ""}` ,
   });
   revalidatePath(RUTA);
   return { detalle: r.yaEstaba ? "Ya estaba pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." : "Republicación pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };

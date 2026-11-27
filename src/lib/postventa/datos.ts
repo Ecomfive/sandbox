@@ -20,6 +20,10 @@ export interface FilaCaso {
   tipos: string[];
   responsableId: string | null;
   responsable: string | null;
+  /** Quién causó la solicitud (migración 0365): «Cliente» o «Tienda». */
+  causa: string | null;
+  /** Si ya se subió el comprobante del pago para el cliente (migración 0365). */
+  comprobante: boolean;
   estado: string | null;
   grupo: string;
   fecha: string | null;
@@ -45,6 +49,8 @@ export interface Persona {
 
 const COLUMNAS =
   "item_id, origen, editado_en, nombre, tienda_texto, numero_pedido, orden_id, tipos, responsable_id, responsable_texto, estado, grupo, fecha, seguimiento, valor_envio, reembolso, adjuntos, notificar, fecha_notificacion, creado_monday, retirar, enviar, motivo, costo_envio, observacion, despacho_item_id";
+/** Las de la migración 0365 (Responsable = Cliente o Tienda, y el comprobante): sin ella, el tablero se lee sin estas. */
+const COLUMNAS_0365 = `${COLUMNAS}, causa, comprobante`;
 
 const num = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
 /** El orden en que se elige el tipo principal: «Reembolso y retiro» se pinta como Reembolso. */
@@ -66,6 +72,8 @@ export function aFilaCaso(r: Record<string, unknown>, personas: Map<string, stri
     tipos,
     responsableId,
     responsable: (responsableId ? personas.get(responsableId) : null) ?? (r.responsable_texto as string | null) ?? null,
+    causa: (r.causa as string | null) ?? null,
+    comprobante: !!r.comprobante,
     estado: etiquetaDe(ESTADOS, r.estado as string | null),
     grupo: grupoDe(r.grupo as string | null),
     fecha: (r.fecha as string | null) ?? null,
@@ -98,25 +106,33 @@ export async function cargarPersonas(supabase: SupabaseClient): Promise<Persona[
 export async function cargarCasos(
   supabase: SupabaseClient,
   opciones: { diasRealizados: number | null; archivados?: boolean },
-): Promise<{ filas: FilaCaso[]; personas: Persona[]; faltaMigracion: boolean }> {
+): Promise<{ filas: FilaCaso[]; personas: Persona[]; faltaMigracion: boolean; falta0365: boolean }> {
   let faltaMigracion = false;
+  let falta0365 = false;
   const personas = await cargarPersonas(supabase);
   const mapa = new Map(personas.map((p) => [p.id, p.nombre]));
   const desde = opciones.diasRealizados === null ? null : new Date(Date.now() - opciones.diasRealizados * 86_400_000).toISOString();
   // Con tiendas limitadas (17 nov 2026), solo las solicitudes de sus tiendas.
   const permitidas = await cargarTiendasPermitidas();
-  const crudas = await traerTodasLasFilas<Record<string, unknown>>((d, h) => {
-    const q = soloSusTiendas(supabase.from("mon_postventa").select(COLUMNAS), permitidas);
-    if (opciones.archivados) return q.not("archivado_en", "is", null).order("item_id").range(d, h);
-    const base = q.is("archivado_en", null);
-    // Los realizados de hace poco: por cuándo se abrieron o cuándo se cambiaron por última vez.
-    return (desde ? base.or(`grupo.is.null,grupo.neq.${GRUPO_REALIZADOS},creado_monday.gte.${desde},actualizado_monday.gte.${desde}`) : base).order("item_id").range(d, h);
-  }).catch(() => {
-    faltaMigracion = true;
-    return [] as Record<string, unknown>[];
-  });
+  const leer = (columnas: string) =>
+    traerTodasLasFilas<Record<string, unknown>>((d, h) => {
+      const q = soloSusTiendas(supabase.from("mon_postventa").select(columnas as "*"), permitidas);
+      if (opciones.archivados) return q.not("archivado_en", "is", null).order("item_id").range(d, h);
+      const base = q.is("archivado_en", null);
+      // Los realizados de hace poco: por cuándo se abrieron o cuándo se cambiaron por última vez.
+      return (desde ? base.or(`grupo.is.null,grupo.neq.${GRUPO_REALIZADOS},creado_monday.gte.${desde},actualizado_monday.gte.${desde}`) : base).order("item_id").range(d, h);
+    });
+  const crudas = await leer(COLUMNAS_0365)
+    .catch(() => {
+      falta0365 = true;
+      return leer(COLUMNAS);
+    })
+    .catch(() => {
+      faltaMigracion = true;
+      return [] as Record<string, unknown>[];
+    });
   const filas = crudas.map((r) => aFilaCaso(r, mapa)).sort((a, b) => (b.creado ?? "").localeCompare(a.creado ?? ""));
-  return { filas, personas, faltaMigracion };
+  return { filas, personas, faltaMigracion, falta0365 };
 }
 
 /** Hoy en Panamá, AAAA-MM-DD. */

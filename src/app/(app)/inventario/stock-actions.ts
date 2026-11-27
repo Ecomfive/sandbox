@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { revisarCorreccionStock } from "@/lib/wms/correccion-stock";
 import { createServiceClient } from "@/lib/supabase/server";
+import { alcanceInventario, bloqueoDeBodega, estaACargoDelInventario, revisarLimite, SOLO_A_CARGO } from "@/lib/permisos/inventario";
 import { autorizadaParaSalidaManual } from "@/lib/permisos/salida-manual";
+import { comprasDe, completarCompras, existenciasEnPais, faltantesDeCompras, leerBodega, NO_SE_PUDO_COMPROBAR, ultimasCompras } from "@/lib/wms/existencia-servidor";
 import { pideMotivo, puedeMoverAMano, SOLO_ADMIN_MOVIMIENTO } from "@/lib/wms/recepcion";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
@@ -14,6 +16,7 @@ import { codigoLote } from "@/lib/wms/vencimiento";
 import { ETIQUETA_ACCION_DEFECTUOSO, revisarDefectuoso } from "@/lib/wms/defectuoso";
 import { compararOpciones, etiquetaTalla } from "@/lib/wms/talla";
 import type { VarianteConStock } from "@/lib/wms/stock-con-variantes";
+import { esRetiroDePlataforma } from "@/lib/wms/remision";
 
 const MODULO = "inventario";
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
@@ -248,14 +251,16 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
 
   const supabase = createServiceClient();
   if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, bodega))) return { error: "No tienes acceso al país de esa bodega." };
+  const datosBodega = await leerBodega(supabase, bodega);
+  if (!datosBodega) return { error: "La bodega no existe." };
+  // Quien no está a cargo del inventario solo mueve la bodega de despacho (26 nov 2026).
+  const bloqueo = bloqueoDeBodega(alcanceInventario(usuario), datosBodega);
+  if (bloqueo) return { error: bloqueo };
   // El país de la bodega va al final del detalle de la auditoría («· Panamá»): así su actividad se filtra por país.
-  const { data: bodegaFila } = await supabase.from("wms_bodegas").select("paises(nombre, codigo)").eq("id", bodega).maybeSingle();
-  const paisBodega = bodegaFila?.paises as { nombre: string; codigo: string } | { nombre: string; codigo: string }[] | null | undefined;
-  const paisDeLaBodega = Array.isArray(paisBodega) ? paisBodega[0] : paisBodega;
-  const nombrePais = paisDeLaBodega?.nombre;
+  const nombrePais = datosBodega.nombrePais;
   // Donde toda salida va con remisión, la salida y el ajuste a mano son de un administrador y llevan motivo (6 nov 2026, flujograma de Costa Rica).
-  if (!puedeMoverAMano(tipo, paisDeLaBodega?.codigo, autorizadaParaSalidaManual(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
-  if (pideMotivo(tipo, paisDeLaBodega?.codigo) && !motivo) return { error: "Una salida a mano necesita un motivo." };
+  if (!puedeMoverAMano(tipo, datosBodega.pais, autorizadaParaSalidaManual(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
+  if (pideMotivo(tipo, datosBodega.pais) && !motivo) return { error: "Una salida a mano necesita un motivo." };
   const { data: maestro } = await supabase.from("skus_maestros").select("codigo, tipo, clase, maneja_vencimiento").eq("id", sku).maybeSingle();
   if (!maestro) return { error: "El SKU no existe." };
   if (maestro.tipo === "combo") return { error: "Un producto compuesto no guarda stock: se calcula de sus componentes." };
@@ -264,6 +269,16 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
   if (maestro.maneja_vencimiento && tipo === "entrada" && !loteId && !(loteCodigo && vencimiento)) return { error: "Un producto con vencimiento necesita la fecha de vencimiento." };
   if (maestro.maneja_vencimiento && tipo === "ajuste" && !loteId && !loteCodigo) return { error: "Un ajuste de un producto con vencimiento necesita el lote." };
   if (!maestro.maneja_vencimiento && (loteId || loteCodigo || vencimiento)) return { error: "Este producto no maneja vencimiento." };
+
+  // Lo que sube la existencia a mano pasa por el límite: la mercancía nueva entra por Recepción. Lo que faltó al recibir sus compras se suma sin motivo y completa la compra (27 nov 2026).
+  const sube = tipo !== "salida" && cantidad > 0;
+  const faltantes = sube ? await faltantesDeCompras(supabase, [sku], datosBodega.paisId, datosBodega.pais) : new Map();
+  if (sube) {
+    const [existencias, ultimas] = await Promise.all([existenciasEnPais(supabase, [sku], datosBodega.paisId), ultimasCompras(supabase, [sku], datosBodega.paisId, datosBodega.pais)]);
+    if (!existencias || !faltantes || !ultimas) return { error: NO_SE_PUDO_COMPROBAR };
+    const limite = revisarLimite({ pais: datosBodega.pais, existencia: existencias.get(sku) ?? 0, aumento: cantidad, aCargo: estaACargoDelInventario(usuario), motivo, dondeVaElMotivo: "en «Motivo»", compras: comprasDe(faltantes, ultimas, sku) });
+    if (limite) return { error: limite };
+  }
 
   const { error } = await supabase.rpc("wms_registrar_movimiento", {
     p_sku: sku,
@@ -287,6 +302,7 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
     entidadId: sku,
     detalle: `${tipo} ${cantidad} de ${maestro.codigo}${loteCodigo ? ` lote ${loteCodigo}` : ""}${referencia ? ` (${referencia})` : ""}${nombrePais ? ` · ${nombrePais}` : ""}`,
   });
+  if (sube && faltantes?.has(sku) && (await completarCompras(supabase, faltantes.get(sku), cantidad, "Inventario")) > 0) revalidatePath("/compras", "layout");
   revalidatePath("/inventario");
   return {};
 }
@@ -302,13 +318,13 @@ export async function marcarDefectuoso(d: { skuId: string; bodegaId: string; acc
   if (!ES_ID(String(d?.bodegaId ?? ""))) return { error: "Elige la bodega." };
   const supabase = createServiceClient();
   if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, d.bodegaId))) return { error: "No tienes acceso al país de esa bodega." };
-  const { data: bodega } = await supabase.from("wms_bodegas").select("nombre, tipo, paises(nombre, codigo)").eq("id", d.bodegaId).maybeSingle();
+  const bodega = await leerBodega(supabase, d.bodegaId);
   if (!bodega) return { error: "La bodega no existe." };
   if (bodega.tipo !== "propia") return { error: "Esta bodega es externa: su stock solo lo cambia la sincronización." };
-  const paisBodega = bodega.paises as { nombre: string; codigo: string } | { nombre: string; codigo: string }[] | null;
-  const pais = Array.isArray(paisBodega) ? paisBodega[0] : paisBodega;
+  const bloqueo = bloqueoDeBodega(alcanceInventario(usuario), bodega);
+  if (bloqueo) return { error: bloqueo };
   // Dar de baja saca unidades del inventario: donde toda salida va con remisión, es de quien puede hacer salidas a mano.
-  if (d.accion === "baja" && !puedeMoverAMano("salida", pais?.codigo, autorizadaParaSalidaManual(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
+  if (d.accion === "baja" && !puedeMoverAMano("salida", bodega.pais, autorizadaParaSalidaManual(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
 
   const { data: maestro } = await supabase.from("skus_maestros").select("codigo, tipo, clase, maneja_vencimiento").eq("id", d.skuId).maybeSingle();
   if (!maestro) return { error: "El SKU no existe." };
@@ -330,7 +346,7 @@ export async function marcarDefectuoso(d: { skuId: string; bodegaId: string; acc
     accion: "marcar_defectuoso_inventario",
     entidad: "skus_maestros",
     entidadId: d.skuId,
-    detalle: `${ETIQUETA_ACCION_DEFECTUOSO[r.accion]}: ${r.cantidad} de ${maestro.codigo} en ${bodega.nombre} (${r.motivo})${pais?.nombre ? ` · ${pais.nombre}` : ""}`,
+    detalle: `${ETIQUETA_ACCION_DEFECTUOSO[r.accion]}: ${r.cantidad} de ${maestro.codigo} en ${bodega.nombre} (${r.motivo})${bodega.nombrePais ? ` · ${bodega.nombrePais}` : ""}`,
   });
   revalidatePath("/inventario");
   return {};
@@ -351,6 +367,7 @@ const errorDeBase = (mensaje: string, porDefecto: string) => (mensaje.length < 2
  */
 export async function transferirStock(formData: FormData): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
+  if (alcanceInventario(usuario) !== "total") return { error: SOLO_A_CARGO };
   const sku = texto(formData, "sku_id");
   const desde = texto(formData, "desde_id");
   const hacia = texto(formData, "hacia_id");
@@ -451,25 +468,34 @@ export async function remitirAExterna(formData: FormData): Promise<{ error?: str
 }
 
 /** El tercero (Dropi, Effi…) confirmó una remisión: cuántas unidades dice que llegaron. Si no son las enviadas, el motivo es obligatorio. */
-export async function recibirEnvioDropi(envioId: string, recibida: number, motivo: string): Promise<{ error?: string }> {
+export async function recibirEnvioDropi(envioId: string, recibida: number, motivo: string, vencimiento?: string): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
   if (!ES_ID(envioId)) return { error: "Envío no válido." };
   if (!Number.isInteger(recibida) || recibida < 0 || recibida > 1_000_000) return { error: "Escribe cuántas unidades llegaron." };
+  // Solo la pide un retiro de plataforma de un producto con vencimiento (migración 0364).
+  if (vencimiento && !/^\d{4}-\d{2}-\d{2}$/.test(vencimiento)) return { error: "La fecha de vencimiento no es válida." };
   const nota = motivo.trim().slice(0, 500);
   const supabase = createServiceClient();
-  const { data: envio } = await supabase.from("wms_envios_dropi").select("sku_maestro_id, bodega_origen_id, enviada, skus_maestros(codigo)").eq("id", envioId).maybeSingle();
+  const { data: envio } = await supabase
+    .from("wms_envios_dropi")
+    .select("sku_maestro_id, bodega_origen_id, enviada, skus_maestros(codigo), origen:wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey(tipo), destino:wms_bodegas!wms_envios_dropi_bodega_dropi_id_fkey(tipo, nombre)")
+    .eq("id", envioId)
+    .maybeSingle();
   if (!envio) return { error: "El envío no existe." };
   if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, envio.bodega_origen_id as string))) return { error: "No tienes acceso al país de ese envío." };
-  const { error } = await supabase.rpc("wms_recibir_envio_dropi", { p_envio: envioId, p_recibida: recibida, p_motivo: nota || null, p_usuario: usuario.id });
+  const { error } = await supabase.rpc("wms_recibir_envio_dropi", { p_envio: envioId, p_recibida: recibida, p_motivo: nota || null, p_usuario: usuario.id, ...(vencimiento ? { p_vencimiento: vencimiento } : {}) });
   if (error) return { error: errorDeBase(error.message, "No se pudo guardar la recepción.") };
   const m = envio.skus_maestros as { codigo: string } | { codigo: string }[] | null;
   const codigo = (Array.isArray(m) ? m[0] : m)?.codigo ?? "";
   const pais = await paisDeBodega(supabase, envio.bodega_origen_id as string);
+  const primera = <T,>(r: unknown) => (Array.isArray(r) ? (r[0] as T | undefined) : (r as T | null | undefined)) ?? null;
+  const destino = primera<{ tipo: string; nombre: string }>(envio.destino);
+  const retiro = esRetiroDePlataforma(primera<{ tipo: string }>(envio.origen)?.tipo, destino?.tipo);
   await registrarAuditoria({
     accion: "envio_dropi_recibido",
     entidad: "skus_maestros",
     entidadId: envio.sku_maestro_id as string,
-    detalle: `Recibieron ${recibida} de ${envio.enviada} de ${codigo}${recibida !== envio.enviada && nota ? `: ${nota}` : ""}${pais ? ` · ${pais}` : ""}`,
+    detalle: `Recibieron ${recibida} de ${envio.enviada} de ${codigo}${retiro && recibida > 0 ? ` (retiro de plataforma: entraron a ${destino?.nombre ?? "la bodega"})` : ""}${recibida !== envio.enviada && nota ? `: ${nota}` : ""}${pais ? ` · ${pais}` : ""}`,
   });
   revalidatePath("/inventario");
   revalidatePath("/inventario/remisiones");
@@ -493,12 +519,14 @@ export async function corregirStock(datos: { skuId: unknown; bodegaId: unknown; 
 
   const supabase = createServiceClient();
   if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, bodega))) return { error: "No tienes acceso al país de esa bodega." };
-  const [{ data: bodegaFila }, { data: maestro }] = await Promise.all([
-    supabase.from("wms_bodegas").select("tipo, nombre, paises(nombre)").eq("id", bodega).maybeSingle(),
+  const [bodegaFila, { data: maestro }] = await Promise.all([
+    leerBodega(supabase, bodega),
     supabase.from("skus_maestros").select("codigo, tipo, clase, maneja_vencimiento").eq("id", sku).maybeSingle(),
   ]);
   if (!bodegaFila) return { error: "La bodega no existe." };
   if (bodegaFila.tipo === "externa") return { error: "Esa bodega es de una plataforma: su stock no se corrige aquí." };
+  const bloqueo = bloqueoDeBodega(alcanceInventario(usuario), bodegaFila);
+  if (bloqueo) return { error: bloqueo };
   if (!maestro) return { error: "El SKU no existe." };
   if (maestro.tipo === "combo") return { error: "Un producto compuesto no guarda stock: se calcula de sus componentes." };
   if (maestro.clase === "test") return { error: "Es un producto de prueba: no tiene stock hasta que se pase a Activo." };
@@ -511,6 +539,14 @@ export async function corregirStock(datos: { skuId: unknown; bodegaId: unknown; 
   if (actual !== visto) return { error: `Mientras corregías, el valor cambió a ${actual.toLocaleString("es-PA")}. Cierra y vuelve a abrir para corregir sobre el número de ahora.` };
   const r = revisarCorreccionStock({ actual, correcto: datos.correcto, nota: datos.nota });
   if ("error" in r) return r;
+
+  const faltantes = r.diferencia > 0 ? await faltantesDeCompras(supabase, [sku], bodegaFila.paisId, bodegaFila.pais) : new Map();
+  if (r.diferencia > 0) {
+    const [existencias, ultimas] = await Promise.all([existenciasEnPais(supabase, [sku], bodegaFila.paisId), ultimasCompras(supabase, [sku], bodegaFila.paisId, bodegaFila.pais)]);
+    if (!existencias || !faltantes || !ultimas) return { error: NO_SE_PUDO_COMPROBAR };
+    const limite = revisarLimite({ pais: bodegaFila.pais, existencia: existencias.get(sku) ?? 0, aumento: r.diferencia, aCargo: estaACargoDelInventario(usuario), motivo: r.motivo, compras: comprasDe(faltantes, ultimas, sku) });
+    if (limite) return { error: limite };
+  }
 
   const { error } = await supabase.rpc("wms_registrar_movimiento", {
     p_sku: sku,
@@ -525,8 +561,7 @@ export async function corregirStock(datos: { skuId: unknown; bodegaId: unknown; 
   });
   if (error) return { error: errorDeBase(error.message, "No se pudo guardar la corrección.") };
 
-  const p = bodegaFila.paises as { nombre: string } | { nombre: string }[] | null;
-  const pais = (Array.isArray(p) ? p[0] : p)?.nombre;
+  const pais = bodegaFila.nombrePais;
   await registrarAuditoria({
     accion: "correccion_inventario",
     entidad: "skus_maestros",
@@ -535,6 +570,7 @@ export async function corregirStock(datos: { skuId: unknown; bodegaId: unknown; 
     antes: { Físico: String(actual) },
     despues: { Físico: String(actual + r.diferencia) },
   });
+  if (r.diferencia > 0 && faltantes?.has(sku) && (await completarCompras(supabase, faltantes.get(sku), r.diferencia, "Inventario")) > 0) revalidatePath("/compras", "layout");
   revalidatePath("/inventario");
   return {};
 }

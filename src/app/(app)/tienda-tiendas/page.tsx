@@ -13,6 +13,8 @@ import { appDeTienda } from "@/lib/tienda/shopify-app";
 import { ConectarTienda } from "./conectar-tienda";
 import { ConectarIcomfly } from "./conectar-icomfly";
 import { EscrituraTienda } from "./escritura-tienda";
+import { ahoraMismo, haceDias, resumirNotasBot, type FilaNotaBot } from "@/lib/tienda/notas-bot-resumen";
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { conexionesIcomfly } from "@/lib/tienda/icomfly";
 
 export const metadata = { title: "Tiendas Shopify" };
@@ -56,8 +58,29 @@ export default async function TiendasPage({ searchParams }: { searchParams: Prom
   // La conexión con iComfly (el bot de WhatsApp de las tiendas, 13 nov 2026); null si falta la migración 0284.
   const icomflyDe = admin ? await conexionesIcomfly(supabase, tiendas.map((t) => t.id)) : new Map();
   // Escribir en Shopify (19 nov 2026): qué tiendas lo tienen encendido. Sin la migración 0337, ninguna.
-  const { data: escrituras } = tiendas.length ? await supabase.from("tiendas").select("id, escribe_shopify, quitar_nota_bot").in("id", tiendas.map((t) => t.id)) : { data: [] };
-  const escrituraDe = new Map((escrituras ?? []).map((e) => [e.id as string, { escribe: e.escribe_shopify === true, quitaNotaBot: e.quitar_nota_bot === true }]));
+  const idsTiendas = tiendas.map((t) => t.id);
+  let escrituras: { id: unknown; escribe_shopify?: unknown; quitar_nota_bot?: unknown; ia_pone_etiqueta?: unknown; pone_en_espera?: unknown }[] | null = [];
+  if (idsTiendas.length) {
+    const r = await supabase.from("tiendas").select("id, escribe_shopify, quitar_nota_bot, ia_pone_etiqueta, pone_en_espera").in("id", idsTiendas);
+    // Sin la migración 0369 (`pone_en_espera`) o la 0348 (`ia_pone_etiqueta`): se lee sin ellas.
+    const r2 = r.error ? await supabase.from("tiendas").select("id, escribe_shopify, quitar_nota_bot, ia_pone_etiqueta").in("id", idsTiendas) : null;
+    escrituras = !r.error ? r.data : !r2?.error ? (r2?.data ?? []) : (await supabase.from("tiendas").select("id, escribe_shopify, quitar_nota_bot").in("id", idsTiendas)).data;
+  }
+  // Etiquetas de zona que puso la IA hoy (hora de Panamá) y las que fallaron (migración 0348); sin ella, vacío.
+  const hoyPanama = ahoraMismo().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+  const { data: puestas } = idsTiendas.length ? await supabase.from("confirmacion_ia_analisis").select("tienda_id, etiqueta_puesta_en, etiqueta_error, actualizado_en").in("tienda_id", idsTiendas).gte("actualizado_en", haceDias(2)) : { data: [] };
+  const etiquetasIaDe = new Map<string, { hoy: number; conError: number }>();
+  for (const f of puestas ?? []) {
+    const id = f.tienda_id as string;
+    const r = etiquetasIaDe.get(id) ?? { hoy: 0, conError: 0 };
+    if (f.etiqueta_puesta_en && new Date(f.etiqueta_puesta_en as string).toLocaleDateString("en-CA", { timeZone: "America/Panama" }) === hoyPanama) r.hoy++;
+    if (f.etiqueta_error && new Date(f.actualizado_en as string).toLocaleDateString("en-CA", { timeZone: "America/Panama" }) === hoyPanama) r.conError++;
+    etiquetasIaDe.set(id, r);
+  }
+  // Pedidos del bot de iComfly vistos en cada tienda y qué pasó con su nota (21 nov 2026: para elegir dónde probar «Quitar la nota del bot»). Sin la migración 0303, vacío.
+  const notasBot = await traerTodasLasFilas<FilaNotaBot>((a, b) => supabase.from("tienda_notas_bot").select("tienda_id, dominio, estado, creado_en").gte("creado_en", haceDias(8)).order("creado_en").range(a, b)).catch(() => [] as FilaNotaBot[]);
+  const resumenNotas = resumirNotasBot(notasBot, ahoraMismo(), tiendas.map((t) => ({ id: t.id, dominio: t.dominio })));
+  const escrituraDe = new Map((escrituras ?? []).map((e) => [e.id as string, { escribe: e.escribe_shopify === true, quitaNotaBot: e.quitar_nota_bot === true, iaPoneEtiqueta: e.ia_pone_etiqueta === true, poneEnEspera: e.pone_en_espera === true }]));
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Tiendas Shopify" oculto>
@@ -119,7 +142,7 @@ export default async function TiendasPage({ searchParams }: { searchParams: Prom
                     <div className="flex flex-col items-start gap-1.5">
                       {escrituraDe.get(t.id)?.escribe ? <Pastilla tono="exito">Escribe etiquetas</Pastilla> : <Pastilla>Solo lectura</Pastilla>}
                       {admin && t.estado === "conectada" && appDeTienda(t.nombre) && (
-                        <EscrituraTienda tiendaId={t.id} escribe={escrituraDe.get(t.id)?.escribe ?? false} quitaNotaBot={escrituraDe.get(t.id)?.quitaNotaBot ?? false} />
+                        <EscrituraTienda tiendaId={t.id} escribe={escrituraDe.get(t.id)?.escribe ?? false} quitaNotaBot={escrituraDe.get(t.id)?.quitaNotaBot ?? false} notasBot={resumenNotas.get(t.id) ?? null} iaPoneEtiqueta={escrituraDe.get(t.id)?.iaPoneEtiqueta ?? false} poneEnEspera={escrituraDe.get(t.id)?.poneEnEspera ?? false} etiquetasIa={etiquetasIaDe.get(t.id) ?? null} />
                       )}
                     </div>
                   </td>

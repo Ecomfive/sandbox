@@ -2,21 +2,28 @@
 
 /* eslint-disable @next/next/no-img-element -- miniaturas de los anuncios, directo de Meta */
 import { useEffect, useState, useTransition } from "react";
+import { Badge, type Tone } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { anilloFoco, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { formatearFechaHora } from "@/lib/formato";
+import { horaDeMeta } from "@/lib/meta-ads/hora";
 import { AnunciosIcon, CalendarioIcon, EnlaceIcon, EtiquetaIcon, FlechaAbajoIcon, FlechaArribaIcon, HistorialIcon, MargenIcon, PersonaIcon } from "@/lib/nav-icons";
-import { conversion, cpa, ctr, dolares, hookRate, holdRate, nivelDeCpa, nivelDeCtr, nivelDeHook, resultado } from "@/lib/meta-ads/metricas";
+import { METRICAS_CAMPANA, dolares, holdRate, nivelesDeMetricas, nivelFrecuencia, nivelTiempo, resultado, tiempoPromedio, type ClaveMetrica, type Resultados } from "@/lib/meta-ads/metricas";
 import { nombreEvento } from "@/lib/meta-ads/actividad-equipo";
+import { NOMBRE_DECISION, type Decision } from "@/lib/meta-ads/decision-anuncio";
 import { NOMBRE_ETAPA, type Etapa } from "@/lib/meta-ads/nombre";
 import type { ActividadVista, AnuncioVista, CampanaVista } from "@/lib/meta-ads/vistas";
 import { corregirCampanaMeta, obtenerActividadCampanaMeta, soltarCorreccionMeta } from "./actions";
 import { NOMBRE_VEREDICTO, veredictoDe } from "./def-campanas";
 import { BarraApilada } from "./graficas";
-import { Cifra, entero, InsigniaEstructura, InsigniaEtapa, MetricasEnLinea, nombreEstado, porcentaje, Resultado, valorCpa } from "./piezas";
+import { Cifra, entero, InsigniaEstructura, InsigniaEtapa, MetricasEnLinea, nombreEstado, porcentaje, QueHacer, Resultado, textoFrecuencia, textoMetrica, textoTiempo } from "./piezas";
+import { AvisoDeTope } from "./aviso-tope";
+import { anguloDeLaCampana, textoDeMezcla } from "@/lib/meta-ads/atributos-video";
+
+/** El color de cada decisión: cortar en rojo, observar y rotar en ámbar, consolidar en verde. */
+const TONO_DECISION: Record<Decision, Tone> = { cortar: "destructive", mantener: "neutral", observar: "warning", consolidar: "success", rebalancear: "info", rotar: "warning" };
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
   return (
@@ -26,6 +33,14 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: str
       </button>
     </Tooltip>
   );
+}
+
+/** La línea de apoyo de algunas cifras: el valor de las compras, lo que mantiene el video 15 s y cuántos vieron la landing. */
+function apoyoDeMetrica(clave: ClaveMetrica, r: Resultados): string | undefined {
+  if (clave === "compras") return r.valor > 0 ? `Valor ${dolares(r.valor)}` : undefined;
+  if (clave === "hook") return holdRate(r) !== null ? `Mantienen 15 s: ${porcentaje(holdRate(r), 0)}` : undefined;
+  if (clave === "cvr") return r.vioLanding > 0 ? `${entero(r.vioLanding)} vieron la landing` : undefined;
+  return undefined;
 }
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
@@ -121,13 +136,16 @@ function MezclaDeAngulos({ c, colores }: { c: CampanaVista; colores: Map<string,
   }
   return (
     <div className="flex flex-col gap-3">
-      <BarraApilada partes={c.angulos.map((a) => ({ nombre: a.angulo, valor: a.videos, color: colores.get(a.angulo) ?? "var(--grafica-5)" }))} alto={18} conPorcentaje etiqueta={`Ángulos de la campaña: ${c.angulos.map((a) => `${a.angulo} ${a.pct} %`).join(", ")}`} />
+      <BarraApilada partes={c.angulos.map((a) => ({ nombre: a.angulo, valor: a.videos, color: colores.get(a.angulo) ?? "var(--grafica-5)" }))} alto={18} conPorcentaje etiqueta={`Ángulos de la campaña: ${textoDeMezcla(c.angulos)}`} />
       <ul role="list" className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
         {c.angulos.map((a) => (
           <li key={a.angulo} className="flex items-center justify-between gap-3">
             <span className="inline-flex min-w-0 items-center gap-2">
               <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: colores.get(a.angulo) ?? "var(--grafica-5)" }} />
-              <span className="truncate">{a.angulo}</span>
+              <span className="min-w-0">
+                <span className="block truncate">{a.angulo}</span>
+                {a.detalles && <span className="block text-xs text-muted-foreground">{a.detalles.join(", ")}</span>}
+              </span>
             </span>
             <span className="shrink-0 tabular-nums">
               <span className="font-semibold">{a.pct} %</span>{" "}
@@ -140,7 +158,7 @@ function MezclaDeAngulos({ c, colores }: { c: CampanaVista; colores: Map<string,
       </ul>
       <p className="m-0 text-xs text-muted-foreground">
         {c.videosConAngulo} de {c.videosTotal} {c.videosTotal === 1 ? "video con ángulo" : "videos con ángulo"}
-        {sin > 0 ? `; ${sin} sin analizar no cuentan.` : "."} Se clasifica como «{c.angulo}»{c.anguloOrigen === "manual" ? " (corregido a mano)" : ""}.
+        {sin > 0 ? `; ${sin} sin analizar no cuentan.` : "."} Se clasifica como «{anguloDeLaCampana(c)}»{c.anguloOrigen === "manual" ? " (corregido a mano)" : ""}.
       </p>
     </div>
   );
@@ -172,7 +190,7 @@ function Actividad({ id }: { id: string }) {
             {e.objeto && e.tipo !== "create_campaign_group" ? ` · ${e.objeto}` : ""}
           </span>
           <span className="text-xs text-muted-foreground">
-            {formatearFechaHora(e.fecha)}
+            {horaDeMeta(e.fecha)}
             {e.detalle ? ` · ${e.detalle}` : ""}
           </span>
         </li>
@@ -208,18 +226,23 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
     >
       {c && r && veredicto && (
         <div className="flex flex-col divide-y divide-border px-5 py-5">
+          {c.pendiente && (
+            <div className="pb-5">
+              <QueHacer pendiente={c.pendiente} />
+            </div>
+          )}
           <Seccion icono={MargenIcon} titulo="Cómo le va en el periodo">
             <p className="m-0 text-sm">
               <span className="font-medium">{NOMBRE_VEREDICTO[veredicto]}.</span> <Resultado r={r} tope={c.tope} /> estimado con un CPA tope de {dolares(c.tope)}
-              {c.topeDefinido ? "" : " (el de por defecto: defínelo en Cuentas)"}.
+              {c.topeDefinido || c.topeAjustado ? "" : " (el general; se puede cambiar en Cuentas)"}.
             </p>
+            {c.guiaTope && <AvisoDeTope guia={c.guiaTope} />}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
-              <Cifra titulo="Gasto" valor={dolares(r.gasto)} />
-              <Cifra titulo="Compras" valor={entero(r.compras)} apoyo={r.valor > 0 ? `Valor ${dolares(r.valor)}` : undefined} />
-              <Cifra titulo="CPA" valor={valorCpa(r)} nivel={nivelDeCpa(cpa(r), c.tope)} />
-              <Cifra titulo="CTR del enlace" valor={porcentaje(ctr(r), 2)} nivel={nivelDeCtr(ctr(r))} />
-              <Cifra titulo="Hook (3 s)" valor={porcentaje(hookRate(r), 0)} nivel={nivelDeHook(hookRate(r))} apoyo={holdRate(r) !== null ? `Mantienen 15 s: ${porcentaje(holdRate(r), 0)}` : undefined} />
-              <Cifra titulo="Visitas que compran" valor={porcentaje(conversion(r), 1)} apoyo={r.vioLanding > 0 ? `${entero(r.vioLanding)} vieron la landing` : undefined} />
+              {METRICAS_CAMPANA.map((m) => (
+                <Cifra key={m.clave} titulo={m.titulo} valor={textoMetrica(m.clave, r)} nivel={nivelesDeMetricas(r, c.etapa, c.tope)[m.clave]} apoyo={apoyoDeMetrica(m.clave, r)} />
+              ))}
+              <Cifra titulo="Tiempo prom." valor={textoTiempo(r)} nivel={nivelTiempo(tiempoPromedio(r))} apoyo={tiempoPromedio(r) === null ? "Meta aún no lo da" : "Por reproducción"} />
+              <Cifra titulo="Frecuencia" valor={textoFrecuencia(c.frecuencia)} nivel={nivelFrecuencia(c.frecuencia)} apoyo={c.frecuencia === null ? "Meta aún no la da" : "Últimos 7 días"} />
             </div>
             <p className="m-0 text-xs text-muted-foreground">
               Resultado = {r.compras} compras × {dolares(c.tope)} − {dolares(r.gasto)} = {dolares(resultado(r, c.tope))}
@@ -239,7 +262,7 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
               <Dato etiqueta="Creada">
                 <span className="inline-flex items-center gap-1.5">
                   <CalendarioIcon aria-hidden="true" className="h-3.5 w-3.5 text-muted-foreground" />
-                  {c.creadaEn ? formatearFechaHora(c.creadaEn) : "—"}
+                  {c.creadaEn ? horaDeMeta(c.creadaEn) : "—"}
                 </span>
               </Dato>
               <Dato etiqueta="La montó">
@@ -269,10 +292,11 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
             ) : (
               <dl className="m-0 grid grid-cols-3 gap-3">
                 <Dato etiqueta="Producto">{c.producto ?? "—"}</Dato>
-                <Dato etiqueta="Ángulo">{c.angulo ?? "—"}</Dato>
+                <Dato etiqueta="Ángulo">{anguloDeLaCampana(c) ?? "—"}</Dato>
                 <Dato etiqueta="Etapa">{c.etapa ? NOMBRE_ETAPA[c.etapa] : "—"}</Dato>
               </dl>
             )}
+            {c.etapa && c.etapaMotivo && <p className="m-0 mt-2 text-xs text-muted-foreground">Etapa {NOMBRE_ETAPA[c.etapa]}: {c.etapaMotivo}</p>}
           </Seccion>
 
           <Seccion icono={AnunciosIcon} titulo={`Anuncios (${anuncios.length})`}>
@@ -287,16 +311,24 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
                       {mini ? <img src={mini} alt="" loading="lazy" className="h-16 w-16 shrink-0 rounded-md bg-muted object-cover" /> : <span aria-hidden="true" className="h-16 w-16 shrink-0 rounded-md bg-muted" />}
                       <div className="flex min-w-0 flex-1 flex-col gap-1">
                         <p className="m-0 truncate text-sm font-medium">
+                          {a.numero && <span className="mr-2 rounded bg-muted px-1.5 py-0.5 text-xs font-semibold tabular-nums">{a.numero}</span>}
                           {a.nombre}
                           {!a.activo && <span className="ml-2 text-xs font-normal text-muted-foreground">apagado</span>}
                         </p>
+                        {a.decision && (
+                          <p className="m-0 flex flex-wrap items-center gap-2 text-xs">
+                            <Badge tone={TONO_DECISION[a.decision]}>{NOMBRE_DECISION[a.decision]}</Badge>
+                            <span className="min-w-0 text-muted-foreground">{a.decisionMotivo}</span>
+                          </p>
+                        )}
+                        {a.angulo && <p className="m-0 text-xs text-foreground">Ángulo: {a.angulo}</p>}
                         {a.copy && <p className="m-0 line-clamp-2 text-xs text-muted-foreground">{a.copy}</p>}
                         {a.landing && <p className="m-0 truncate text-xs text-muted-foreground">Landing: {a.landing}</p>}
                         <p className="m-0 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
                           <span>{dolares(a.r.gasto)}</span>
                           <span>{a.r.compras} compras</span>
                         </p>
-                        {a.r.gasto > 0 && <MetricasEnLinea r={a.r} tope={c.tope} />}
+                        {a.r.gasto > 0 && <MetricasEnLinea r={a.r} tope={c.tope} etapa={c.etapa} completa frecuencia={a.frecuencia} />}
                       </div>
                     </li>
                   );

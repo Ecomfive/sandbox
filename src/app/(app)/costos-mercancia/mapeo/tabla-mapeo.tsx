@@ -14,7 +14,7 @@ import type { FilaMapeo } from "@/lib/finanzas/cargar-costos";
 import { aplicarCostosAProductos, mapearProductoDropi } from "../actions";
 import { claseCifra } from "@/components/af4/estilos-af4";
 import { dinero, SIN_DATO } from "@/lib/af4/formato";
-import { usd4 } from "../tabla-costos";
+import { usd4 } from "../formato";
 
 const DEF: DefTabla<FilaMapeo> = {
   clave: "costos-mapeo",

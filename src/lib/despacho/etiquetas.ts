@@ -1,10 +1,17 @@
-// Gestión de tienda › Despacho ciudad y Devoluciones (15 nov 2026, pedido de Hernán: «pasar Monday al sistema, que funcione igual que Monday»). Las
+// Gestión de tienda › Envíos Delivery y Devoluciones (15 nov 2026, pedido de Hernán: «pasar Monday al sistema, que funcione igual que Monday»). Las
 // etiquetas de cada columna con sus colores, tal como estaban en los tableros de Panamá de Monday, y las reglas puras del tablero: el nombre limpio del
 // repartidor, qué fila se muestra cuando un pedido está en el consolidado y en el tablero del repartidor, y las sumas del día. Sin base ni React.
 
 import { normalizar } from "@/lib/finanzas/clasificacion";
 
 export type Columna = "tienda" | "courier" | "estado" | "edo_pago" | "forma_pago" | "turno" | "estado_asesores";
+
+/**
+ * El repartidor de prueba (24 nov 2026, pedido de Hernán: probar el panel del repartidor sin tocar pedidos reales). Las filas del tablero de prueba de
+ * Monday (`mon_tableros_extra.prueba`, migración 0363) se guardan con este repartidor, sin tienda ni pedido enlazado: lo que se marque no cambia ningún
+ * pedido, no sale en Logística ni en las métricas de Monday y no se confunde con una fila real del mismo número.
+ */
+export const REPARTIDOR_PRUEBA = "USUARIO DE PRUEBA";
 
 export interface Etiqueta {
   nombre: string;
@@ -38,6 +45,7 @@ export const ETIQUETAS: Record<Columna, { titulo: string; opciones: Etiqueta[] }
       { nombre: "DEIMIBEL ZONA 5", color: "#037f4c" },
       { nombre: "DEIMIBEL CHORRERA", color: "#784bd1" },
       { nombre: "DEIMIBEL ARRAIJÁN", color: "#7e3b8a" },
+      { nombre: "USUARIO DE PRUEBA", color: "#c4c4c4" },
     ],
   },
   estado: {
@@ -153,6 +161,8 @@ export interface FilaDespacho {
   numero: string | null;
   tienda: string | null;
   dia: string | null;
+  /** El repartidor: las filas de prueba (`REPARTIDOR_PRUEBA`) nunca se juntan con una real del mismo número. */
+  courier?: string | null;
 }
 
 /**
@@ -168,7 +178,7 @@ export function sinDuplicados<T extends FilaDespacho>(filas: T[], tableroConsoli
       sueltas.push(f);
       continue;
     }
-    const clave = `${normalizar(f.tienda ?? "")}|${normalizar(f.numero).replace(/\s|COPY|COPIA/g, "")}|${f.dia ?? ""}`;
+    const clave = `${f.courier === REPARTIDOR_PRUEBA ? "PRUEBA|" : ""}${normalizar(f.tienda ?? "")}|${normalizar(f.numero).replace(/\s|COPY|COPIA/g, "")}|${f.dia ?? ""}`;
     const previa = mejor.get(clave);
     if (!previa || puntos(f) > puntos(previa)) mejor.set(clave, f);
   }
@@ -192,3 +202,19 @@ export function diaIso(texto: string | null | undefined): string | null {
 
 /** El día como se lee en el tablero: «14/11/2026», como en Monday. */
 export const diaTexto = (iso: string | null) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "Sin día");
+
+/** Hasta cuántos días se pueden pedir de una vez en Envíos Delivery (un cierre de quincena o de mes cabe; más carga demasiado). */
+export const MAX_DIAS_RANGO = 62;
+
+/**
+ * El día o los días que se eligieron para mirar Envíos Delivery («Del … al …», 24 nov 2026, pedido de Soporte para los cierres de pago a los
+ * mensajeros), o null si no se eligió nada válido. Sin «hasta», es un solo día; al revés, se ordenan; más de `MAX_DIAS_RANGO` días, se corta.
+ */
+export function rangoElegido(desde: unknown, hasta: unknown): { desde: string; hasta: string } | null {
+  const ok = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
+  if (!ok(desde)) return null;
+  let [a, b] = ok(hasta) ? [desde, hasta] : [desde, desde];
+  if (b < a) [a, b] = [b, a];
+  const tope = new Date(Date.parse(`${a}T00:00:00Z`) + (MAX_DIAS_RANGO - 1) * 86_400_000).toISOString().slice(0, 10);
+  return { desde: a, hasta: b > tope ? tope : b };
+}

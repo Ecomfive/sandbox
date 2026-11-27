@@ -1,0 +1,93 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { tasasDe } from "./costos-operacion";
+import { decisionDeAnuncio, umbralesDeAnuncio } from "./decision-anuncio";
+import { analizarHistorico, type CampanaHist } from "./historico";
+import { estadoFrenteAGuia, guiaDeTope, textoDeGuia, topeAjustado, topeDeProducto, zonaDe, zonaDeCpa } from "./limite";
+import { calculadorDeTopes } from "./limite-datos";
+import { nivelesDeMetricas, sinResultados, type Resultados } from "./metricas";
+import { claveDeDecision, limiteDeApagado, sugerir } from "./sugerencias";
+import type { CampanaVista } from "./vistas";
+
+const r = (o: Partial<Resultados>): Resultados => ({ ...sinResultados(), ...o });
+// Los números de Oferfy Panamá el 25 nov 2026: se envía el 64 % y de eso se entrega el 85 %.
+const PEDIDOS_TIENDA = { entregadas: 14822, devueltas: 2692, canceladas: 10056, enCamino: 875, sinEnviar: 346 };
+const TIENDA = tasasDe(PEDIDOS_TIENDA);
+const peor = { entregadas: 60, devueltas: 20, canceladas: 60, enCamino: 0, sinEnviar: 0 };
+
+test("el tope baja solo en el que envía o entrega peor, entre $10 y $9 según cuánto menos le llega", () => {
+  const tienda = { envio: 0.8, entrega: 0.8 };
+  // A este le llega esa parte menos que a la tienda.
+  const con = (caida: number) => topeAjustado(10, { envio: 0.8, entrega: 0.8 * (1 - caida) }, tienda);
+  assert.deepEqual([con(0.03), con(0.07), con(0.1), con(0.125), con(0.2), con(0.25), con(0.6), con(1)], [null, 9.7, 9.6, 9.5, 9.2, 9, 9, 9]);
+  // Cuenta igual si lo que baja es el envío.
+  assert.equal(topeAjustado(10, { envio: 0.7, entrega: 0.8 }, tienda), 9.5);
+  assert.equal(topeAjustado(10, tasasDe(peor), TIENDA), 9.2);
+  // Mejor que la tienda: no sube. Igual: no cambia. Sin pedidos suficientes: no se toca.
+  assert.equal(topeAjustado(10, { envio: 0.9, entrega: 0.95 }, TIENDA), null);
+  assert.equal(topeAjustado(10, TIENDA, TIENDA), null);
+  assert.equal(topeAjustado(10, { envio: null, entrega: null }, TIENDA), null);
+  assert.equal(topeAjustado(10, tasasDe(peor), { envio: null, entrega: 0.8 }), null);
+});
+
+test("un tope escrito a mano se respeta; el ajustado dice por qué", () => {
+  const mano = topeDeProducto(12, peor, TIENDA);
+  assert.deepEqual([mano.tope, mano.definido, mano.ajustado, guiaDeTope(mano)], [12, true, false, null]);
+  const solo = topeDeProducto(undefined, peor, TIENDA);
+  assert.deepEqual([solo.base, solo.definido, solo.ajustado], [10, false, true]);
+  const g = guiaDeTope(solo)!;
+  assert.deepEqual([g.causa, g.motivo], ["Envía y entrega menos", "envía 57 % (la tienda 64 %) y entrega 75 % (la tienda 85 %)"]);
+  assert.deepEqual([g.vigilar, g.apagar, g.vigilarGeneral, g.apagarGeneral], [Math.round(solo.tope * 90) / 100, Math.round(solo.tope * 120) / 100, 9, 12]);
+  assert.equal(g.apagar, limiteDeApagado({ tope: solo.tope, topeAjustado: true }), "lo que se indica es lo que el sistema usa para apagar");
+  assert.match(textoDeGuia(g), /conviene empezar a vigilarlo desde un CPA de \$\d\.\d\d y apagarlo desde \$\d+\.\d\d si en 4 días no baja \(con el tope general sería \$9\.00 y \$12\.00\)\.$/);
+  assert.deepEqual([estadoFrenteAGuia({ gasto: g.apagar * 10, compras: 10 }, g), estadoFrenteAGuia({ gasto: g.vigilar * 10, compras: 10 }, g), estadoFrenteAGuia({ gasto: 10, compras: 10 }, g), estadoFrenteAGuia({ gasto: 3, compras: 0 }, g)], ["apagar", "vigilar", "bien", "sin_compras"]);
+  // Solo entrega menos: lo dice así.
+  assert.equal(guiaDeTope(topeDeProducto(undefined, { entregadas: 50, devueltas: 50, canceladas: 55, enCamino: 0, sinEnviar: 0 }, TIENDA))!.causa, "Entrega más baja");
+  const de = calculadorDeTopes(new Map([["MANO", 8]]), { entrega: [{ clave: "PEOR", ...peor }], pedidosDeLaTienda: PEDIDOS_TIENDA });
+  assert.equal(de("MANO").tope, 8);
+  assert.equal(de("PEOR").tope, solo.tope);
+  assert.equal(de("OTRO").tope, 10);
+  assert.equal(calculadorDeTopes(new Map(), null)("PEOR").tope, 10);
+});
+
+test("las zonas frente al tope, y los montos de apagar y de cada anuncio bajan con un tope ajustado", () => {
+  assert.deepEqual([zonaDeCpa(7, 10), zonaDeCpa(9, 10), zonaDeCpa(10.1, 10)], ["dentro", "cerca", "sobre"]);
+  assert.deepEqual([zonaDe({ gasto: 12, compras: 0 }, 10), zonaDe({ gasto: 15, compras: 0 }, 10)], ["dentro", "sobre"]);
+  assert.equal(limiteDeApagado({ tope: 10 }), 12);
+  assert.equal(limiteDeApagado({ tope: 9, topeAjustado: true }), 10.8);
+  assert.equal(limiteDeApagado({ tope: 15, topeDefinido: true }), 15);
+  assert.equal(umbralesDeAnuncio(0.7).ventanaCorte, 8.4);
+  assert.equal(umbralesDeAnuncio(0.7).ctrBueno, 2, "los porcentajes no cambian");
+  const sinVentas = { acumulado: r({ gasto: 9, compras: 0, impresiones: 1000, clics: 30 }), ultimos2: sinResultados(), ultimoDia: sinResultados(), presupuestoCampana: null, esCbo: false, hayOtroConCpaBajo: false };
+  assert.equal(decisionDeAnuncio(sinVentas), null);
+  assert.equal(decisionDeAnuncio({ ...sinVentas, factor: 0.7 })!.decision, "cortar");
+  const venta = r({ gasto: 80, compras: 10 });
+  assert.equal(nivelesDeMetricas(venta, "venta", 10).cpa, "bueno");
+  assert.equal(nivelesDeMetricas(venta, "venta", 7).cpa, "malo");
+});
+
+test("que el CPA suba de $5 a $7 no pide tocar la campaña: queda en observación, y la semana y el mes van en una sola tarjeta", () => {
+  const v = (a: number[], b: number[]) => ({ semana: { prev: r({ gasto: a[0], compras: a[1] }), rec: r({ gasto: a[2], compras: a[3] }) }, mes: { prev: r({ gasto: b[0], compras: b[1] }), rec: r({ gasto: b[2], compras: b[3] }) } });
+  const campana = (id: string, tope: number, ventanas: ReturnType<typeof v>): CampanaHist => ({ id, nombre: `Campaña ${id}`, producto: "P", clave: "P", familia: "general", activa: true, etapa: "venta", estructura: "CBO", puja: null, angulo: null, tope, total: r({ gasto: 1000, compras: 150 }), v: ventanas });
+  const subio = v([300, 60, 350, 50], [900, 180, 1050, 150]);
+  const dentro = analizarHistorico({ campanas: [campana("a", 10, subio)], videos: [], productos: [], desde: null, hasta: null }).hallazgos.filter((h) => h.id.startsWith("tendencia:Campaña:"));
+  assert.equal(dentro.length, 1, "una sola tarjeta por la semana y el mes");
+  assert.equal(dentro[0].tono, "info");
+  assert.match(dentro[0].titulo, /el CPA subió en la última semana, dentro del tope \(\$5\.00 → \$7\.00, tope \$10\.00\)/);
+  assert.match(dentro[0].detalle, /también empeoró \(\$5\.00 → \$7\.00\)/);
+  assert.match(dentro[0].accion!, /^No la toques/);
+  // El mismo cambio con un tope ajustado de $6 sí pide atención.
+  const sobre = analizarHistorico({ campanas: [campana("a", 6, subio)], videos: [], productos: [], desde: null, hasta: null }).hallazgos.find((h) => h.id === "tendencia:Campaña:Campaña a:semana")!;
+  assert.deepEqual([sobre.tono, sobre.zona, sobre.impacto], ["alerta", "sobre", 50]);
+  assert.match(sobre.titulo, /empeoró en la última semana y pasa del tope/);
+  // Lo decidido «en observación» no tapa el aviso cuando después pasa del tope.
+  assert.notEqual(claveDeDecision({ id: sobre.id, tono: "info" }), claveDeDecision(sobre));
+});
+
+test("cerca del tope solo se piden videos si ya no baja sola", () => {
+  const c = { id: "n", cuentaId: "x", nombre: "N", activa: true, estado: "ACTIVE", etapa: "venta", tope: 10, topeDefinido: false, r: r({ gasto: 190, compras: 20 }), creadaEn: null, producto: "P" } as unknown as CampanaVista;
+  const anuncio = { id: "n-V2", campanaId: "n", nombre: "V2", numero: "V2", activo: true, angulo: null, r: r({ gasto: 70, compras: 10 }), r7: r({ gasto: 70, compras: 10 }), ultimos2: sinResultados(), ultimoDia: sinResultados() };
+  const con = (compras: number) => sugerir({ hoy: "2026-11-25", videos: [], campanas: [c], anuncios: [anuncio], serie: new Map([["n", [{ fecha: "2026-11-24", r: r({ gasto: 60, compras }) }]]]) }).map((x) => x.tipo);
+  assert.deepEqual(con(8), ["en_recuperacion"]);
+  assert.deepEqual(con(6), ["sumar_videos"]);
+});

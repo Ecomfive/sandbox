@@ -42,7 +42,8 @@ export interface CampanaMeta {
   nombre: string;
   objetivo: string | null;
   estado: string;
-  estructura: Estructura;
+  /** Null en una campaña que Meta no dejó leer y que solo se conoce por sus resultados. */
+  estructura: Estructura | null;
   puja: Puja | null;
   presupuestoDiario: number | null;
   creadaEn: string | null;
@@ -140,6 +141,12 @@ const PAGO = ["omni_initiated_checkout", "initiate_checkout", "offsite_conversio
 export interface ResultadoDia extends Resultados {
   anuncioMetaId: string;
   fecha: string;
+  /** Lo que el propio reporte de resultados dice de su anuncio, conjunto y campaña: sirve para guardar el anuncio aunque Meta no deje leer su detalle. */
+  anuncioNombre: string | null;
+  conjuntoMetaId: string | null;
+  conjuntoNombre: string | null;
+  campanaMetaId: string | null;
+  campanaNombre: string | null;
 }
 
 /** Una fila de «insights» a nivel anuncio y día. */
@@ -151,6 +158,11 @@ export function resultadoDiaDe(f: unknown): ResultadoDia | null {
   return {
     anuncioMetaId,
     fecha,
+    anuncioNombre: texto(o.ad_name, 300),
+    conjuntoMetaId: texto(o.adset_id, 40),
+    conjuntoNombre: texto(o.adset_name, 300),
+    campanaMetaId: texto(o.campaign_id, 40),
+    campanaNombre: texto(o.campaign_name, 300),
     gasto: numeroMeta(o.spend),
     impresiones: Math.round(numeroMeta(o.impressions)),
     clics: Math.round(numeroMeta(o.inline_link_clicks)),
@@ -160,6 +172,9 @@ export function resultadoDiaDe(f: unknown): ResultadoDia | null {
     video50: Math.round(accion(o.video_p50_watched_actions, ["video_view"])),
     video75: Math.round(accion(o.video_p75_watched_actions, ["video_view"])),
     video95: Math.round(accion(o.video_p95_watched_actions, ["video_view"])),
+    // Meta da el tiempo promedio de cada reproducción: se guarda el total (promedio × reproducciones) para poder sumar días y volver a sacar el promedio.
+    reproducciones: Math.round(accion(o.video_play_actions, ["video_view"])),
+    segundosVistos: accion(o.video_avg_time_watched_actions, ["video_view"]) * Math.round(accion(o.video_play_actions, ["video_view"])),
     vioLanding: Math.round(accion(o.actions, LANDING)),
     carrito: Math.round(accion(o.actions, CARRITO)),
     pago: Math.round(accion(o.actions, PAGO)),

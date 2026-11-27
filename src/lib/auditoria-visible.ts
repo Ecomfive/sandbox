@@ -12,6 +12,7 @@ import type { Afinado } from "@/lib/permisos/afinado";
  * historial completo en /usuarios/auditoria.
  */
 export const MODULO_DE_ENTIDAD: Record<string, string> = {
+  despacho_pedidos_inventario: "despacho-pedir-inventario",
   fin_movimientos: "libro-movimientos",
   fin_reparto_plantillas: "libro-movimientos",
   fin_reglas: "libro-movimientos",
@@ -89,6 +90,7 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   puestos: "puestos",
   compras_alertas_sin_stock: "compras",
   skus_maestros: "producto",
+  tienda_cuanto_hay: "despacho-cuanto-hay",
   competencia_productos: "analisis-competencia",
   drop_competencia_productos: "analisis-competencia",
   effi_competencia_productos: "analisis-competencia",
@@ -133,6 +135,7 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   meta_campanas: "anuncios-meta",
   meta_topes: "anuncios-meta",
   meta_decisiones: "anuncios-meta",
+  meta_ajustes: "anuncios-meta",
 };
 
 const COMERCIALES = new Set<string>(ACCIONES_COMERCIALES);

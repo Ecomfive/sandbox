@@ -83,6 +83,8 @@ export function FilaStockLista({
   conPlataformas = false,
   plataforma = null,
   hijo = false,
+  grupoColor = false,
+  profundo = false,
   abierto,
   bodegaId = null,
 }: {
@@ -94,6 +96,10 @@ export function FilaStockLista({
   conPlataformas?: boolean;
   plataforma?: Plataforma | null;
   hijo?: boolean;
+  /** La fila de un color dentro de un producto con variantes (suma sus tallas y las despliega, como en el Levantamiento). */
+  grupoColor?: boolean;
+  /** La variante que está dentro de un color: va más hacia adentro y se llama por lo que la distingue del color («M»). */
+  profundo?: boolean;
   /** Solo en un producto con variantes: si está desplegado. */
   abierto?: boolean;
   /** La bodega que se está viendo (el selector o el filtro): «sin repartir» se dice según el stock general de esa bodega. */
@@ -103,14 +109,16 @@ export function FilaStockLista({
   const compuesto = f.tipo === "combo";
   const armables = compuesto && f.fisico !== 0 ? "armables" : undefined;
   const fuera = fueraDeVenta(f);
-  const clasesFila = `group grid w-full grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 py-3 pr-4 text-left transition-colors hover:bg-muted/50 ${hijo ? "bg-muted/30 pl-10" : "pl-4"} ${conPlataformas ? COLUMNAS_PLATAFORMAS : COLUMNAS}`;
+  const clasesFila = `group grid w-full grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 py-3 pr-4 text-left transition-colors hover:bg-muted/50 ${profundo ? "bg-muted/30 pl-16" : hijo ? "bg-muted/30 pl-10" : "pl-4"} ${conPlataformas ? COLUMNAS_PLATAFORMAS : COLUMNAS}`;
   const identidad = (
     <>
       <span className="shrink-0">
         <MiniaturaFoto url={f.foto} nombre={f.nombre} />
       </span>
       <span className="flex min-w-0 flex-col gap-0.5">
-        {conVariantes ? (
+        {grupoColor ? (
+          <span className="truncate text-sm font-medium">{f.nombre}</span>
+        ) : conVariantes ? (
           // El nombre del principal es un botón aparte: abre su ficha sin desplegar las variantes (el clic en el resto de la fila las despliega).
           <button
             type="button"
@@ -124,12 +132,20 @@ export function FilaStockLista({
             {f.nombre}
           </button>
         ) : (
-          <span className="truncate text-sm font-medium">{hijo && f.opciones ? f.opciones : f.nombre}</span>
+          <span className="truncate text-sm font-medium">{profundo && f.resto ? f.resto : hijo && f.opciones ? f.opciones : f.nombre}</span>
         )}
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">
-          <span className="font-mono font-semibold text-foreground">{f.codigo}</span>
-          <CodigosProducto numero={f.numero} barras={f.barras} />
-          {conVariantes && <Badge tone="neutral">{f.variantes.length} variantes</Badge>}
+          {grupoColor ? (
+            <span>
+              {f.variantes.length} variante{f.variantes.length === 1 ? "" : "s"} ({f.variantes.map((h) => h.resto || h.opciones).join(", ")})
+            </span>
+          ) : (
+            <>
+              <span className="font-mono font-semibold text-foreground">{f.codigo}</span>
+              <CodigosProducto numero={f.numero} barras={f.barras} />
+              {conVariantes && <Badge tone="neutral">{f.variantes.length} variantes</Badge>}
+            </>
+          )}
           {sinRepartirEn(f, bodegaId) && <Badge tone="neutral">{hijo ? "Sin repartir: sale del general" : "Stock sin repartir"}</Badge>}
           {compuesto && <Badge tone="neutral">{ETIQUETA_TIPO_SKU.combo}</Badge>}
           {f.clase === "test" && <Badge tone="azul">{ETIQUETA_CLASE_SKU.test}</Badge>}
@@ -172,7 +188,7 @@ export function FilaStockLista({
             e.stopPropagation();
             alAlternar?.();
           }}
-          aria-label={`${abierto ? "Cerrar" : "Abrir"} las ${f.variantes.length} variantes de ${f.nombre}`}
+          aria-label={grupoColor ? `${abierto ? "Cerrar" : "Abrir"} las variantes ${f.nombre}` : `${abierto ? "Cerrar" : "Abrir"} las ${f.variantes.length} variantes de ${f.nombre}`}
           aria-expanded={abierto}
           className={`relative -m-3 cursor-pointer rounded-md p-3 text-muted-foreground lg:order-last ${anilloFoco}`}
         >

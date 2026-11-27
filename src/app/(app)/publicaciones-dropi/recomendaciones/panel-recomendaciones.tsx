@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- foto de Storage */
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import Link from "next/link";
 import { useState, type ComponentType } from "react";
 import { anilloFoco } from "@/components/ui/field";
@@ -79,7 +79,7 @@ function Producto({ p, compacto = false }: { p: PublicacionResumen | undefined; 
   const tam = compacto ? "h-10 w-10" : "h-14 w-14";
   return (
     <Link href={`/publicaciones-dropi?abrir=${p.id}`} className={`flex min-w-0 items-center gap-3 rounded-lg ${compacto ? "" : "sm:w-44 sm:shrink-0 sm:flex-col sm:items-start"} ${anilloFoco}`}>
-      {p.fotoUrl ? <img src={p.fotoUrl} alt="" className={`${tam} shrink-0 rounded-lg border border-border object-cover`} /> : <span aria-hidden="true" className={`${tam} shrink-0 rounded-lg border border-dashed border-border-control`} />}
+      {p.fotoUrl ? <FotoAmpliable src={p.fotoUrl} alt="" className={`${tam} shrink-0 rounded-lg border border-border object-cover`} /> : <span aria-hidden="true" className={`${tam} shrink-0 rounded-lg border border-dashed border-border-control`} />}
       <span className="flex min-w-0 flex-col">
         <span className="text-xs text-muted-foreground tabular-nums">{numeroPublicacion(p.numero)}</span>
         <span className="text-sm font-medium [overflow-wrap:anywhere] hover:underline">{p.nombre}</span>

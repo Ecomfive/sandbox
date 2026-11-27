@@ -18,6 +18,8 @@ import { estadoFuente, masNueva, type AccionFuente, type Fuente, type GrupoFuent
 /** Los días que se esperan entre lecturas: lo diario se atrasa pasado un día (26 h, como las tareas programadas); los Excel, pasado un mes. */
 const DIARIA = 26;
 const MENSUAL = 35 * 24;
+/** La competencia cambia poco: se lee una vez por semana (24 nov 2026); se atrasa pasados 8 días. */
+const SEMANAL = 8 * 24;
 const VIGENCIA_CORRIENDO_MS = 40 * 60_000;
 
 type FilaTarea = { tarea: string; inicio: string; fin: string | null; ok: boolean | null; error: string | null; disparo: string | null; usuario_id: string | null };
@@ -37,10 +39,11 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
   const verDropi = tiene(u, "publicaciones-dropi") || tiene(u, "retiros");
   const verEffi = tiene(u, "publicaciones-effi") || tiene(u, "analisis-competencia");
   const verTareas = tiene(u, "deliverys") || tiene(u, "cierre-mes") || tiene(u, "panel-financiero") || tiene(u, "ventas-tiendas");
-  const archivos = ORDEN_CARGA.filter((m) => m !== "ventas-tiendas" && tiene(u, m));
+  // Los costos de mercancía ya no se suben en Excel: se cargan en la hoja de Costos de producto (0992).
+  const archivos = ORDEN_CARGA.filter((m) => m !== "ventas-tiendas" && m !== "costos-mercancia" && tiene(u, m));
   const vacio = Promise.resolve({ data: null });
 
-  const [dropi, effi, tareas, matriz, matrizExcel, matrizPedido, siscore, saldo, meta, metaManual, tuwinner, importaciones, conteo, conexiones] = await Promise.all([
+  const [dropi, effi, tareas, matriz, matrizExcel, matrizPedido, siscore, saldo, meta, metaManual, tuwinner, importaciones, conteo, conexiones, competenciaDrop] = await Promise.all([
     verDropi ? cargarPanel(supabase) : null,
     verEffi ? supabase.from("effi_publicaciones").select("ultima_vez").eq("en_effi", true).order("ultima_vez", { ascending: false }).limit(1).maybeSingle() : vacio,
     verTareas
@@ -71,6 +74,8 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
       : Promise.resolve({ data: [] }),
     tiene(u, "inventario") ? auditoria("conteo_inventario") : vacio,
     tiene(u, "ventas-tiendas") ? supabase.from("ven_tiendas_conexion").select("unidad_id, activo, ultima_lectura, ultimo_error") : Promise.resolve({ data: [] }),
+    // La competencia en Drop (24 nov 2026): cada lectura queda en drop_competencia_busquedas (lista, fallida o corriendo).
+    tiene(u, "analisis-competencia") ? supabase.from("drop_competencia_busquedas").select("estado, inicio, fin, detalle").order("inicio", { ascending: false }).limit(5) : Promise.resolve({ data: [] }),
   ]);
 
   // Los nombres de quien corrió a mano una tarea programada.
@@ -101,6 +106,36 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
     };
   };
 
+  // «Drop dropshipper» (la competencia del Catálogo, 24 nov 2026): va en Plataformas, justo después de «Drop proveedor», porque las dos usan la pestaña de Drop
+  // del mismo Chrome con una cuenta distinta (cada lectura espera la suya).
+  let competenciaAgregada = false;
+  const agregarCompetenciaDrop = () => {
+    if (competenciaAgregada || !tiene(u, "analisis-competencia")) return;
+    competenciaAgregada = true;
+    const filas = ((competenciaDrop.data ?? []) as { estado: string; inicio: string; fin: string | null; detalle: string | null }[]).filter(Boolean);
+    const ultima = filas[0];
+    const buena = filas.find((f) => f.estado === "lista");
+    const conError = ultima?.estado === "fallida";
+    agregar(
+      {
+        clave: "drop-competencia",
+        grupo: "plataformas",
+        nombre: "Drop dropshipper (Costa Rica)",
+        que: "La competencia: el Catálogo con los demás proveedores (para «Bajar precio»)",
+        fecha: conError ? (ultima.fin ?? ultima.inicio) : (buena?.fin ?? buena?.inicio ?? null),
+        quien: null,
+        error: conError ? (ultima.detalle ?? "Falló") : null,
+        automatica: null,
+        requisito: "Con la cuenta de dropshipper de Drop (si está la de proveedor, te pide cambiarla)",
+        donde: { texto: "Análisis de competencia", href: "/analisis-competencia" },
+        accion: escribe(u, "analisis-competencia") ? { tipo: "ventana", ventana: { tipo: "competencia-drop" }, titulo: "Leer la competencia de Drop", texto: "Actualizar" } : null,
+        corriendo: ultima?.estado === "corriendo" && reciente(ultima.inicio, VIGENCIA_CORRIENDO_MS),
+        conError,
+      },
+      SEMANAL,
+    );
+  };
+
   // ── Plataformas ──
   if (dropi && tiene(u, "publicaciones-dropi")) {
     const puede = puedeActualizarDropi(u) && escribe(u, "publicaciones-dropi");
@@ -108,7 +143,7 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
       { sitio: "pa", nombre: "Dropi Panamá", que: "Pedidos, cartera, retiros, stock y ventas", sesion: "Dropi Panamá" },
       { sitio: "cr", nombre: "Dropi Costa Rica", que: "Pedidos, cartera, retiros, stock y ventas", sesion: "Dropi Costa Rica" },
       { sitio: "mx", nombre: "Dropi México", que: "Pedidos, cartera, retiros, stock y ventas", sesion: "Dropi México" },
-      { sitio: "drop", nombre: "Drop (Costa Rica)", que: "Productos, precio, stock y ventas por día", sesion: "Drop" },
+      { sitio: "drop", nombre: "Drop proveedor (Costa Rica)", que: "Productos, precio, stock y ventas por día", sesion: "proveedor de Drop" },
       { sitio: "duna", nombre: "Dunamixfy (Costa Rica)", que: "Productos, precio, stock, ventas y dropshippers", sesion: "Dunamixfy" },
     ];
     for (const s of SITIOS) {
@@ -137,8 +172,11 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
         },
         DIARIA,
       );
+      if (s.sitio === "drop") agregarCompetenciaDrop();
     }
   }
+  // Sin Gestión de IDs Dropi, la competencia de Drop sale igual (al principio de Plataformas).
+  agregarCompetenciaDrop();
   if (verEffi) {
     const puede = escribe(u, "publicaciones-effi") && puedeVerPais(u.paisesPermitidos, "CR");
     agregar(
@@ -408,7 +446,6 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
       DIARIA,
     );
   }
-
   // ── Archivos (los Excel que se suben a mano) ──
   const imps = (importaciones.data ?? []) as { modulo: ModuloImportable; usuario_nombre: string | null; creado_en: string; terminado_en: string | null; estado: string }[];
   for (const m of archivos) {

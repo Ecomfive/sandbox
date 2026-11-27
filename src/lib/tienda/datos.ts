@@ -102,6 +102,8 @@ export interface PedidoFila extends PedidoResumen {
   postventa?: string | null;
   /** Cómo pagó el cliente al recibir (efectivo, yappy, transferencia, tarjeta, otro), según el repartidor en Monday (14 nov 2026). */
   pagoEntrega?: string | null;
+  /** La guía de SISCORE que no entró sola en Shopify, o cuyo aviso al cliente no salió (24 nov 2026): el motivo, para «Guía sin cargar». */
+  guiaSinCargar?: string | null;
   /** Cuándo salió el pedido (Shopify, Monday o Servientrega), 14 nov 2026. */
   despachadoEn?: string | null;
   tiendaId: string;

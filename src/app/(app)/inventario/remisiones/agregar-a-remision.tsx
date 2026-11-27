@@ -7,6 +7,7 @@ import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { anilloFoco, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
+import { useLineasArriba } from "@/components/ui/usar-lineas-arriba";
 import { agregarAremision } from "./actions";
 import type { StockPorBodega } from "./nueva-remision";
 
@@ -26,6 +27,7 @@ export function AgregarAremision({
   productos,
   stock,
   yaEstan,
+  retiro = false,
 }: {
   remisionId: string;
   numero: string;
@@ -33,11 +35,14 @@ export function AgregarAremision({
   productos: OpcionSkuMaestro[];
   stock: StockPorBodega;
   yaEstan: string[];
+  /** Un retiro de plataforma no tiene tope: la lectura de la plataforma puede venir ya descontada. */
+  retiro?: boolean;
 }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [abierto, setAbierto] = useState(false);
   const [lineas, setLineas] = useState<Linea[]>([]);
+  const { buscador, enfocarCantidadDe, volverAlBuscador } = useLineasArriba(lineas);
   const [error, setError] = useState<string | null>(null);
   const [pendiente, empezar] = useTransition();
 
@@ -45,7 +50,7 @@ export function AgregarAremision({
   const disponibles = productos.filter((p) => !yaEstan.includes(p.id) && !lineas.some((l) => l.sku.id === p.id));
   const cantidad = (l: Linea) => (l.cantidad.trim() === "" ? NaN : Number(l.cantidad));
   const incompleta = lineas.some((l) => !Number.isInteger(cantidad(l)) || cantidad(l) <= 0);
-  const pasada = lineas.find((l) => cantidad(l) > hay(l.sku.id));
+  const pasada = retiro ? undefined : lineas.find((l) => cantidad(l) > hay(l.sku.id));
   const falta = lineas.length === 0 ? "Agrega al menos un producto." : incompleta ? "Escribe la cantidad de cada producto." : pasada ? `De ${pasada.sku.codigo} solo hay ${hay(pasada.sku.id).toLocaleString("es-PA")} en esa bodega.` : null;
   const unidades = lineas.reduce((t, l) => t + (Number.isInteger(cantidad(l)) ? cantidad(l) : 0), 0);
 
@@ -55,12 +60,15 @@ export function AgregarAremision({
     setError(null);
   }
   function agregar(sku: OpcionSkuMaestro | null) {
-    if (sku && !lineas.some((l) => l.sku.id === sku.id)) setLineas((l) => [...l, { sku, cantidad: "" }]);
+    if (sku && !lineas.some((l) => l.sku.id === sku.id)) {
+      enfocarCantidadDe(sku.id);
+      setLineas((l) => [{ sku, cantidad: "" }, ...l]);
+    }
   }
   function guardar() {
     setError(null);
     empezar(async () => {
-      const r = await agregarAremision(remisionId, lineas.map((l) => ({ sku: l.sku.id, cantidad: cantidad(l) }))).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      const r = await agregarAremision(remisionId, [...lineas].reverse().map((l) => ({ sku: l.sku.id, cantidad: cantidad(l) }))).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
       if ("error" in r) return void setError(r.error);
       mostrarToast(`${r.agregadas} ${r.agregadas === 1 ? "producto agregado" : "productos agregados"} a ${r.numero}`);
       cerrar();
@@ -84,7 +92,7 @@ export function AgregarAremision({
         if (!falta && !pendiente) guardar();
       }}
     >
-      <div className="flex flex-col gap-1">
+      <div ref={buscador} className="flex flex-col gap-1">
         <span className={labelClassSm}>Agregar producto a {numero}</span>
         <ProveedorSkusMaestros opciones={disponibles}>
           <CampoSkuMaestro key={lineas.length} valor={null} alCambiar={agregar} etiquetaAria="Agregar producto a la remisión" placeholder="Busca por SKU o nombre" claseContenedor="w-full" />
@@ -95,7 +103,7 @@ export function AgregarAremision({
           {lineas.map((l) => {
             const pasa = cantidad(l) > hay(l.sku.id);
             return (
-              <li key={l.sku.id} className="flex items-center gap-3 px-3 py-2">
+              <li key={l.sku.id} data-linea={l.sku.id} className="flex items-center gap-3 px-3 py-2">
                 <MiniaturaFoto url={l.sku.foto ?? null} nombre={l.sku.nombre} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{l.sku.nombre}</span>
@@ -109,6 +117,7 @@ export function AgregarAremision({
                   min={1}
                   step={1}
                   aria-label={`Unidades de ${l.sku.codigo}`}
+                  onKeyDown={volverAlBuscador}
                   value={l.cantidad}
                   onChange={(e) => setLineas((ls) => ls.map((x) => (x.sku.id === l.sku.id ? { ...x, cantidad: e.target.value } : x)))}
                   placeholder="0"

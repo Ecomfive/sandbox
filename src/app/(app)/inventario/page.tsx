@@ -4,10 +4,12 @@ import { cargarCodigosProductos } from "@/lib/wms/codigos-producto";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
+import { alcanceInventario, esBodegaDeDespacho } from "@/lib/permisos/inventario";
 import { autorizadaParaSalidaManual } from "@/lib/permisos/salida-manual";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { leerStockPlataformas } from "./datos-plataformas";
 import { etiquetaTalla } from "@/lib/wms/talla";
+import { colorDeVariante } from "@/lib/wms/color-variante";
 import type { FilaStock } from "./def-stock";
 import { ListaStock } from "./lista-stock";
 import { agruparVariantes } from "./variantes-stock";
@@ -115,9 +117,13 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     padreId: hijaDe.get(String(r.sku_maestro_id))?.padre_id ?? null,
     repartoPendiente: repartoPendiente.has(String(r.sku_maestro_id)) || repartoPendiente.has(hijaDe.get(String(r.sku_maestro_id))?.padre_id ?? ""),
     opciones: etiquetaTalla(Object.values(hijaDe.get(String(r.sku_maestro_id))?.opciones ?? {}).join(" / ")),
+    ...colorDeVariante(hijaDe.get(String(r.sku_maestro_id))?.opciones),
     variantes: [],
   }));
   const filas = agruparVariantes(todasLasFilas);
+  // Quien no está a cargo del inventario solo modifica la bodega de despacho (26 nov 2026).
+  const alcance = alcanceInventario(usuario);
+  const soloEnBodegas = alcance === "despacho" ? bodegas.filter((b) => esBodegaDeDespacho({ codigo: b.codigo as string, tipo: b.tipo as string, pais: pais.codigo })).map((b) => b.id as string) : null;
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -134,7 +140,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
           bodegaElegida={bodegaElegida}
           bodegasPropias={bodegas.filter((b) => b.tipo === "propia" && b.activa).map((b) => ({ id: b.id as string, nombre: b.nombre as string }))}
           ubicaciones={(ubicaciones.data ?? []).map((u) => ({ id: u.id, bodegaId: u.bodega_id, codigo: u.codigo, propiedad: u.propiedad }))}
-          puedeEscribir={!usuario.modulosSoloLectura.includes("inventario")}
+          puedeEscribir={alcance !== "lectura"}
+          soloEnBodegas={soloEnBodegas}
           codigoPais={pais.codigo}
           bodegasExternas={bodegas.filter((b) => b.tipo === "externa").map((b) => ({ id: b.id as string, nombre: b.nombre as string }))}
           lecturas={plataformas?.lecturas ?? null}

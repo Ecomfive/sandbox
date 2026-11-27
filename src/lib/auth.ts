@@ -20,6 +20,7 @@ import { MODULOS_AFINABLES, catalogoDe } from "@/lib/permisos/catalogo";
 import { paginaInicialDe, primeraPestanaPermitida } from "@/lib/nav-data";
 import { leerTiendasPermitidas, modulosSegunTiendas } from "@/lib/finanzas/tiendas-permitidas";
 import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta";
+import { RUTA_PANEL_REPARTIDOR, cuentaDeRepartidor } from "@/lib/despacho/cuenta-repartidor";
 
 /** Cookie de "Ver así": el id del rol que Usuarios y roles está probando, o nada. Vive solo en el
  * navegador de quien la prende (ver `src/lib/vista-previa-actions.ts`), nunca en la base. */
@@ -342,6 +343,8 @@ async function irSinPerfil(): Promise<never> {
   await irADosPasosSiFalta();
   const usuarioId = await getUsuarioIdSesion();
   if (usuarioId && (await cuentaDeProveedor(usuarioId))) redirect(RUTA_PORTAL_PROVEEDOR);
+  // Una cuenta de repartidor (24 nov 2026) vuelve a su panel.
+  if (usuarioId && (await cuentaDeRepartidor(usuarioId))) redirect(RUTA_PANEL_REPARTIDOR);
   redirect("/login");
 }
 
@@ -354,7 +357,7 @@ export async function requireModulo(clave: string): Promise<UsuarioActual> {
 }
 
 /**
- * La primera pestaña de un panel con pestañas (Pedidos de tienda, Despacho ciudad, Tiendas Shopify; 17 nov 2026): si la persona tiene el
+ * La primera pestaña de un panel con pestañas (Pedidos de tienda, Envíos Delivery, Tiendas Shopify; 17 nov 2026): si la persona tiene el
  * módulo de la pestaña principal, se queda; si solo tiene el de otra pestaña (por ejemplo, solo Devoluciones), la lleva a esa en vez de sacarla.
  */
 export async function requirePanel(href: string, clave: string): Promise<UsuarioActual> {

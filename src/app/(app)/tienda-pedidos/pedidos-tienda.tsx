@@ -7,18 +7,20 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { Indicador, Pastilla, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { formatearMoneda } from "@/lib/formato";
 import { Tooltip } from "@/components/ui/tooltip";
+import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { AlertaIcon, CalendarioIcon, CerrarIcon, ChatIcon, CheckIcon, ShopifyLogo, WhatsAppLogo, DeshacerIcon, EnvioIcon, EtiquetaIcon, InventarioIcon, MargenIcon, PedidoIcon, ProductoIcon, TiendaIcon } from "@/lib/nav-icons";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { ESTADOS_PEDIDO, diaPanama, resumirPedidos, type EstadoPedido } from "@/lib/tienda/resumen";
 import type { PedidoFila } from "@/lib/tienda/datos";
+import { VISTAS_ATC, ahoraMs } from "@/lib/tienda/gestion-atc";
 import { etiquetaEntrega } from "@/lib/tienda/entregas-monday";
 
 /** Cómo pagó al recibir (14 nov 2026). */
 const PAGO_ENTREGA: Record<string, string> = { efectivo: "Efectivo", yappy: "Yappy", transferencia: "Transferencia", tarjeta: "Tarjeta", otro: "Otro" };
 import { FichaPedido } from "./ficha-pedido";
 import { pendientesWhatsapp } from "./chat-actions";
-import { pendientesPorPedido, type ChatPendiente } from "@/lib/tienda/chat-tienda";
+import { pendientesPorPedido, type ChatDelPedido, type ChatPendiente } from "@/lib/tienda/chat-tienda";
 
 const ESTADO = new Map(ESTADOS_PEDIDO.map((e) => [e.id, e]));
 export const NOMBRE: NombreFilas = { singular: "pedido", plural: "pedidos" };
@@ -79,7 +81,7 @@ export interface Contexto {
   codigoPais: string;
   tiendas: Record<string, string>;
   /** Mensajes de WhatsApp pendientes por pedido (iComfly): el numerito sobre el logo del cliente. Solo en Pedidos de tienda. */
-  whatsapp?: Record<string, number>;
+  whatsapp?: Record<string, ChatDelPedido>;
 }
 
 /** Las columnas, como en Mi Reto Digital: se ocultan y se reordenan desde «Columnas». */
@@ -92,20 +94,30 @@ export const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
     label: "Cliente",
     ocultable: true,
     // El logo de WhatsApp si el cliente tiene teléfono (13 nov 2026, pedido de Hernán): su chat se ve a la derecha de la ficha del pedido. Con mensajes
-    // pendientes en iComfly (sin leer, o el cliente espera respuesta), el numerito encima; se borra al abrir su chat en la ficha.
+    // sin leer en iComfly, el numerito rojo encima; se borra al abrir su chat en la ficha. Si ya se leyó pero el cliente espera respuesta, solo un punto
+    // (24 nov 2026: antes salía «1» y atención decía que sí lo había leído).
     render: (p, c) => {
-      const n = c.whatsapp?.[p.id] ?? 0;
-      const pendientes = `${n} ${n === 1 ? "mensaje pendiente" : "mensajes pendientes"}`;
+      const chat = c.whatsapp?.[p.id];
+      const n = chat?.sinLeer ?? 0;
+      const espera = !n && !!chat?.espera;
+      const pendientes = `${n} ${n === 1 ? "mensaje sin leer" : "mensajes sin leer"}`;
+      const texto = n ? `WhatsApp: ${pendientes}` : espera ? "WhatsApp: leído, el cliente espera respuesta" : "Tiene WhatsApp";
       return (
         <span className="flex max-w-[8.5rem] items-center gap-1.5" title={p.cliente ?? undefined}>
           {p.pedidosCliente != null && (
-            <span role="img" aria-label={n ? `WhatsApp: ${pendientes}` : "Tiene WhatsApp"} title={n ? `${pendientes} por WhatsApp: ábrelo para verlo` : "Tiene WhatsApp: su chat se ve en la ficha del pedido"} className="relative shrink-0">
+            <span
+              role="img"
+              aria-label={texto}
+              title={n ? `${pendientes} por WhatsApp: ábrelo para verlo` : espera ? "Leído: el último mensaje es del cliente y nadie le respondió" : "Tiene WhatsApp: su chat se ve en la ficha del pedido"}
+              className="relative shrink-0"
+            >
               <WhatsAppLogo className="h-3.5 w-3.5" />
               {n > 0 && (
                 <span aria-hidden="true" className="absolute -top-2 -right-2 min-w-[15px] rounded-full bg-destructive px-1 text-center text-[9px] leading-[15px] font-bold text-white tabular-nums">
                   {n > 99 ? "99+" : n}
                 </span>
               )}
+              {espera && <span aria-hidden="true" className="absolute -top-1 -right-1 h-2 w-2 rounded-full border border-card bg-primario" />}
             </span>
           )}
           <span className={`truncate ${n > 0 ? "ml-1 font-semibold" : ""}`}>{p.cliente ?? "—"}</span>
@@ -135,14 +147,26 @@ export const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
     id: "productos",
     label: "Productos",
     ocultable: true,
-    // Con la foto del producto (la de Shopify), como en Mi Reto Digital.
+    // Con la foto del producto (la de Shopify), como en Mi Reto Digital. Al pasar el cursor por la foto se ve grande, como en
+    // Inventario o Compras (23 nov 2026, pedido de Hernán).
     render: (p) => (
-      <span className="flex max-w-[9rem] items-center gap-1.5" title={p.productos ?? undefined}>
+      <span className="flex max-w-[9rem] items-center gap-1.5">
         {p.foto && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.foto} alt="" loading="lazy" className="h-6 w-6 shrink-0 rounded border border-border object-cover" />
+          <TarjetaEmergente
+            clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
+            claseEnvoltura="shrink-0"
+            contenido={
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={p.foto} alt={p.productos ?? ""} className="max-h-72 max-w-72 rounded-md object-contain" />
+            }
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={p.foto} alt="" loading="lazy" className="h-6 w-6 rounded border border-border object-cover" />
+          </TarjetaEmergente>
         )}
-        <span className="truncate">{p.productos ?? "—"}</span>
+        <span className="truncate" title={p.productos ?? undefined}>
+          {p.productos ?? "—"}
+        </span>
       </span>
     ),
   },
@@ -339,6 +363,9 @@ export function PedidosTienda({
 }) {
   const router = useRouter();
   const [estado, setEstado] = useState<EstadoPedido | null>(null);
+  // Las vistas del manual ATC (24 nov 2026): reemplazan las pestañas del Sheet de atención al cliente. Una vista y una tarjeta no se combinan.
+  const [vista, setVista] = useState<string | null>(null);
+  const [ahora] = useState(ahoraMs);
   const [abierto, setAbierto] = useState<string | null>(abrirInicial);
   const [orden, setOrden] = useState<string[]>([]);
   // Si ya se está en Pedidos y llega otro `?pedido=` (el «Ver» del aviso de «Nuevo pedido»), se abre esa ficha (se ajusta al dibujar, sin efecto).
@@ -348,7 +375,12 @@ export function PedidosTienda({
     if (abrirInicial) setAbierto(abrirInicial);
   }
   const r = useMemo(() => resumirPedidos(pedidos), [pedidos]);
-  const filas = useMemo(() => (estado ? pedidos.filter((p) => p.estado === estado) : pedidos), [pedidos, estado]);
+  const conteoVistas = useMemo(() => VISTAS_ATC.map((v) => ({ ...v, n: pedidos.filter((p) => v.incluye(p, ahora)).length })), [pedidos, ahora]);
+  const filas = useMemo(() => {
+    const v = VISTAS_ATC.find((x) => x.id === vista);
+    if (v) return pedidos.filter((p) => v.incluye(p, ahora));
+    return estado ? pedidos.filter((p) => p.estado === estado) : pedidos;
+  }, [pedidos, estado, vista, ahora]);
   const def = useMemo(() => defPedidos(tiendas), [tiendas]);
   // Los mensajes de WhatsApp pendientes (iComfly) de la tienda que se mira, cada 30 segundos con la página a la vista (y al abrir o cerrar una ficha).
   const tiendaUnica = pedidos.length && pedidos.every((p) => p.tiendaId === pedidos[0].tiendaId) ? pedidos[0].tiendaId : null;
@@ -370,7 +402,14 @@ export function PedidosTienda({
   const columnas = useMemo(() => (Object.keys(tiendas).length > 1 ? COLUMNAS : COLUMNAS.filter((c) => c.id !== "tienda")), [tiendas]);
   const pct = (n: number | null) => (n === null ? "—" : `${n.toLocaleString("es-PA")} %`);
   const num = (n: number) => n.toLocaleString("es-PA");
-  const alternar = (e: EstadoPedido) => setEstado((x) => (x === e ? null : e));
+  const alternar = (e: EstadoPedido) => {
+    setVista(null);
+    setEstado((x) => (x === e ? null : e));
+  };
+  const alternarVista = (id: string) => {
+    setEstado(null);
+    setVista((x) => (x === id ? null : id));
+  };
 
   // La ficha abierta queda en la dirección (`?pedido=`), así se puede copiar o recargar.
   const marcarEnDireccion = useCallback((id: string | null) => {
@@ -391,7 +430,7 @@ export function PedidosTienda({
     <div className="flex flex-col gap-5">
       {/* El tablero de tarjetas de Compras (17 nov 2026, pedido de Hernán: igual que las demás pantallas); cada tarjeta filtra la lista. */}
       <TableroIndicadores etiqueta="Tablero de pedidos">
-        <Indicador titulo="Pedidos" icono={PedidoIcon} color="violeta" valor={num(r.pedidos)} detalle="todos los del periodo" alPulsar={() => setEstado(null)} activo={!estado} />
+        <Indicador titulo="Pedidos" icono={PedidoIcon} color="violeta" valor={num(r.pedidos)} detalle="todos los del periodo" alPulsar={() => { setEstado(null); setVista(null); }} activo={!estado && !vista} />
         <Indicador titulo="Por confirmar" icono={AlertaIcon} color="ambar" punto={r.porEstado.nuevo ? "aviso" : undefined} valor={num(r.porEstado.nuevo)} detalle="esperan llamada o mensaje" alPulsar={() => alternar("nuevo")} activo={estado === "nuevo"} />
         <Indicador titulo="Confirmados" icono={CheckIcon} color="azul" valor={num(r.porEstado.confirmado)} detalle={`${pct(r.confirmacion)} pasó la confirmación`} alPulsar={() => alternar("confirmado")} activo={estado === "confirmado"} />
         <Indicador titulo="En camino" icono={EnvioIcon} color="violeta" punto={r.porEstado.en_camino ? "aviso" : undefined} valor={num(r.porEstado.en_camino)} detalle="con guía, sin entregar" alPulsar={() => alternar("en_camino")} activo={estado === "en_camino"} />
@@ -400,6 +439,25 @@ export function PedidosTienda({
         <Indicador titulo="Devoluciones" icono={DeshacerIcon} color="rojo" punto={r.porEstado.devuelto ? "peligro" : undefined} valor={num(r.porEstado.devuelto)} detalle={pct(r.devolucion)} alPulsar={() => alternar("devuelto")} activo={estado === "devuelto"} />
         <Indicador titulo="SKU sin vincular" icono={AlertaIcon} color="ambar" punto={sinVincular ? "aviso" : undefined} valor={num(sinVincular)} detalle="variantes de Shopify sin producto nuestro" href="/tienda-tiendas/productos" />
       </TableroIndicadores>
+
+      <nav aria-label="Vistas de atención al cliente" className="-mt-2 flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-xs font-medium text-muted-foreground">Vistas</span>
+        {conteoVistas.map((v) => (
+          <button
+            key={v.id}
+            type="button"
+            onClick={() => alternarVista(v.id)}
+            aria-pressed={vista === v.id}
+            title={v.detalle}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+              vista === v.id ? "border-primario bg-primario text-white" : "border-border bg-card text-foreground hover:bg-primario-suave"
+            }`}
+          >
+            {v.etiqueta}
+            <span className={`tabular-nums ${vista === v.id ? "text-white/80" : v.n ? "text-primario" : "text-muted-foreground"}`}>{num(v.n)}</span>
+          </button>
+        ))}
+      </nav>
 
       <TablaDatos
         def={def}

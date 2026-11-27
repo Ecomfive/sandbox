@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { pendientesPersonales } from "@/lib/pendientes-vivos-actions";
+import { conPausaAlVolver } from "@/lib/consulta-con-pausa";
 import { CADA_PENDIENTES_MS, type PendientesPersonales } from "@/lib/pendientes-vivos";
 
 interface Vivos {
@@ -25,11 +26,13 @@ export function ProveedorPendientesVivos({ children }: { children: ReactNode }) 
       .catch(() => {});
   }, []);
   useEffect(() => {
-    const t = setInterval(refrescar, CADA_PENDIENTES_MS);
-    document.addEventListener("visibilitychange", refrescar);
+    // Al volver a la pestaña solo si la última lectura fue hace 20 s o más (no una por cada ida y vuelta). `refrescar` sigue siendo inmediato.
+    const pausa = conPausaAlVolver(refrescar);
+    const t = setInterval(pausa.ahora, CADA_PENDIENTES_MS);
+    document.addEventListener("visibilitychange", pausa.alVolver);
     return () => {
       clearInterval(t);
-      document.removeEventListener("visibilitychange", refrescar);
+      document.removeEventListener("visibilitychange", pausa.alVolver);
     };
   }, [refrescar]);
   const valor = useMemo(() => ({ vivos, refrescar }), [vivos, refrescar]);

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FRENTES, agruparPaginas, colapsarGestionDeIds, construirAreas, encontrarSeccionActiva, paginaInicialDe, pestanasSinModulo, primeraPestanaPermitida, puedeAbrirPagina } from "./nav-data";
+import { FRENTES, agruparPaginas, colapsarGestionDeIds, construirAreas, encontrarSeccionActiva, moduloDeHref, paginaInicialDe, pestanasSinModulo, primeraPestanaPermitida, puedeAbrirPagina } from "./nav-data";
+import { PESTANAS_POR_MODULO } from "./pestanas";
 import { ICONOS_PAGINA } from "./nav-icons";
 
 // Se corre con: npm run test:seguridad (incluye estas pruebas del menú)
@@ -192,10 +193,10 @@ test("Gestión de IDs es una sola entrada del menú que sigue a la plataforma el
   assert.equal(encontrarSeccionActiva("/publicaciones-dunamixfy", menu), "Operación");
 });
 
-test("Gestión de tienda: tres entradas con pestañas, cada pestaña con su permiso", () => {
-  const tienda = areas.flatMap((a) => a.items).filter((i) => i.frente === "tienda" && i.href !== "/tienda-dashboard").map((i) => i.href);
-  assert.deepEqual(tienda.filter((h) => h !== "/tienda-reporteria" && h !== "/anuncios-meta"), ["/tienda-pedidos", "/despacho-ciudad", "/tienda-tiendas"]);
-  // Solo Devoluciones: ve «Despacho ciudad», entra directo a su pestaña y no ve las otras.
+test("Gestión de tienda: entradas con pestañas, cada pestaña con su permiso", () => {
+  const tienda = areas.flatMap((a) => a.items).filter((i) => i.frente === "tienda" && i.href !== "/tienda-dashboard" && i.href !== "/tienda-tablero").map((i) => i.href);
+  assert.deepEqual(tienda.filter((h) => h !== "/tienda-reporteria" && h !== "/anuncios-meta"), ["/tienda-pedidos", "/despacho-ciudad", "/inventario-despacho", "/tienda-tiendas"]);
+  // Solo Devoluciones: ve «Envíos Delivery», entra directo a su pestaña y no ve las otras.
   const solo = ["despacho-devoluciones"];
   assert.equal(puedeAbrirPagina(solo, "/despacho-ciudad"), true);
   assert.equal(puedeAbrirPagina(solo, "/tienda-pedidos"), false);
@@ -205,4 +206,26 @@ test("Gestión de tienda: tres entradas con pestañas, cada pestaña con su perm
   assert.ok(ocultas.includes("/despacho-ciudad") && ocultas.includes("/despacho-ciudad/cambios"));
   assert.ok(!ocultas.includes("/despacho-ciudad/devoluciones"));
   assert.equal(encontrarSeccionActiva("/despacho-ciudad/cambios/nueva", areas), "Operación");
+});
+
+test("Envíos Delivery y el inventario de despacho van aparte (25 nov 2026)", () => {
+  const entradas = areas.flatMap((a) => a.items);
+  assert.equal(entradas.find((i) => i.href === "/despacho-ciudad")?.label, "Envíos Delivery");
+  assert.equal(entradas.find((i) => i.href === "/inventario-despacho")?.label, "Inventario despacho");
+  assert.deepEqual(PESTANAS_POR_MODULO["/despacho-ciudad"].map((p) => p.etiqueta), ["Hoy", "Devoluciones", "Cambios y reembolsos", "Cierres", "Control de envíos"]);
+  assert.deepEqual(PESTANAS_POR_MODULO["/inventario-despacho"].map((p) => p.etiqueta), ["Mercancía existente", "Solicitud de inventario", "Archivos de solicitudes"]);
+  // Cada entrada sale con sus permisos y no arrastra la otra.
+  assert.equal(puedeAbrirPagina(["despacho-ciudad"], "/inventario-despacho"), false);
+  assert.equal(puedeAbrirPagina(["despacho-pedir-inventario"], "/despacho-ciudad"), false);
+  // Quien solo pide inventario ve la entrada y cae en su pestaña; quien responde cuánto hay entra por la primera.
+  assert.equal(puedeAbrirPagina(["despacho-pedir-inventario"], "/inventario-despacho"), true);
+  assert.equal(paginaInicialDe(["despacho-pedir-inventario"]), "/inventario-despacho/solicitudes");
+  assert.equal(paginaInicialDe(["despacho-cuanto-hay"]), "/inventario-despacho");
+  assert.equal(moduloDeHref("/inventario-despacho"), "despacho-cuanto-hay");
+});
+
+test("Tablero de tiendas (Desempeño) pide su propio permiso", () => {
+  assert.equal(puedeAbrirPagina(["tienda-pedidos"], "/tienda-tablero"), false);
+  assert.equal(puedeAbrirPagina(["tienda-tablero"], "/tienda-tablero"), true);
+  assert.equal(encontrarSeccionActiva("/tienda-tablero", areas), "Desempeño");
 });

@@ -1,6 +1,6 @@
 // Anuncios Meta: las cuentas del equipo. Resultados de un grupo de anuncios (suma de días) y lo que se calcula de ellos. Todo en dólares, como los reporta Meta. Lógica pura, con prueba.
 
-import { nivelCtr, nivelHookRate, type NivelMetrica } from "@/lib/metricas-meta-ads";
+import { nivelCpa, nivelCpm, nivelCtr, nivelCvr, nivelEfectividad, nivelGasto, nivelHookRate, type NivelMetrica } from "@/lib/metricas-meta-ads";
 
 export interface Resultados {
   gasto: number;
@@ -15,6 +15,9 @@ export interface Resultados {
   video50: number;
   video75: number;
   video95: number;
+  /** Reproducciones del video y tiempo total visto en segundos (promedio de Meta × reproducciones): sumables; el promedio es `tiempoPromedio`. 0 = sin dato. */
+  reproducciones: number;
+  segundosVistos: number;
   vioLanding: number;
   carrito: number;
   pago: number;
@@ -22,7 +25,7 @@ export interface Resultados {
   valor: number;
 }
 
-export const sinResultados = (): Resultados => ({ gasto: 0, impresiones: 0, clics: 0, video3s: 0, video15s: 0, video25: 0, video50: 0, video75: 0, video95: 0, vioLanding: 0, carrito: 0, pago: 0, compras: 0, valor: 0 });
+export const sinResultados = (): Resultados => ({ gasto: 0, impresiones: 0, clics: 0, video3s: 0, video15s: 0, video25: 0, video50: 0, video75: 0, video95: 0, reproducciones: 0, segundosVistos: 0, vioLanding: 0, carrito: 0, pago: 0, compras: 0, valor: 0 });
 
 export function sumar(a: Resultados, b: Partial<Resultados>): Resultados {
   return {
@@ -35,6 +38,8 @@ export function sumar(a: Resultados, b: Partial<Resultados>): Resultados {
     video50: a.video50 + (b.video50 ?? 0),
     video75: a.video75 + (b.video75 ?? 0),
     video95: a.video95 + (b.video95 ?? 0),
+    reproducciones: a.reproducciones + (b.reproducciones ?? 0),
+    segundosVistos: a.segundosVistos + (b.segundosVistos ?? 0),
     vioLanding: a.vioLanding + (b.vioLanding ?? 0),
     carrito: a.carrito + (b.carrito ?? 0),
     pago: a.pago + (b.pago ?? 0),
@@ -45,8 +50,15 @@ export function sumar(a: Resultados, b: Partial<Resultados>): Resultados {
 
 /** Con menos gasto que esto, un número no alcanza para comparar (una campaña con $20 y 2 compras no «gana» a una con $600). */
 export const GASTO_MINIMO_CONFIABLE = 100;
-/** El CPA tope mientras nadie lo defina para el producto (el equipo lo cambia en «Cuentas»; los umbrales de Productos Test ya consideran malo todo lo que pasa de $4). */
-export const CPA_TOPE_PREDETERMINADO = 3;
+/** El CPA tope mientras nadie lo defina para el producto: $10 (23 nov 2026, indicado por Alcides; antes $3). El equipo lo cambia por producto en «Cuentas». */
+export const CPA_TOPE_PREDETERMINADO = 10;
+
+/** Segundos que se ve en promedio cada reproducción del video (null si Meta todavía no dio el dato). */
+export const tiempoPromedio = (r: Resultados): number | null => (r.reproducciones > 0 && r.segundosVistos > 0 ? r.segundosVistos / r.reproducciones : null);
+/** Tiempo promedio de reproducción (documento «Métrica»): bien desde 8 s, mal hasta 5 s. */
+export const nivelTiempo = (s: number | null): NivelMetrica => (s === null ? "neutral" : s >= 8 ? "bueno" : s > 5 ? "medio" : "malo");
+/** Frecuencia (documento «Métrica»): bien hasta 2.20 veces, mal pasadas 2.80 (saturación). */
+export const nivelFrecuencia = (f: number | null): NivelMetrica => (f === null ? "neutral" : f <= 2.2 ? "bueno" : f <= 2.8 ? "medio" : "malo");
 
 export const cpa = (r: Resultados): number | null => (r.compras > 0 ? r.gasto / r.compras : null);
 export const ctr = (r: Resultados): number | null => (r.impresiones > 0 ? (r.clics / r.impresiones) * 100 : null);
@@ -79,6 +91,12 @@ export function llegaAlLlamado(r: Resultados, ctaSegundo: number | null, duracio
 export const clicAVisita = (r: Resultados): number | null => (r.clics > 0 && r.vioLanding > 0 ? Math.min(100, (r.vioLanding / r.clics) * 100) : null);
 /** Compras ÷ visitas a la landing: lo que convierte la página. */
 export const conversion = (r: Resultados): number | null => (r.vioLanding > 0 ? (r.compras / r.vioLanding) * 100 : null);
+/** Costo por mil impresiones. */
+export const cpm = (r: Resultados): number | null => (r.impresiones > 0 ? (r.gasto / r.impresiones) * 1000 : null);
+/** «% Efectividad» de la hoja de Control de Testing: las visitas a la landing que salen de los clics (visitas ÷ clics del enlace). */
+export const efectividad = clicAVisita;
+/** «CVR» de la hoja: compras ÷ visitas a la landing. */
+export const cvr = conversion;
 /** Lo que dejó, antes de gastos del negocio: compras × lo que se puede pagar por compra, menos lo gastado. Positivo = el anuncio se pagó solo. */
 export const resultado = (r: Resultados, tope: number): number => r.compras * tope - r.gasto;
 export const confiable = (r: Resultados): boolean => r.gasto >= GASTO_MINIMO_CONFIABLE;
@@ -123,3 +141,76 @@ export const nivelDeHook = (v: number | null): NivelMetrica => (v === null ? "ne
 export const dolares = (n: number): string => `$${n.toFixed(2)}`;
 export const dolaresEnteros = (n: number): string => `${n < 0 ? "−" : ""}$${Math.abs(n).toFixed(0)}`;
 export const conSigno = (n: number): string => `${n < 0 ? "−" : "+"}$${Math.abs(n).toFixed(0)}`;
+/** Como `conSigno`, pero con miles abreviados para que quepa en un espacio chico: «−$149 mil», «+$12.5 mil»; de menos de $10 000 va entero. */
+export const conSignoCompacto = (n: number): string => {
+  const a = Math.abs(n);
+  const signo = n < 0 ? "−" : "+";
+  const sinCero = (x: number) => x.toFixed(1).replace(/[.]0$/, "");
+  if (a < 10_000) return `${signo}$${a.toFixed(0)}`;
+  if (a < 1_000_000) return `${signo}$${a >= 100_000 ? (a / 1000).toFixed(0) : sinCero(a / 1000)} mil`;
+  return `${signo}$${sinCero(a / 1_000_000)} M`;
+};
+
+/** Las ocho cifras que se miran de una campaña, en el orden de la hoja «Control de Testing» (23 nov 2026, pedido de Jhokser). */
+export type ClaveMetrica = "cpm" | "efectividad" | "hook" | "ctr" | "cpa" | "gasto" | "compras" | "cvr";
+export const METRICAS_CAMPANA: { clave: ClaveMetrica; titulo: string }[] = [
+  { clave: "cpm", titulo: "CPM" },
+  { clave: "efectividad", titulo: "% Efectividad" },
+  { clave: "hook", titulo: "Hook Rate" },
+  { clave: "ctr", titulo: "CTR" },
+  { clave: "cpa", titulo: "CPA" },
+  { clave: "gasto", titulo: "Gasto" },
+  { clave: "compras", titulo: "Compras" },
+  { clave: "cvr", titulo: "CVR" },
+];
+
+/**
+ * Las escalas de **ventas** (documento «Métrica» de Oferfy, 23 nov 2026): CPA bien hasta $9.50 y mal desde $11; CTR del enlace bien desde 3 % y mal bajo 2 %; CPM bien hasta $5.50 y mal desde $7.50; Hook Rate bien desde
+ * 40 %, regular desde 25 % y mal bajo 25 %; efectividad de la visita a la landing bien desde 85 % y mal bajo 75 %; conversión de la landing bien desde 1.5 % y mal bajo 1 %. Gasto y compras no llevan color.
+ */
+const escalaVenta = {
+  cpm: (v: number): NivelMetrica => (v <= 5.5 ? "bueno" : v <= 7.5 ? "medio" : "malo"),
+  ctr: (v: number): NivelMetrica => (v >= 3 ? "bueno" : v >= 2 ? "medio" : "malo"),
+  hook: (v: number): NivelMetrica => (v >= 40 ? "bueno" : v >= 25 ? "medio" : "malo"),
+  efectividad: (v: number): NivelMetrica => (v >= 85 ? "bueno" : v >= 75 ? "medio" : "malo"),
+  cvr: (v: number): NivelMetrica => (v >= 1.5 ? "bueno" : v >= 1 ? "medio" : "malo"),
+  cpa: (v: number): NivelMetrica => (v <= 9.5 ? "bueno" : v <= 11 ? "medio" : "malo"),
+};
+
+/**
+ * El color de cada cifra. **En ventas** valen las escalas del documento «Métrica» (`escalaVenta`). **En testing** (campañas de etapa «Test») valen las escalas de la hoja de Control de Testing —las mismas de Productos Test, `@/lib/metricas-meta-ads`—: CPM menor que 3 bien y mayor
+ * que 5 mal; % Efectividad mayor que 80 bien y menor que 70 mal; Hook mayor que 40 bien y menor que 30 mal; CTR mayor que 3 bien y menor que 2 mal; CPA menor que 2 bien y mayor que 4 mal; CVR mayor que 9
+ * bien y menor que 4 mal; Gasto mayor que 24 mal; lo de en medio, regular (los dos extremos incluidos). Una campaña de testing que gastó y no compró lleva el CPA en rojo si ya pasó de $4, como la hoja
+ * (que pone el gasto como CPA). **Escala y retargeting** todavía no tienen sus rangos (los dará el equipo): conservan lo que había (CPA frente a su tope, CTR y Hook) y el resto sin color.
+ */
+export function nivelesDeMetricas(r: Resultados, etapa: string | null, tope: number): Record<ClaveMetrica, NivelMetrica> {
+  const sinColor: Record<ClaveMetrica, NivelMetrica> = { cpm: "neutral", efectividad: "neutral", hook: "neutral", ctr: "neutral", cpa: "neutral", gasto: "neutral", compras: "neutral", cvr: "neutral" };
+  const valor = <T extends number | null>(v: T, f: (n: number) => NivelMetrica): NivelMetrica => (v === null ? "neutral" : f(v));
+  if (etapa === "venta") {
+    // El CPA se pinta contra el tope del producto: con un tope ajustado de $9, los cortes del documento bajan en la misma proporción.
+    const f = tope > 0 ? Math.min(1, tope / CPA_TOPE_PREDETERMINADO) : 1;
+    return {
+      cpm: valor(cpm(r), escalaVenta.cpm),
+      efectividad: valor(efectividad(r), escalaVenta.efectividad),
+      hook: valor(hookRate(r), escalaVenta.hook),
+      ctr: valor(ctr(r), escalaVenta.ctr),
+      // Gastó más del CPA en rojo sin comprar: malo (el documento corta el anuncio a los $12).
+      cpa: r.compras === 0 && r.gasto > 0 ? (r.gasto >= 12 * f ? "malo" : "neutral") : valor(cpa(r), (v) => escalaVenta.cpa(v / f)),
+      gasto: "neutral",
+      compras: "neutral",
+      cvr: valor(cvr(r), escalaVenta.cvr),
+    };
+  }
+  if (etapa !== "testing") return { ...sinColor, cpa: nivelDeCpa(cpa(r), tope), ctr: nivelDeCtr(ctr(r)), hook: nivelDeHook(hookRate(r)) };
+  const sinCompras = r.compras === 0 && r.gasto > 0;
+  return {
+    cpm: valor(cpm(r), nivelCpm),
+    efectividad: valor(efectividad(r), nivelEfectividad),
+    hook: valor(hookRate(r), nivelHookRate),
+    ctr: valor(ctr(r), nivelCtr),
+    cpa: sinCompras ? (nivelCpa(r.gasto) === "malo" ? "malo" : "neutral") : valor(cpa(r), nivelCpa),
+    gasto: r.gasto > 0 ? nivelGasto(r.gasto) : "neutral",
+    compras: "neutral",
+    cvr: valor(cvr(r), nivelCvr),
+  };
+}

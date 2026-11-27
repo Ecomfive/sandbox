@@ -11,7 +11,7 @@ export const FRENTES_USO = [
   { id: "producto", etiqueta: "Producto", rutas: ["/producto", "/wms-productos", "/wms-productos-dropi", "/productos-test"] },
   { id: "compras", etiqueta: "Compras", rutas: ["/compras", "/portal-proveedor"] },
   { id: "inventario", etiqueta: "Inventario", rutas: ["/inventario", "/wms-bodegas", "/wms-ubicaciones"] },
-  { id: "pedidos", etiqueta: "Pedidos y ventas", rutas: ["/pedidos-dropi", "/tienda-pedidos", "/tienda-reporteria", "/tienda-pedidos/confirmacion", "/tienda-pedidos/logistica", "/tienda-tiendas/productos", "/tienda-tiendas", "/tienda-dashboard", "/ventas-dropi", "/ventas-tiendas", "/deliverys"] },
+  { id: "pedidos", etiqueta: "Pedidos y ventas", rutas: ["/pedidos-dropi", "/tienda-pedidos", "/tienda-reporteria", "/tienda-pedidos/confirmacion", "/tienda-pedidos/logistica", "/tienda-tiendas/productos", "/tienda-tiendas", "/tienda-dashboard", "/tienda-tablero", "/tienda-pedidos/asesores", "/ventas-dropi", "/ventas-tiendas", "/deliverys"] },
   { id: "finanzas", etiqueta: "Finanzas", rutas: ["/retiros", "/conciliaciones", "/extractos", "/productos", "/panel-financiero"] },
   {
     id: "investigacion",

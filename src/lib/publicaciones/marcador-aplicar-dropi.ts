@@ -167,6 +167,12 @@ const CODIGO = [
   "if(c.datos&&c.datos.b280)return republicar280(c,bp,o);",
   // Con variaciones (1 nov 2026) las unidades se cuentan por bodega y variación y el producto nuevo se arma con sus atributos y variaciones (el precio de cada una se copia igual).
   "var vr=esV(o),id=Number(c.nuevo)||0,st=vr?unidadesV(o):stockDe(o),k;",
+  // «Sumar unidades al republicar» (20 nov 2026): las que llegaron van al ID nuevo, además de las que pasan del viejo, en una sola entrada. La meta (`mt`) es
+  // lo del viejo más esas: un reintento con el viejo ya vacío no las vuelve a sumar (el nuevo ya tiene más que la meta).
+  "var su=c.datos&&!c.datos.b280&&Number(c.datos.sumar)>0?c.datos:null,mt=Object.assign({},st);",
+  "if(su){if(vr)return{ok:false,nuevo:id||undefined,error:'Tiene variaciones: las unidades que llegaron súmalas con el lápiz de stock del ID nuevo.'};var bs=Number(su.bodega);",
+  "if(!bp.some(function(x){return Number(x.id)===bs}))return{ok:false,nuevo:id||undefined,error:'La bodega para sumar las unidades no es de ECOMFIVE en Dropi.'};mt[String(bs)]=(mt[String(bs)]||0)+Number(su.sumar)}",
+  "var cr='Republicado desde el ID '+c.producto+(su?' + '+Number(su.sumar)+' u. que llegaron':'');",
   // El precio elegido al republicar (27 oct 2026) va al producto nuevo; sin él, queda el del viejo.
   "if(!id){var r=vr?nuevoV(o,bp,{precio:c.precio,precioSugerido:c.sugerido}):nuevo(o,bp,{precio:c.precio,precioSugerido:c.sugerido});if(r.error)return{ok:false,error:r.error};",
   "var g=await pedir('/products','POST',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)};",
@@ -179,8 +185,8 @@ const CODIGO = [
   // Una foto que no se pudo copiar ya no detiene la republicación (8 nov 2026, pedido de Alcides): se termina el trabajo y vuelve en `fotosFaltan`, y el
   // sistema le deja una tarea a quien la pidió para subirla a mano en el ID nuevo (sacándola del viejo).
   ...FOTOS_GARANTIAS_JS,
-  "var sn=vr?unidadesV(n):stockDe(n),en={},hay=false;for(k in st)if((sn[k]||0)<st[k]){en[k]=st[k]-(sn[k]||0);hay=true}",
-  "if(hay){var me;if(vr){var em=emparejarV(n,en);if(em.error)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+em.error);var e1=await entradasV(n);if(e1.error)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+e1.error);me=entradaV(n,bp,em.porVariacion,e1.ent,'Republicado desde el ID '+c.producto)}else me=mover(n,bp,en,'Republicado desde el ID '+c.producto);if(me.error)return f(me.error);",
+  "var sn=vr?unidadesV(n):stockDe(n),en={},hay=false;for(k in mt)if((sn[k]||0)<mt[k]){en[k]=mt[k]-(sn[k]||0);hay=true}",
+  "if(hay){var me;if(vr){var em=emparejarV(n,en);if(em.error)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+em.error);var e1=await entradasV(n);if(e1.error)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+e1.error);me=entradaV(n,bp,em.porVariacion,e1.ent,cr)}else me=mover(n,bp,en,cr);if(me.error)return f(me.error);",
   "var pe=await pedir('/products/'+id,'PUT',me.cuerpo);if(!pe.ok)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+motivo(pe))}",
   // Con variaciones, antes de sacarle algo al viejo se comprueba que el nuevo quedó con el stock de cada variación: si no, no se toca el viejo.
   "if(vr){var vz=await pedir('/products/'+id),nz=vz.j&&vz.j.objects;if(!vz.ok||!nz)return f('Se creó el '+id+', pero no se pudo comprobar su stock: '+motivo(vz));var s2=unidadesV(nz),m2=[];for(k in st)if((s2[k]||0)<st[k])m2.push(k.slice(k.indexOf('|')+1)||k);if(m2.length)return f('Se creó el '+id+', pero su stock no coincide con el del '+c.producto+' (falta en: '+m2.join(', ')+'): no se le sacó nada al '+c.producto+'.')}",
@@ -285,6 +291,14 @@ const CODIGO = [
   "var tn=0,sw=stockDe(w);for(k in sw)tn+=sw[k];var nf=fotosDe(w).length;",
   "if(w.name!==d.nombre)return f('Dropi muestra el nombre «'+w.name+'» en el '+id+'.');",
   "var esp=unicas(d.fotos).length;if(nf<esp)return f('El '+id+' tiene '+nf+' foto(s) en Dropi y se esperaban '+esp+'.');",
+  // Dejar el stock en 0 (24 nov 2026): es lo último, con todo lo demás ya comprobado. Solo se saca lo que se puso para poder crear (`d.bodegas`), nunca más. Si Dropi no deja, no se
+  // reintenta (un reintento volvería a ponerlo): el producto queda publicado y el aviso dice que se saque a mano. Con `quitarTemporal` en false se deja el stock tal cual.
+  "if(d.quitarTemporal!==false){var sq={},hq=false;d.bodegas.forEach(function(x){var t=Number(sw[String(x.id)])||0,m=Math.min(t,Number(x.unidades)||0);if(m>0){sq[String(x.id)]=-m;hq=true}});",
+  "if(hq){var avq=function(e){aviso=(aviso?aviso+' ':'')+e},mq=mover(w,bp,sq,'Stock temporal para publicar');",
+  "if(mq.error)avq('No se pudo dejar el stock en 0: '+mq.error+' Sácalo en Dropi.');",
+  "else{var pq=await pedir('/products/'+id,'PUT',mq.cuerpo);if(!pq.ok)avq('No se pudo dejar el stock en 0: '+motivo(pq)+' Sácalo en Dropi.');",
+  "else{var vq=await pedir('/products/'+id),wq=vq.j&&vq.j.objects;if(!vq.ok||!wq)avq('Se pidió dejar el stock en 0, pero no se pudo comprobar en Dropi.');",
+  "else{tn=0;sw=stockDe(wq);for(k in sw)tn+=sw[k];if(tn>0)avq('Se pidió dejar el stock en 0, pero Dropi todavía muestra '+tn+' unidades: sácalas en Dropi.')}}}}}",
   "return{ok:true,nuevo:id,stock:tn,fotos:nf,aviso:aviso,subidas:SUB}}",
   // Privatizar (26 oct 2026): comprobar el correo, crear el producto privado, ponerle fotos, garantías y stock, asignárselo al dropshipper en
   // «Productos privados» y sacarle esas unidades al público. Cada paso que ya está hecho se salta, así un reintento sigue desde donde quedó:
@@ -457,16 +471,23 @@ const CODIGO = [
   "if(c.guia!==null&&n.name_in_guide!==c.guia)return{ok:false,error:'Dropi sigue mostrando en la guía «'+n.name_in_guide+'».'};",
   "if(Array.isArray(c.fotos)&&c.fotos.length){var mal=await subirFotos(c.producto,n,c.fotos,false);if(mal)return{ok:false,error:'No se pudieron subir '+mal+' foto(s) a Dropi'+porque()+'.'}}",
   "return{ok:true}}",
-  "var W=window.open(O+'/publicaciones-dropi/aplicar-dropi?p='+P+'&v='+__VERSION__,'aplicar-dropi','width=560,height=760');",
+  // Un código por pulsación (20 nov 2026: el Shilajit y 7 productos nuevos se crearon dos y tres veces). Un favorito pulsado antes (uno viejo que la ventana
+  // rechazó por desactualizado, o una pulsación repetida) se quedaba escuchando en la pestaña y, al pulsar «Aplicar» en la ventana, aplicaba también: la ventana
+  // ahora manda los cambios solo a la última pulsación (`k`), con otro nombre de mensaje («aplicar») que los favoritos viejos no escuchan.
+  "if(window.__ecfAplicando){alert('«Aplicar en Dropi» ya está trabajando en esta pestaña: espera a que termine.');return}",
+  "var K=Math.random().toString(36).slice(2)+Date.now().toString(36);",
+  "var W=window.open(O+'/publicaciones-dropi/aplicar-dropi?p='+P+'&v='+__VERSION__+'&k='+K,'aplicar-dropi','width=560,height=760');",
   "if(!W){alert('El navegador bloqueó la ventana: permite las ventanas emergentes de Dropi y vuelve a pulsar.');return}",
   "window.addEventListener('message',async function f(e){",
-  "if(e.origin!==O||e.source!==W||!e.data||e.data.tipo!=='pendientes')return;window.removeEventListener('message',f);",
+  "if(e.origin!==O||e.source!==W||!e.data||e.data.tipo!=='aplicar'||e.data.k!==K)return;window.removeEventListener('message',f);",
+  // Si otra pulsación ya está aplicando en esta pestaña, esta no hace nada (le avisa a la ventana).
+  "if(window.__ecfAplicando){W.postMessage({tipo:'resultados',resultados:[],ocupado:true},O);return}window.__ecfAplicando=true;",
   "var C=(Array.isArray(e.data.cambios)?e.data.cambios:[]).slice(0,100),R=[];",
   "var u=await pedir('/users/'+L.id),bp=u.ok&&u.j&&u.j.objects&&Array.isArray(u.j.objects.warehouses)?u.j.objects.warehouses:null;",
   "for(var i=0;i<C.length;i++){var c=C[i],x;",
   "try{x=bp?await aplicar(c,bp):{ok:false,error:motivo(u)}}catch(z){x={ok:false,error:String(z&&z.message||z)}}",
   "x.id=c.id;R.push(x);W.postMessage({tipo:'progreso',hechos:i+1,total:C.length},O)}",
-  "W.postMessage({tipo:'resultados',resultados:R},O)});",
+  "window.__ecfAplicando=false;W.postMessage({tipo:'resultados',resultados:R},O)});",
   "})();",
 ].join("");
 

@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
+import { puedeAnularSinAutorizacion } from "@/lib/permisos/anular-remision";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { quienesAutorizan, revisarCorreccion, textoCorreccion } from "@/lib/wms/correccion-remision";
-import { numeroRemision, revisarLineasRemision } from "@/lib/wms/remision";
+import { esRetiroDePlataforma, numeroRemision, revisarLineasRemision } from "@/lib/wms/remision";
 import { PAISES_SALIDA_CON_REMISION } from "@/lib/wms/recepcion";
 
 const ES_ID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-fA-F-]{8,64}$/.test(v);
@@ -26,13 +27,19 @@ export async function crearRemision(datos: { desde: unknown; hacia: unknown; not
   if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, datos.desde)) || !(await puedeVerBodega(supabase, usuario.paisesPermitidos, datos.hacia))) {
     return { error: "No tienes acceso al país de esas bodegas." };
   }
-  // De una plataforma a otra (migración 0242): es un documento, no mueve el stock del sistema. Solo donde toda salida va con remisión.
-  const { data: origen } = await supabase.from("wms_bodegas").select("tipo, paises(codigo)").eq("id", datos.desde).maybeSingle();
+  // Desde una plataforma: hacia otra (migración 0242) es un documento y no mueve stock; hacia una bodega propia es un retiro (migración 0364) que entra al inventario al
+  // confirmar lo que llegó. Solo donde toda salida va con remisión.
+  const [{ data: origen }, { data: destino }] = await Promise.all([
+    supabase.from("wms_bodegas").select("tipo, paises(codigo)").eq("id", datos.desde).maybeSingle(),
+    supabase.from("wms_bodegas").select("tipo").eq("id", datos.hacia).maybeSingle(),
+  ]);
+  const retiro = esRetiroDePlataforma(origen?.tipo as string | undefined, destino?.tipo as string | undefined);
   const paisOrigen = origen?.paises as { codigo: string } | { codigo: string }[] | null | undefined;
   const entrePlataformas = origen?.tipo === "externa";
   if (entrePlataformas && !PAISES_SALIDA_CON_REMISION.includes((Array.isArray(paisOrigen) ? paisOrigen[0] : paisOrigen)?.codigo ?? "")) return { error: "En este país la remisión sale de una bodega propia." };
   const { data, error } = await supabase.rpc(entrePlataformas ? "wms_crear_remision_plataformas" : "wms_crear_remision", { p_desde: datos.desde, p_hacia: datos.hacia, p_items: revisadas.lineas, p_notas: notas || null, p_usuario: usuario.id });
   if (error) {
+    if (retiro && /va de una plataforma a otra/.test(error.message)) return { error: "Falta correr la migración 0364 (retiro de plataforma) en la base." };
     if (/wms_crear_remision_plataformas/.test(error.message)) return { error: "Falta correr la migración 0242 en la base." };
     if (/wms_crear_remision/.test(error.message)) return { error: "Falta correr la migración 0233 en la base." };
     return { error: error.message.length < 200 ? error.message : "No se pudo crear la remisión." };
@@ -44,7 +51,7 @@ export async function crearRemision(datos: { desde: unknown; hacia: unknown; not
     accion: "envio_dropi_inventario",
     entidad: "wms_remisiones",
     entidadId: creada.id,
-    detalle: `${numero}: ${revisadas.lineas.length} ${revisadas.lineas.length === 1 ? "producto" : "productos"}, ${unidades.toLocaleString("es-PA")} unidades${notas ? ` · ${notas}` : ""}`,
+    detalle: `${numero}${retiro ? " (retiro de plataforma)" : ""}: ${revisadas.lineas.length} ${revisadas.lineas.length === 1 ? "producto" : "productos"}, ${unidades.toLocaleString("es-PA")} unidades${notas ? ` · ${notas}` : ""}`,
   });
   revalidatePath("/inventario");
   revalidatePath("/inventario/remisiones");
@@ -93,7 +100,7 @@ async function avisar(supabase: ReturnType<typeof createServiceClient>, personas
 }
 
 /** Pide corregir lo recibido o anular lo que sigue en camino (migración 0237). No cambia nada: queda esperando a quien puede autorizar y les llega el aviso. */
-export async function pedirCorreccion(envioId: string, tipo: unknown, recibida: unknown, motivo: unknown): Promise<{ error?: string }> {
+export async function pedirCorreccion(envioId: string, tipo: unknown, recibida: unknown, motivo: unknown): Promise<{ error?: string; anulada?: boolean }> {
   const usuario = await requireModuloEscritura("inventario");
   if (!ES_ID(envioId)) return { error: "Línea no válida." };
   const supabase = createServiceClient();
@@ -107,11 +114,16 @@ export async function pedirCorreccion(envioId: string, tipo: unknown, recibida: 
   const r = revisarCorreccion({ estado: linea.estado as string, recibida: linea.recibida === null ? null : Number(linea.recibida) }, { tipo, recibida, motivo });
   if ("error" in r) return r;
   const bodega = (Array.isArray(linea.wms_bodegas) ? linea.wms_bodegas[0] : linea.wms_bodegas) as { pais_id: string } | null;
+  const nombre = usuario.nombre || usuario.email;
+  const sku = (Array.isArray(linea.skus_maestros) ? linea.skus_maestros[0] : linea.skus_maestros) as { codigo: string } | null;
+  const donde = `${linea.referencia ?? "Remisión"} · ${sku?.codigo ?? ""}`;
+  const que = textoCorreccion({ tipo: r.tipo, recibidaAntes: linea.recibida === null ? null : Number(linea.recibida), recibidaNueva: r.recibida, enviada: Number(linea.enviada) });
+  // Quien lleva las remisiones (módulo `anular-remision`, migración 0344) anula lo que sigue en camino sin esperar a nadie: la petición queda guardada y resuelta al instante, con su motivo y su nombre.
+  if (r.tipo === "anular" && puedeAnularSinAutorizacion(usuario)) return anularDirecto(supabase, { envioId, motivo: r.motivo, usuario: { id: usuario.id, nombre }, donde, que });
   const { data: autorizadores, error: errorAut } = await supabase.from("wms_autorizadores_remision").select("perfil_id, pais_id");
   if (errorAut) return { error: "Falta correr la migración 0237 en la base." };
   const autoriza = quienesAutorizan(autorizadores ?? [], bodega?.pais_id ?? "", usuario.id);
   if (!autoriza.length) return { error: "No hay quién autorice esta corrección." };
-  const nombre = usuario.nombre || usuario.email;
   const { error } = await supabase.from("wms_correcciones_remision").insert({
     envio_id: envioId,
     tipo: r.tipo,
@@ -123,13 +135,35 @@ export async function pedirCorreccion(envioId: string, tipo: unknown, recibida: 
     autoriza_a: autoriza,
   });
   if (error) return { error: error.code === "23505" ? "Esa línea ya tiene una petición esperando autorización." : "No se pudo guardar la petición." };
-  const sku = (Array.isArray(linea.skus_maestros) ? linea.skus_maestros[0] : linea.skus_maestros) as { codigo: string } | null;
-  const que = textoCorreccion({ tipo: r.tipo, recibidaAntes: linea.recibida === null ? null : Number(linea.recibida), recibidaNueva: r.recibida, enviada: Number(linea.enviada) });
-  const donde = `${linea.referencia ?? "Remisión"} · ${sku?.codigo ?? ""}`;
   await avisar(supabase, autoriza, `Remisión por autorizar: ${donde}`, `${que}. ${nombre}: ${r.motivo}`, { id: usuario.id, nombre });
   await registrarAuditoria({ accion: "remision_correccion_pedida", entidad: "wms_envios_dropi", entidadId: envioId, detalle: `${donde} · ${que} · ${r.motivo}` });
   revalidatePath(RUTA);
   return {};
+}
+
+/** Anula la línea al instante: guarda la petición como directa (resuelta por quien la pide) y la resuelve; si algo falla, no queda ninguna petición a medias. */
+async function anularDirecto(
+  supabase: ReturnType<typeof createServiceClient>,
+  d: { envioId: string; motivo: string; usuario: { id: string; nombre: string }; donde: string; que: string },
+): Promise<{ error?: string; anulada?: boolean }> {
+  const { data: creada, error } = await supabase
+    .from("wms_correcciones_remision")
+    .insert({ envio_id: d.envioId, tipo: "anular", motivo: d.motivo, solicitante_id: d.usuario.id, solicitante_nombre: d.usuario.nombre, autoriza_a: [d.usuario.id], directa: true })
+    .select("id")
+    .single();
+  if (error || !creada) {
+    if (error?.code === "23505") return { error: "Esa línea ya tiene una petición esperando autorización." };
+    return { error: error?.code === "42703" ? "Falta correr la migración 0344 en la base." : "No se pudo anular la línea." };
+  }
+  const { error: fallo } = await supabase.rpc("wms_resolver_correccion_remision", { p_correccion: creada.id, p_autorizar: true, p_nota: "Anulada directamente por quien lleva las remisiones", p_usuario: d.usuario.id, p_nombre: d.usuario.nombre });
+  if (fallo) {
+    await supabase.from("wms_correcciones_remision").delete().eq("id", creada.id);
+    return { error: fallo.message.length < 200 ? fallo.message : "No se pudo anular la línea." };
+  }
+  await registrarAuditoria({ accion: "remision_anulada_directa", entidad: "wms_envios_dropi", entidadId: d.envioId, detalle: `${d.donde} · ${d.que} · ${d.motivo}` });
+  revalidatePath(RUTA);
+  revalidatePath("/inventario");
+  return { anulada: true };
 }
 
 /** Autoriza o rechaza una petición. La base comprueba que esta persona pueda hacerlo y que no sea quien la pidió. */

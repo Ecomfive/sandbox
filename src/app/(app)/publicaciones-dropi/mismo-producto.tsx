@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- foto de Storage o de Dropi */
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { TIPOS, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
@@ -27,7 +27,7 @@ export function PublicacionesDelProducto({ otras, alAbrir }: { otras: FilaPublic
               className={`flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted ${anilloFoco} ${o.archivada ? "opacity-60" : ""}`}
             >
               {o.fotoUrl ? (
-                <img src={o.fotoUrl} alt="" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" />
+                <FotoAmpliable src={o.fotoUrl} alt="" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" />
               ) : (
                 <span aria-hidden="true" className="h-10 w-10 shrink-0 rounded-md border border-dashed border-border-control" />
               )}

@@ -391,7 +391,6 @@ export function FormularioCompra({
                   todas={tiendas}
                   renderValor={(n) => <PastillaTienda nombre={n} />}
                   gestion={gestionTiendas}
-                  unica
                 />
               </Campo>
             </CampoGobernado>
@@ -461,6 +460,9 @@ export function FormularioCompra({
                   <PrediccionFechaLimite fechaLimite={compra?.fechaLimite ?? null} />
                 </Campo>
               </CampoGobernado>
+              <Campo etiqueta={conEmoji("fechaLlegadaPuerto", "Fecha llegada a puerto")} id="campo-fecha-llegada-puerto">
+                <input id="campo-fecha-llegada-puerto" type="date" name="fecha_llegada_puerto" defaultValue={compra?.fechaLlegadaPuerto ?? ""} className={fieldClass} />
+              </Campo>
               <Campo etiqueta={conEmoji("fechaLlegada", "Fecha de llegada")} id="campo-fecha-llegada">
                 <input id="campo-fecha-llegada" type="date" name="fecha_llegada" defaultValue={compra?.fechaLlegada ?? ""} className={fieldClass} />
               </Campo>

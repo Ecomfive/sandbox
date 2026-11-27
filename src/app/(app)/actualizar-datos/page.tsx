@@ -26,7 +26,7 @@ export default async function ActualizarDatosPage() {
   if (!veAlgunaFuente(usuario.modulos)) irAlInicio(usuario);
   const supabase = createServiceClient();
   const fuentes = await cargarFuentes(supabase, usuario);
-  const usaExtension = fuentes.some((f) => f.accion?.tipo === "ventana" && /^(dropi-|siscore$|tu-winner$|retiros$)/.test(f.clave));
+  const usaExtension = fuentes.some((f) => f.accion?.tipo === "ventana" && /^(dropi-|siscore$|tu-winner$|retiros$|drop-competencia$)/.test(f.clave));
   // Lo que necesitan las ventanas que se abren aquí (solo si alguna fila de la persona las usa).
   const ventanas = fuentes.flatMap((f) => (f.accion?.tipo === "ventana" ? [f.accion.ventana] : []));
   const usa = (pred: (v: (typeof ventanas)[number]) => boolean) => ventanas.some(pred);

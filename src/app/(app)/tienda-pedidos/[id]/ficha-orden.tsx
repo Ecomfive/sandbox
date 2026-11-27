@@ -16,6 +16,9 @@ import { casoAbierto, tipoPrincipal, type CasoPedido } from "@/lib/tienda/postve
 import { etiquetasDe, zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
 import { NotasOrden } from "./notas-orden";
 import { EtiquetasPedido } from "./etiquetas-pedido";
+import { GestionPedido } from "./gestion-pedido";
+import { EditarDireccion } from "./editar-direccion";
+import { sugerenciaPermitida } from "@/lib/tienda/gestion-atc";
 import { cambiarEtiquetasPedido } from "../etiquetas-actions";
 import { ETIQUETA_CONFIRMADA, esConfirmada } from "@/lib/tienda/etiquetas-shopify";
 import { ChatTienda } from "@/components/tienda/chat-tienda";
@@ -254,6 +257,10 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
   const zona = zonaDeEtiquetas(etiquetas.join(", "));
   const esc = orden.escritura;
   const confirmada = esConfirmada(etiquetas);
+  // Con el manual ATC (24 nov 2026) la gestión va por los botones de «Gestión»: abajo no sale el «Confirmar pedido» de antes y no se sugieren las
+  // etiquetas que el manual reemplaza (Confirmada, ANULADO/VERIFICADO, Cancelado, Pendiente, zona y motivos).
+  const conGestionAtc = esc.activa && deShopify && (puedeEscribir || !!esc.finanzas);
+  const sugeridas = conGestionAtc ? esc.sugeridas.filter(sugerenciaPermitida) : esc.sugeridas;
   function cambiarEtiquetas(agregar: string[], quitar: string[], hecho: string) {
     startCambio(async () => {
       const r = await cambiarEtiquetasPedido(orden.id, agregar, quitar);
@@ -301,7 +308,27 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
           </nav>
 
           {(etiquetas.length > 0 || esc.activa) && (
-            <EtiquetasPedido ordenId={orden.id} etiquetas={etiquetas} sugeridas={esc.sugeridas} activa={esc.activa} motivo={esc.motivo} pendiente={cambiando} onCambiar={cambiarEtiquetas} />
+            <EtiquetasPedido ordenId={orden.id} etiquetas={etiquetas} sugeridas={sugeridas} activa={esc.activa && !esc.soloFinanzas} motivo={esc.motivo} pendiente={cambiando} onCambiar={cambiarEtiquetas} />
+          )}
+
+          {/* Manual ATC (24 nov 2026): Confirmar, Novedad y Anular con las reglas del manual; cada uno escribe en Shopify y deja su línea en la cronología. */}
+          {conGestionAtc && (
+            <GestionPedido
+              ordenId={orden.id}
+              etiquetas={etiquetas}
+              codigoPais={codigoPais}
+              estadoEntrega={o.estado_entrega ?? null}
+              estadoPago={o.estado_pago ?? null}
+              guia={o.guia ?? null}
+              guiaSinCargar={orden.guiaSinCargar ?? null}
+              finanzas={!!esc.finanzas}
+              soloFinanzas={!!esc.soloFinanzas || !puedeEscribir}
+              alHecho={(r) => {
+                setEtiquetas(r.etiquetas);
+                mostrarToast(r.aviso ?? r.texto, r.aviso ? "destructive" : undefined);
+                router.refresh();
+              }}
+            />
           )}
 
           {orden.asistente && (
@@ -335,6 +362,12 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
               <Campo etiqueta="Dirección exacta" campo="address1" valor={cliente?.direccion} />
               <Campo etiqueta="Nota del cliente" campo="note" valor={cliente?.notas} />
             </div>
+            {/* La asesora corrige la dirección que el bot no entendió (26 nov 2026): se cambia en Shopify. */}
+            {conGestionAtc && puedeEscribir && !esc.soloFinanzas && o.estado_entrega !== "entregada" && (
+              <div className="flex">
+                <EditarDireccion key={`${cliente?.direccion ?? ""}|${cliente?.corregimiento ?? ""}`} ordenId={orden.id} direccion={cliente?.direccion ?? null} corregimiento={cliente?.corregimiento ?? null} />
+              </div>
+            )}
             <p className="m-0 text-sm">
               <span className="text-muted-foreground">Pedidos anteriores del cliente: </span>
               {anteriores.length ? `${anteriores.length} · ${entregados} ${entregados === 1 ? "entregado" : "entregados"}${devueltos ? ` · ${devueltos} ${devueltos === 1 ? "devuelto" : "devueltos"}` : ""}` : "ninguno"}
@@ -467,7 +500,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
           </Seccion>
 
           <Seccion id={sid("notas")} titulo={S("notas").titulo} icono={S("notas").icono} extra={<span className="text-xs text-muted-foreground">quedan en el sistema, no en Shopify</span>}>
-            <NotasOrden key={orden.id} ordenId={orden.id} notas={orden.notas} puedeEscribir={puedeEscribir} />
+            <NotasOrden key={`${orden.id}-${orden.notas.length}`} ordenId={orden.id} notas={orden.notas} puedeEscribir={puedeEscribir} />
           </Seccion>
 
           <Seccion id={sid("historial")} titulo={S("historial").titulo} icono={S("historial").icono} extra={<span className="text-xs text-muted-foreground">del más nuevo al más viejo</span>}>
@@ -520,6 +553,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
           <div className="sticky bottom-0 z-[5] mt-auto flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3">
             {/* «Confirmar pedido» (19 nov 2026): pone la etiqueta «Confirmada» en Shopify, que es lo que el sistema lee como confirmado. */}
             {esc.activa &&
+              !conGestionAtc &&
               (confirmada ? (
                 <span className="inline-flex items-center gap-1.5 rounded-md bg-success-soft px-3 py-1.5 text-[13px] font-semibold text-success">
                   <CheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -536,7 +570,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
                   {cambiando ? "Guardando…" : "Confirmar pedido"}
                 </button>
               ))}
-            {ACCIONES.filter((a) => !esc.activa || a !== "Confirmar pedido").map((a) => (
+            {ACCIONES.filter((a) => (!esc.activa || a !== "Confirmar pedido") && (!conGestionAtc || a !== "Anular pedido")).map((a) => (
               <Tooltip key={a} texto="Todavía no: por ahora desde el sistema solo se cambian las etiquetas del pedido en Shopify (y «Confirmar pedido», si la tienda lo tiene encendido).">
                 <button type="button" aria-disabled="true" className="cursor-not-allowed rounded-md border border-border bg-muted/50 px-3 py-1.5 text-[13px] font-medium text-muted-foreground">
                   {a}

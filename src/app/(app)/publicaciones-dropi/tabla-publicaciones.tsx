@@ -120,6 +120,12 @@ export function TablaPublicaciones({
   const verVentas = corteVentas !== null;
   const def = DEF_PUBLICACIONES;
   const [abierta, setAbierta] = useState<string | null>(() => (abrirInicial && publicaciones.some((p) => p.id === abrirInicial) ? abrirInicial : null));
+  // Si la página ya está abierta y llega otro `?abrir=` (un resultado de «Buscar por imagen» de esta misma lista), esa publicación se abre también: el estado inicial solo se lee al montar (24 nov 2026).
+  const [abrirVisto, setAbrirVisto] = useState(abrirInicial);
+  if (abrirInicial !== abrirVisto) {
+    setAbrirVisto(abrirInicial);
+    if (abrirInicial && publicaciones.some((p) => p.id === abrirInicial)) setAbierta(abrirInicial);
+  }
   // La ficha abierta también queda en la dirección (`?abrir=<id>`): si la lista se vuelve a cargar (al guardar), sigue abierta.
   useEffect(() => {
     const url = new URL(window.location.href);

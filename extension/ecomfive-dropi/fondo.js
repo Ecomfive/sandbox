@@ -30,6 +30,8 @@
 // el nombre del contenedor, sino la lista que trae pedidos, para que el próximo cambio de nombre no lo rompa.
 // 0.8.3 (18 nov 2026): el lector de SISCORE recibe `saltar` (guía → estado de las que el sistema ya tiene cerradas, con su rastreo) y no vuelve a abrir el
 // rastreo de las que siguen con ese estado: Oferfy pasa de ~2.500 rastreos por lectura a las nuevas y las abiertas.
+// 0.8.4 (24 nov 2026): lector `competencia_drop`: el Catálogo de Drop entero con la sesión de dropshipper (perfil aparte de Chrome), para Análisis de
+// competencia y «Bajar precio» de Gestión de IDs Drop. La pestaña va a /dropshipping antes de leer; con la sesión de proveedor avisa y no guarda nada.
 // 0.8.0 (12 nov 2026): «siscore» es la pestaña de servientrega-clientes.appsiscore.com (SISCORE, el portal de clientes de Servientrega Panamá) con la cuenta
 // de la tienda (Kenku primero), con el lector `siscore` (informe de guías y rastreo de cada una) para Logística de tienda. SOLO LECTURA: solo consultas;
 // nunca anula, crea guías, recolecciones ni confirmaciones. Su sesión es una cookie: se ve si la página es la del cliente (no la de entrar).
@@ -63,6 +65,8 @@ const LECTORES = {
   tuwinner: { pais: "tw", archivo: "lectores/tuwinner.js", funcion: "leerTuWinner", estado: "__tuwinner", archivos: ["tuwinner"] },
   // SISCORE (0.8.0): las guías de Servientrega de la cuenta de la tienda, para Logística de tienda. Solo lectura.
   siscore: { pais: "siscore", archivo: "lectores/siscore.js", funcion: "leerSiscore", estado: "__siscore", archivos: ["siscore"], frente: true },
+  // La competencia en Drop (0.8.4): el Catálogo completo con la sesión de DROPSHIPPER (en un perfil aparte de Chrome). `ruta`: la pestaña va ahí antes de leer.
+  competencia_drop: { pais: "drop", archivo: "lectores/competencia-drop.js", funcion: "leerCompetenciaDrop", estado: "__competenciaDrop", archivos: ["competenciadrop"], frente: true, ruta: "/dropshipping" },
 };
 // Las direcciones firmadas de subida del sistema: solo a su carpeta temporal de «Actualizar Dropi» y solo en el proyecto de Supabase
 // del sistema (auditoría 27 oct 2026: antes cualquier proyecto *.supabase.co pasaba y lo leído podía terminar en otro lado).
@@ -217,6 +221,11 @@ async function atender(m, remitente) {
           ? Object.fromEntries(Object.entries(ss).filter(([k, v]) => /^[0-9A-Za-z-]{4,40}$/.test(k) && typeof v === "string" && v.length <= 200).slice(0, 20000))
           : null;
       const t = await pestana(l.pais, true, !!l.frente);
+      // Un lector que lee una página fija (la competencia, en el Catálogo de Drop): la pestaña va ahí antes de leer.
+      if (l.ruta && new URL(t.url || ORIGEN[l.pais]).pathname !== l.ruta) {
+        await chrome.tabs.update(t.id, { url: `${ORIGEN[l.pais]}${l.ruta}` });
+        await cargada(t.id);
+      }
       await chrome.scripting.executeScript({ target: { tabId: t.id }, world: "MAIN", files: [l.archivo] });
       await enPagina(
         t.id,

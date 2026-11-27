@@ -44,7 +44,7 @@ export default async function SaludDatosPage() {
   const criticas: (Omit<TablaCritica, "filas"> & { tabla: string; modulo: string })[] = [
     { tabla: "fin_base_distribucion", nombre: "Base de reparto", href: "/libro-movimientos/importar", accion: "Importar", modulo: "libro-movimientos" },
     { tabla: "fin_saldos_iniciales", nombre: "Saldos iniciales", href: "/flujo-caja", accion: "Cargar", modulo: "flujo-caja" },
-    { tabla: "fin_costos_lotes", nombre: "Costos de mercancía", href: "/costos-mercancia/importar", accion: "Importar", modulo: "costos-mercancia" },
+    { tabla: "fin_costos_lotes", nombre: "Costos de producto", href: "/costos-mercancia", accion: "Abrir la hoja", modulo: "costos-mercancia" },
     { tabla: "ven_ordenes", nombre: "Ventas por tienda", href: "/ventas-tiendas/importar", accion: "Importar", modulo: "ventas-tiendas" },
     { tabla: "conc_lineas", nombre: "Extractos bancarios", href: "/conciliacion-bancaria/importar", accion: "Importar", modulo: "conciliacion-bancaria" },
     { tabla: "del_entregas", nombre: "Deliverys", href: "/deliverys/importar", accion: "Importar", modulo: "deliverys" },

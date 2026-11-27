@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { AnunciosIcon, ChevronRightIcon, EtiquetaIcon, EstadoIcon, MargenIcon, PersonaIcon, ProductoIcon, TiendaIcon, CalendarioIcon, FiltroIcon } from "@/lib/nav-icons";
-import { cpa, ctr, dolares, nivelDeCpa, nivelDeCtr } from "@/lib/meta-ads/metricas";
+import { PRESETS_COLUMNAS, type ClaveColumna } from "@/lib/meta-ads/columnas";
+import { confiable, dolares } from "@/lib/meta-ads/metricas";
+import { ordenarPor } from "@/lib/meta-ads/orden";
+import { CRITERIOS_CAMPANAS, ORDEN_CAMPANAS } from "@/lib/meta-ads/orden-listas";
 import type { CuentaVista } from "@/lib/meta-ads/datos";
 import { faltanEtiquetas } from "@/lib/meta-ads/sugerencias";
 import type { AnuncioVista, CampanaVista } from "@/lib/meta-ads/vistas";
@@ -12,49 +15,44 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { DEF_CAMPANAS, NOMBRE_VEREDICTO, veredictoDe } from "./def-campanas";
 import { BarraApilada, coloresDeAngulos } from "./graficas";
 import { FichaCampana } from "./ficha-campana";
-import { InsigniaEstructura, InsigniaEtapa, Nivel, nombreEstado, porcentaje, Resultado, valorCpa } from "./piezas";
+import { CeldasColumnas, EncabezadoColumnas, estiloRejilla, SelectorColumnasMeta, useColumnasMeta } from "./columnas-meta";
+import { BarraOrden, useOrdenMeta } from "./orden-meta";
+import { GuiaEnLinea } from "./aviso-tope";
+import { InsigniaEstructura, InsigniaEtapa, InsigniaPrioridad, nombreEstado } from "./piezas";
+import { textoDeMezcla } from "@/lib/meta-ads/atributos-video";
 
 const NOMBRE: NombreFilas = { singular: "campaña", plural: "campañas" };
 const ICONOS: Record<string, IconoComp> = { nombre: ProductoIcon, veredicto: MargenIcon, etapa: EtiquetaIcon, estado: EstadoIcon, estructura: FiltroIcon, puja: FiltroIcon, mercado: TiendaIcon, videos: AnunciosIcon, producto: ProductoIcon, angulo: EtiquetaIcon, cuenta: TiendaIcon, persona: PersonaIcon, meta: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, creada: CalendarioIcon };
 
-const COLUMNAS = "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1.3fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_1rem]";
+// Pantalla ancha: nombre, tipo, las columnas que cada persona elige con «Columnas» (por defecto las de la hoja de Testing y el resultado) y la flecha. Más angosta, las cifras van en una línea debajo del nombre.
+const COLUMNAS_CAMPANAS: ClaveColumna[] = PRESETS_COLUMNAS.find((p) => p.id === "testing")!.columnas;
 
-function EncabezadoFilas() {
-  return (
-    <div aria-hidden="true" className={`hidden gap-3 px-4 py-2 text-xs font-medium text-muted-foreground lg:grid ${COLUMNAS}`}>
-      <span>Campaña</span>
-      <span>Tipo</span>
-      <span className="text-right">Gasto</span>
-      <span className="text-right">Compras</span>
-      <span className="text-right">CPA</span>
-      <span className="text-right">Resultado estimado</span>
-      <span />
-    </div>
-  );
-}
-
-function FilaCampana({ c, alAbrir, colores }: { c: CampanaVista; alAbrir: () => void; colores: Map<string, string> }) {
+function FilaCampana({ c, alAbrir, colores, columnas }: { c: CampanaVista; alAbrir: () => void; colores: Map<string, string>; columnas: ClaveColumna[] }) {
   const v = veredictoDe(c);
   const punto = v === "pierde" ? "bg-destructive" : v === "deja" ? "bg-success" : "bg-muted-foreground";
   return (
-    <button type="button" onClick={alAbrir} className={`grid w-full cursor-pointer grid-cols-1 gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${COLUMNAS}`}>
+    <button type="button" onClick={alAbrir} style={estiloRejilla(columnas.length, true)} className={`grid w-full cursor-pointer grid-cols-1 gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground xl:[grid-template-columns:var(--columnas-meta)]`}>
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-2">
           <span role="img" aria-label={NOMBRE_VEREDICTO[v]} className={`h-2 w-2 shrink-0 rounded-full ${punto}`} />
           <span className="truncate text-sm font-medium">{c.nombre}</span>
         </span>
-        <span className="truncate text-xs text-muted-foreground">
-          {c.mercado ?? c.cuentaNombre}
-          {c.videos ? ` · ${c.videos}` : ""}
-          {c.persona ? ` · la montó ${c.persona}` : ""}
-          {c.creadaEn ? ` · ${c.creadaEn.slice(0, 10)}` : ""}
-          {c.activa ? "" : ` · ${nombreEstado(c.estado)}`}
-          {c.activa && faltanEtiquetas(c).length > 0 ? ` · falta ${faltanEtiquetas(c).join(" y ")}` : ""}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <InsigniaPrioridad pendiente={c.pendiente} />
+          <span className="min-w-0 truncate text-xs text-muted-foreground">
+            {c.mercado ?? c.cuentaNombre}
+            {c.videos ? ` · ${c.videos}` : ""}
+            {c.persona ? ` · la montó ${c.persona}` : ""}
+            {c.creadaEn ? ` · ${c.creadaEn.slice(0, 10)}` : ""}
+            {c.activa ? "" : ` · ${nombreEstado(c.estado)}`}
+            {c.activa && faltanEtiquetas(c).length > 0 ? ` · falta ${faltanEtiquetas(c).join(" y ")}` : ""}
+          </span>
         </span>
+        {c.guiaTope && <GuiaEnLinea guia={c.guiaTope} className="mt-0.5" />}
         {c.angulos.length > 0 && (
           <span className="mt-0.5 flex min-w-0 flex-col gap-0.5">
-            <BarraApilada partes={c.angulos.map((a) => ({ nombre: a.angulo, valor: a.videos, color: colores.get(a.angulo) ?? "var(--grafica-5)" }))} alto={6} etiqueta={`Ángulos de sus videos: ${c.angulos.map((a) => `${a.angulo} ${a.pct} %`).join(", ")}`} />
-            <span className="truncate text-xs text-muted-foreground">{c.angulos.map((a) => `${a.angulo} ${a.pct} %`).join(" · ")}</span>
+            <BarraApilada partes={c.angulos.map((a) => ({ nombre: a.angulo, valor: a.videos, color: colores.get(a.angulo) ?? "var(--grafica-5)" }))} alto={6} etiqueta={`Ángulos de sus videos: ${textoDeMezcla(c.angulos)}`} />
+            <span className="line-clamp-2 text-xs text-muted-foreground">{textoDeMezcla(c.angulos)}</span>
           </span>
         )}
       </span>
@@ -62,25 +60,8 @@ function FilaCampana({ c, alAbrir, colores }: { c: CampanaVista; alAbrir: () => 
         <InsigniaEtapa etapa={c.etapa} />
         <InsigniaEstructura estructura={c.estructura} puja={c.puja} />
       </span>
-      <span className="text-sm tabular-nums lg:text-right">
-        <span className="sr-only">Gasto: </span>
-        {c.r.gasto > 0 ? dolares(c.r.gasto) : "—"}
-      </span>
-      <span className="text-sm tabular-nums lg:text-right">
-        <span className="sr-only">Compras: </span>
-        {c.r.gasto > 0 ? c.r.compras : "—"}
-      </span>
-      <span className="text-sm lg:text-right">
-        <span className="sr-only">CPA: </span>
-        {c.r.compras > 0 ? <Nivel nivel={nivelDeCpa(cpa(c.r), c.tope)}>{valorCpa(c.r)}</Nivel> : "—"}
-        {c.r.impresiones > 0 && <span className="block text-xs text-muted-foreground">CTR <Nivel nivel={nivelDeCtr(ctr(c.r))}>{porcentaje(ctr(c.r))}</Nivel></span>}
-      </span>
-      <span className="lg:text-right">
-        <span className="sr-only">Resultado estimado: </span>
-        <Resultado r={c.r} tope={c.tope} />
-        {!c.topeDefinido && c.r.gasto > 0 && <span className="block text-xs text-muted-foreground">con tope {dolares(c.tope)}</span>}
-      </span>
-      <ChevronRightIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground lg:block" />
+      <CeldasColumnas columnas={columnas} r={c.r} ctx={{ tope: c.tope, etapa: c.etapa, frecuencia: c.frecuencia, confiable: confiable(c.r) }} minimo="xl" />
+      <ChevronRightIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground xl:block" />
     </button>
   );
 }
@@ -100,7 +81,10 @@ export function CampanasLista({ campanas: todas, anuncios, cuentas, productos, e
     if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
   }, [abierta, soloFaltan]);
   const [orden, setOrden] = useState<string[]>([]);
+  const [columnas, guardarColumnas, restablecerColumnas] = useColumnasMeta("campanas", COLUMNAS_CAMPANAS);
   const colores = useMemo(() => coloresDeAngulos(todas), [todas]);
+  const [ordenes, guardarOrdenes] = useOrdenMeta("campanas", CRITERIOS_CAMPANAS, ORDEN_CAMPANAS);
+  const ordenadas = ordenarPor(campanas, CRITERIOS_CAMPANAS, ordenes, (c) => c.r.gasto);
   // La ficha se dibuja en `<body>` (portal): con `?abrir=` arranca abierta, así que solo se monta ya en el navegador.
   const enNavegador = useSyncExternalStore(
     () => () => {},
@@ -122,19 +106,23 @@ export function CampanasLista({ campanas: todas, anuncios, cuentas, productos, e
           </button>
         </div>
       )}
+      <BarraOrden criterios={CRITERIOS_CAMPANAS} ordenes={ordenes} alCambiar={guardarOrdenes}>
+        <SelectorColumnasMeta titulo="Campañas" columnas={columnas} alCambiar={guardarColumnas} alRestablecer={restablecerColumnas} />
+      </BarraOrden>
       <ListaDatos
         def={DEF_CAMPANAS}
-        filas={campanas}
+        filas={ordenadas}
         iconos={ICONOS}
         nombre={NOMBRE}
         claveFila={(c) => c.id}
         variante="filas"
-        encabezado={<EncabezadoFilas />}
+        encabezado={<EncabezadoColumnas nombre="Campaña" extra="Tipo" columnas={columnas} minimo="xl" />}
         formatearTotal={dolares}
         renderFila={(c, enOrden) => (
           <FilaCampana
             c={c}
             colores={colores}
+            columnas={columnas}
             alAbrir={() => {
               setOrden(enOrden.map((x) => x.id));
               setAbierta(c.id);

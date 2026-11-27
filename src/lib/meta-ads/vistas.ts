@@ -1,6 +1,9 @@
 // Anuncios Meta: lo que las pantallas reciben ya armado (serializable: cruza de servidor a cliente).
 
+import type { GuiaDeTope } from "./limite";
+import type { Decision } from "./decision-anuncio";
 import type { Resultados } from "./metricas";
+import type { Pendiente } from "./prioridad";
 import type { Estructura, Etapa, Puja } from "./nombre";
 
 export interface CampanaVista {
@@ -12,6 +15,14 @@ export interface CampanaVista {
   estado: string;
   activa: boolean;
   etapa: Etapa | null;
+  /** Encendida y gastando en los últimos 7 días (o recién montada). */
+  enMarcha?: boolean;
+  /** Lo más urgente de «Para decidir hoy» sobre esta campaña. */
+  pendiente?: Pendiente | null;
+  /** Por qué tiene esa etapa (lo que dice el nombre, el producto en Producto o lo corregido a mano). */
+  etapaMotivo: string | null;
+  /** Veces que, en promedio, una persona vio la campaña en los últimos 7 días (null si Meta todavía no se lo dijo al sistema). */
+  frecuencia: number | null;
   estructura: Estructura | null;
   puja: Puja | null;
   producto: string | null;
@@ -38,8 +49,32 @@ export interface CampanaVista {
   r: Resultados;
   tope: number;
   topeDefinido: boolean;
+  /** El tope se bajó del general por el envío y la entrega del producto, y por qué. */
+  topeAjustado?: boolean;
+  guiaTope?: GuiaDeTope | null;
   /** Qué etiquetas se corrigieron a mano (la lectura de Meta no las pisa): `producto`, `angulo`, `etapa`. */
   manual: string[];
+}
+
+/** Un producto con lo que sumaron sus campañas en el periodo (vista por producto). */
+export interface ProductoVista {
+  /** La llave del producto (sin acentos, mayúsculas ni signos): vacía para «Sin producto». */
+  clave: string;
+  nombre: string;
+  tope: number;
+  topeDefinido: boolean;
+  topeAjustado?: boolean;
+  guiaTope?: GuiaDeTope | null;
+  r: Resultados;
+  campanas: number;
+  activas: number;
+  /** Tiene una campaña activa que gastó en los últimos 7 días. */
+  enMarcha: boolean;
+  /** Lo más urgente entre sus campañas. */
+  pendiente?: Pendiente | null;
+  /** Videos distintos de sus campañas (los últimos 30 días). */
+  videos: number;
+  anuncios: number;
 }
 
 /** Un ángulo dentro de una campaña: cuántos de sus videos lo usan y qué parte de los videos con ángulo es. Los porcentajes de una campaña suman 100. */
@@ -48,6 +83,8 @@ export interface ComposicionAngulo {
   videos: number;
   pct: number;
   gasto: number;
+  /** En una táctica general, de qué son sus videos (el más repetido primero). */
+  detalles?: string[];
 }
 
 export interface AnuncioVista {
@@ -60,6 +97,15 @@ export interface AnuncioVista {
   copy: string | null;
   titulo: string | null;
   landing: string | null;
+  /** «V3»: el número del video dentro de su tanda, según el nombre del anuncio. */
+  numero: string | null;
+  /** El ángulo de su video, según el análisis de la IA. */
+  angulo: string | null;
+  /** Qué toca hacer con este anuncio según la escalera del documento «Métrica» (solo anuncios activos de campañas activas) y por qué. */
+  decision: Decision | null;
+  decisionMotivo: string | null;
+  /** Veces que, en promedio, una persona vio el anuncio en los últimos 7 días. */
+  frecuencia: number | null;
   r: Resultados;
 }
 
@@ -74,6 +120,8 @@ export interface AnalisisVideoVista {
   gancho: string | null;
   /** Qué tipo de gancho es (pregunta, problema o dolor, resultado…), de una lista fija; null si todavía no se clasificó. */
   ganchoTipo: string | null;
+  /** Solo en las tácticas generales (Antes y después, Testimonio de cliente, Experto o autoridad): de qué es. */
+  anguloDetalle: string | null;
   resumen: string | null;
   transcripcion: string | null;
   publico: string | null;
@@ -104,6 +152,10 @@ export interface VideoVista {
   anuncios: number;
   /** «V3»: el número del video dentro de su tanda, si el nombre del anuncio lo dice. */
   numero: string | null;
+  /** Tiene un anuncio activo en una campaña en marcha. */
+  enMarcha?: boolean;
+  /** Lo más urgente de «Para decidir hoy» sobre este video o sus anuncios. */
+  pendiente?: Pendiente | null;
   /** El análisis de la IA, si ya se hizo. */
   analisis: AnalisisVideoVista | null;
   /** Los anuncios que usan este video y a qué campaña pertenece cada uno (últimos 30 días). */
@@ -114,6 +166,8 @@ export interface VideoVista {
 
 export interface Grupo {
   nombre: string;
+  /** En un ángulo que es una táctica general, de qué son sus videos. */
+  deQue?: string;
   campanas: number;
   /** Videos distintos del grupo (solo cuenta cuando el elemento trae su video: el ángulo). */
   videos: number;

@@ -62,6 +62,8 @@ const AREAS: NavSection[] = [
       { label: "Hoy", href: "/", frente: "proveeduria" },
       { label: "Ventas Proveeduría", href: "/ventas-dropi", dropi: true, frente: "proveeduria" },
       { label: "Dashboard de tienda", href: "/tienda-dashboard", frente: "tienda" },
+      // El tablero que compara las tiendas (20 nov 2026): antes era «Todas las tiendas» en Pedidos de tienda; ahora es de Admin y CEO.
+      { label: "Tablero de tiendas", href: "/tienda-tablero", frente: "tienda" },
     ],
   },
   // El recorrido de un producto antes de comprarse, en orden: de dónde sale (Fuentes), qué se elige (Selección), cómo se
@@ -118,16 +120,20 @@ const AREAS: NavSection[] = [
       { label: "Gestión de IDs Drop", href: "/publicaciones-drop", frente: "proveeduria" },
       { label: "Gestión de IDs Effi", href: "/publicaciones-effi", frente: "proveeduria" },
       { label: "Gestión de IDs Dunamixfy", href: "/publicaciones-dunamixfy", frente: "proveeduria" },
-      // Gestión de tienda (17 nov 2026, pedido de Hernán: «que no esté todo repartido»): tres entradas y lo demás son pestañas de ellas
-      // (`PESTANAS_POR_MODULO`). Pedidos: Confirmación, Con IA, Logística y Cuánto hay. Despacho ciudad, como el panel de Monday: Devoluciones,
-      // Cambios y reembolsos, Cuánto hay y Pedir a inventario. Tiendas Shopify: Productos. Cada pestaña sigue con su propio permiso.
+      // Gestión de tienda (17 nov 2026, pedido de Hernán: «que no esté todo repartido»): pocas entradas y lo demás son pestañas de ellas
+      // (`PESTANAS_POR_MODULO`). Pedidos: Confirmación, Con IA, Logística y Cuánto hay. Envíos Delivery, como el panel de Monday: Devoluciones y
+      // Cambios y reembolsos. Inventario despacho (aparte desde el 25 nov 2026): Mercancía existente, Solicitud de inventario y Archivos de solicitudes. Tiendas Shopify: Productos. Cada pestaña sigue con su propio permiso.
       { label: "Pedidos de tienda", href: "/tienda-pedidos", frente: "tienda" },
       { label: "Reportería de pedidos", href: "/tienda-reporteria", frente: "tienda" },
-      { label: "Despacho ciudad", href: "/despacho-ciudad", frente: "tienda" },
+      { label: "Envíos Delivery", href: "/despacho-ciudad", frente: "tienda" },
+      // Inventario despacho (25 nov 2026, pedido del equipo: «no es lo mismo que los envíos»): lo del stock de despacho, aparte.
+      { label: "Inventario despacho", href: "/inventario-despacho", frente: "tienda" },
       { label: "Tiendas Shopify", href: "/tienda-tiendas", frente: "tienda" },
       { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },
       { label: "Inventario", href: "/inventario", dropi: true, frente: "fulfillment" },
       { label: "Comunicación despacho", href: "/inventario-pedidos-despacho", frente: "fulfillment" },
+      // Llegadas a puerto (20 nov 2026, pedido de Logística: «solo me aparecen en avisos y las perdería de vista»): la lista que abre «Ver lista» del aviso.
+      { label: "Llegadas a puerto", href: "/llegadas", frente: "fulfillment" },
       { label: "Bodegas", href: "/wms-bodegas", frente: "fulfillment" },
       { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "fulfillment" },
       { label: "Compras", href: "/compras", frente: "fulfillment" },
@@ -157,7 +163,7 @@ const AREAS: NavSection[] = [
       { label: "Cierre de mes", href: "/cierre-mes", grupo: "Contabilidad y cierre" },
       { label: "Libro de movimientos", href: "/libro-movimientos", grupo: "Contabilidad y cierre" },
       { label: "Balance general", href: "/balance-general", grupo: "Contabilidad y cierre" },
-      { label: "Costos de mercancía", href: "/costos-mercancia", grupo: "Contabilidad y cierre" },
+      { label: "Costos de producto", href: "/costos-mercancia", grupo: "Contabilidad y cierre" },
       { label: "Bienes de uso", href: "/bienes-de-uso", grupo: "Contabilidad y cierre" },
       { label: "Ventas por tienda", href: "/ventas-tiendas", grupo: "Comercial" },
       { label: "Clientes y marketing", href: "/clientes-marketing", grupo: "Comercial" },
@@ -263,14 +269,21 @@ export function paginaInicialDe(modulos: readonly string[], excluirModulo?: stri
 
 /** Clave de módulo (permisos) correspondiente a un href de navegación. */
 export function moduloDeHref(href: string): string {
-  return href === "/" ? "dashboard" : href.slice(1);
+  return href === "/" ? "dashboard" : (MODULO_DE_ENTRADA[href] ?? href.slice(1));
 }
+
+/** Entradas del menú cuyo nombre de ruta no es un módulo: «Inventario despacho» junta pestañas de dos permisos y su página principal pide el de «Mercancía existente». */
+const MODULO_DE_ENTRADA: Record<string, string> = { "/inventario-despacho": "despacho-cuanto-hay" };
 
 /**
  * Las entradas del menú que juntan varios módulos en pestañas (17 nov 2026): cada pestaña con el módulo que pide, en el orden de las pestañas.
  * La entrada sale en el menú si la persona tiene cualquiera de ellos, y la lleva a la primera pestaña que puede abrir.
  */
 export const PESTANAS_CON_MODULO: Record<string, { href: string; modulo: string }[]> = {
+  "/pedidos-dropi": [
+    { href: "/pedidos-dropi", modulo: "pedidos-dropi" },
+    { href: "/pedidos-dropi/resumen", modulo: "pedidos-dropi-resumen" },
+  ],
   "/tienda-pedidos": [
     { href: "/tienda-pedidos", modulo: "tienda-pedidos" },
     { href: "/tienda-pedidos/confirmacion", modulo: "tienda-confirmacion" },
@@ -280,13 +293,19 @@ export const PESTANAS_CON_MODULO: Record<string, { href: string; modulo: string 
   "/inventario-pedidos-despacho": [
     { href: "/inventario-pedidos-despacho", modulo: "inventario-pedidos-despacho" },
     { href: "/inventario-pedidos-despacho/cuanto-hay", modulo: "tienda-cuanto-hay" },
+    { href: "/inventario-pedidos-despacho/archivo", modulo: "inventario-pedidos-despacho" },
   ],
   "/despacho-ciudad": [
     { href: "/despacho-ciudad", modulo: "despacho-ciudad" },
     { href: "/despacho-ciudad/devoluciones", modulo: "despacho-devoluciones" },
     { href: "/despacho-ciudad/cambios", modulo: "despacho-cambios" },
-    { href: "/despacho-ciudad/cuanto-hay", modulo: "despacho-cuanto-hay" },
-    { href: "/despacho-ciudad/pedir-inventario", modulo: "despacho-pedir-inventario" },
+    { href: "/despacho-ciudad/cierres", modulo: "despacho-ciudad" },
+    { href: "/despacho-ciudad/control", modulo: "despacho-ciudad" },
+  ],
+  "/inventario-despacho": [
+    { href: "/inventario-despacho", modulo: "despacho-cuanto-hay" },
+    { href: "/inventario-despacho/solicitudes", modulo: "despacho-pedir-inventario" },
+    { href: "/inventario-despacho/archivo", modulo: "despacho-pedir-inventario" },
   ],
   "/tienda-tiendas": [
     { href: "/tienda-tiendas", modulo: "tienda-tiendas" },

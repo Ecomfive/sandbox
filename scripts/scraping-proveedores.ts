@@ -24,7 +24,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { huellaFoto } from "../src/lib/wms/huella-foto";
 import { guardarCompetencia } from "./competencia-guardar";
-import { guardarCatalogo, type LecturaCatalogo } from "./competencia-catalogo-guardar";
+import { guardarCatalogo, type LecturaCatalogo } from "../src/lib/competencia/guardar-catalogo";
 import { guardarDrop, type LecturaDrop } from "./drop-guardar";
 import { guardarPedidosDunamixfy, guardarProductosDunamixfy } from "../src/lib/dunamixfy/guardar";
 import { guardarNuestrosProductos, type LecturaNuestros } from "./publicaciones-sincronizar-dropi";
