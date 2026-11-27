@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { alcanceInventario, aumentoDeConteo, bloqueoDeBodega, esBodegaDeDespacho, estaACargoDelInventario, revisarLimite, SOLO_A_CARGO, SOLO_BODEGA_DESPACHO } from "./inventario";
+import { alcanceInventario, aumentoDeConteo, bloqueoDeBodega, esBodegaDeDespacho, estaACargoDelInventario, faltanteDeCompras, repartirFaltante, revisarLimite, SOLO_A_CARGO, SOLO_BODEGA_DESPACHO } from "./inventario";
 
 const persona = (modulos: string[], soloLectura: string[] = []) => ({ modulos, modulosSoloLectura: soloLectura });
 
@@ -82,4 +82,30 @@ test("cuánto sube un levantamiento", () => {
   assert.equal(aumentoDeConteo({ enBodega: 100, contado: null, sumar: 0 }), 0);
   assert.equal(aumentoDeConteo({ enBodega: 100, contado: 90, sumar: 10 }), 0);
   assert.equal(aumentoDeConteo({ enBodega: -5, contado: 0, sumar: 0 }), 5);
+});
+
+test("lo que faltó al recibir la orden de compra se suma sin motivo", () => {
+  // Se pidieron 600, se recibieron 599: la que faltaba entra sin motivo, aunque no esté a cargo.
+  assert.equal(revisarLimite({ pais: "PA", existencia: 599, aumento: 1, aCargo: false, motivo: null, margen: 1 }), null);
+  // Más de lo que faltó sigue pidiendo motivo, y lo dice.
+  const m = revisarLimite({ pais: "PA", existencia: 599, aumento: 3, aCargo: true, motivo: "", margen: 1, dondeVaElMotivo: "en «Referencia»" });
+  assert.match(m ?? "", /De la orden de compra faltaron 1 al recibir: esa se suma sin motivo; lo demás no\./);
+  assert.match(m ?? "", /escribe el motivo en «Referencia»/);
+  assert.equal(revisarLimite({ pais: "PA", existencia: 599, aumento: 3, aCargo: true, motivo: "Conteo", margen: 1 }), null);
+});
+
+test("cuánto faltó de las compras y cómo se completa", () => {
+  const lineas = [
+    { item: "a", compra: "C-1", pedida: 600, recibida: 599, notas: null },
+    { item: "b", compra: "C-2", pedida: 100, recibida: 90, notas: "rotas" },
+    { item: "c", compra: "C-3", pedida: 50, recibida: 50, notas: null },
+  ];
+  assert.equal(faltanteDeCompras(lineas), 11);
+  assert.deepEqual(repartirFaltante(lineas, 5), [
+    { item: "a", compra: "C-1", antes: 599, despues: 600, suma: 1, notas: null },
+    { item: "b", compra: "C-2", antes: 90, despues: 94, suma: 4, notas: "rotas" },
+  ]);
+  // Nunca pasa lo pedido.
+  assert.equal(repartirFaltante(lineas, 50).reduce((t, x) => t + x.suma, 0), 11);
+  assert.deepEqual(repartirFaltante(lineas, 0), []);
 });

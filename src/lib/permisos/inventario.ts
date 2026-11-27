@@ -61,11 +61,19 @@ export function revisarLimite(p: {
   dondeVaElMotivo?: string;
   /** El producto, cuando se guardan varios a la vez. */
   producto?: string;
+  /**
+   * Lo que faltó al recibir sus compras (lo pedido menos lo recibido en Recepción, ver `faltanteDeCompras`): eso se puede sumar sin motivo, porque la orden de compra ya lo traía (27 nov 2026,
+   * pedido de Hernán: se pidieron 600, Dinora recibió 599 y la que faltaba llegó después).
+   */
+  margen?: number;
 }): string | null {
   if (!PAISES_CON_LIMITE.includes(p.pais ?? "") || p.aumento <= 0) return null;
+  const margen = Math.max(0, p.margen ?? 0);
+  if (p.aumento <= margen) return null;
   if (p.aCargo && (p.motivo ?? "").trim()) return null;
   const unidades = `${p.existencia.toLocaleString("es-PA")} ${p.existencia === 1 ? "unidad" : "unidades"}`;
-  const base = `${p.producto ? `${p.producto}: ` : ""}La existencia de este producto es de ${unidades}, estás superando el límite.`;
+  const deLaOrden = margen ? ` De la orden de compra faltaron ${margen.toLocaleString("es-PA")} al recibir: ${margen === 1 ? "esa se suma" : "esas se suman"} sin motivo; lo demás no.` : "";
+  const base = `${p.producto ? `${p.producto}: ` : ""}La existencia de este producto es de ${unidades}, estás superando el límite.${deLaOrden}`;
   if (p.aCargo) return `${base} Para guardarlo igual, escribe el motivo${p.dondeVaElMotivo ? ` ${p.dondeVaElMotivo}` : ""}.`;
   return `${base} La mercancía nueva entra por Recepción; si el conteo encontró más, pídeselo a la persona a cargo del inventario.`;
 }
@@ -77,4 +85,36 @@ export function revisarLimite(p: {
  */
 export function aumentoDeConteo(p: { enBodega: number; contado: number | null; sumar: number }): number {
   return (p.contado === null ? 0 : p.contado - p.enBodega) + p.sumar;
+}
+
+/** Una línea de compra ya recibida en Recepción con menos de lo pedido. */
+export interface LineaConFaltante {
+  item: string;
+  /** El código de la compra («ECOM01-0419»). */
+  compra: string;
+  pedida: number;
+  recibida: number;
+  notas: string | null;
+}
+
+/** Cuánto falta por llegar de esas líneas: lo pedido menos lo recibido. */
+export function faltanteDeCompras(lineas: readonly LineaConFaltante[]): number {
+  return lineas.reduce((t, l) => t + Math.max(0, l.pedida - l.recibida), 0);
+}
+
+/**
+ * Lo que sube la existencia completa primero lo que faltó de las compras, en el orden dado (la más vieja primero): cada línea pasa a recibida + lo que le toca, sin pasar lo pedido. Así
+ * la compra queda al día y lo mismo no se puede volver a sumar sin motivo.
+ */
+export function repartirFaltante(lineas: readonly LineaConFaltante[], unidades: number): { item: string; compra: string; antes: number; despues: number; suma: number; notas: string | null }[] {
+  let quedan = Math.max(0, Math.floor(unidades));
+  const r: { item: string; compra: string; antes: number; despues: number; suma: number; notas: string | null }[] = [];
+  for (const l of lineas) {
+    if (quedan <= 0) break;
+    const suma = Math.min(quedan, Math.max(0, l.pedida - l.recibida));
+    if (!suma) continue;
+    r.push({ item: l.item, compra: l.compra, antes: l.recibida, despues: l.recibida + suma, suma, notas: l.notas });
+    quedan -= suma;
+  }
+  return r;
 }

@@ -5,7 +5,7 @@ import { revisarCorreccionStock } from "@/lib/wms/correccion-stock";
 import { createServiceClient } from "@/lib/supabase/server";
 import { alcanceInventario, bloqueoDeBodega, estaACargoDelInventario, revisarLimite, SOLO_A_CARGO } from "@/lib/permisos/inventario";
 import { autorizadaParaSalidaManual } from "@/lib/permisos/salida-manual";
-import { existenciasEnPais, leerBodega, NO_SE_PUDO_COMPROBAR } from "@/lib/wms/existencia-servidor";
+import { completarCompras, existenciasEnPais, faltantesDeCompras, leerBodega, margenDe, NO_SE_PUDO_COMPROBAR } from "@/lib/wms/existencia-servidor";
 import { pideMotivo, puedeMoverAMano, SOLO_ADMIN_MOVIMIENTO } from "@/lib/wms/recepcion";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
@@ -270,11 +270,13 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
   if (maestro.maneja_vencimiento && tipo === "ajuste" && !loteId && !loteCodigo) return { error: "Un ajuste de un producto con vencimiento necesita el lote." };
   if (!maestro.maneja_vencimiento && (loteId || loteCodigo || vencimiento)) return { error: "Este producto no maneja vencimiento." };
 
-  // Lo que sube la existencia a mano pasa por el límite: la mercancía nueva entra por Recepción.
-  if (tipo !== "salida" && cantidad > 0) {
+  // Lo que sube la existencia a mano pasa por el límite: la mercancía nueva entra por Recepción. Lo que faltó al recibir sus compras se suma sin motivo y completa la compra (27 nov 2026).
+  const sube = tipo !== "salida" && cantidad > 0;
+  const faltantes = sube ? await faltantesDeCompras(supabase, [sku], datosBodega.paisId, datosBodega.pais) : new Map();
+  if (sube) {
     const existencias = await existenciasEnPais(supabase, [sku], datosBodega.paisId);
-    if (!existencias) return { error: NO_SE_PUDO_COMPROBAR };
-    const limite = revisarLimite({ pais: datosBodega.pais, existencia: existencias.get(sku) ?? 0, aumento: cantidad, aCargo: estaACargoDelInventario(usuario), motivo, dondeVaElMotivo: "en «Motivo»" });
+    if (!existencias || !faltantes) return { error: NO_SE_PUDO_COMPROBAR };
+    const limite = revisarLimite({ pais: datosBodega.pais, existencia: existencias.get(sku) ?? 0, aumento: cantidad, aCargo: estaACargoDelInventario(usuario), motivo, dondeVaElMotivo: "en «Motivo»", margen: margenDe(faltantes, sku) });
     if (limite) return { error: limite };
   }
 
@@ -300,6 +302,7 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
     entidadId: sku,
     detalle: `${tipo} ${cantidad} de ${maestro.codigo}${loteCodigo ? ` lote ${loteCodigo}` : ""}${referencia ? ` (${referencia})` : ""}${nombrePais ? ` · ${nombrePais}` : ""}`,
   });
+  if (sube && faltantes?.has(sku) && (await completarCompras(supabase, faltantes.get(sku), cantidad, "Inventario")) > 0) revalidatePath("/compras", "layout");
   revalidatePath("/inventario");
   return {};
 }
@@ -537,10 +540,11 @@ export async function corregirStock(datos: { skuId: unknown; bodegaId: unknown; 
   const r = revisarCorreccionStock({ actual, correcto: datos.correcto, nota: datos.nota });
   if ("error" in r) return r;
 
+  const faltantes = r.diferencia > 0 ? await faltantesDeCompras(supabase, [sku], bodegaFila.paisId, bodegaFila.pais) : new Map();
   if (r.diferencia > 0) {
     const existencias = await existenciasEnPais(supabase, [sku], bodegaFila.paisId);
-    if (!existencias) return { error: NO_SE_PUDO_COMPROBAR };
-    const limite = revisarLimite({ pais: bodegaFila.pais, existencia: existencias.get(sku) ?? 0, aumento: r.diferencia, aCargo: estaACargoDelInventario(usuario), motivo: r.motivo });
+    if (!existencias || !faltantes) return { error: NO_SE_PUDO_COMPROBAR };
+    const limite = revisarLimite({ pais: bodegaFila.pais, existencia: existencias.get(sku) ?? 0, aumento: r.diferencia, aCargo: estaACargoDelInventario(usuario), motivo: r.motivo, margen: margenDe(faltantes, sku) });
     if (limite) return { error: limite };
   }
 
@@ -566,6 +570,7 @@ export async function corregirStock(datos: { skuId: unknown; bodegaId: unknown; 
     antes: { Físico: String(actual) },
     despues: { Físico: String(actual + r.diferencia) },
   });
+  if (r.diferencia > 0 && faltantes?.has(sku) && (await completarCompras(supabase, faltantes.get(sku), r.diferencia, "Inventario")) > 0) revalidatePath("/compras", "layout");
   revalidatePath("/inventario");
   return {};
 }

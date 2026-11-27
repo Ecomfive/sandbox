@@ -10,7 +10,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { indexar, parecidos, todasLasCoincidencias } from "@/lib/scraping/cruces";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { revisarCajas } from "@/lib/wms/cajas";
-import { existenciasEnPais, leerBodega, NO_SE_PUDO_COMPROBAR, type BodegaDeInventario } from "@/lib/wms/existencia-servidor";
+import { completarCompras, existenciasEnPais, faltantesDeCompras, leerBodega, margenDe, NO_SE_PUDO_COMPROBAR, type BodegaDeInventario } from "@/lib/wms/existencia-servidor";
+import type { LineaConFaltante } from "@/lib/permisos/inventario";
 import { pideMotivo, puedeMoverAMano, SOLO_ADMIN_MOVIMIENTO } from "@/lib/wms/recepcion";
 import { numeroTraslado } from "@/lib/wms/traslado";
 import { itemsParaSumar, MAX_LINEAS_IMPORTADAS, revisarConteo, revisarTransferencias, varianteDeLinea, type ItemConteo } from "@/lib/wms/levantamiento";
@@ -21,34 +22,45 @@ const revisarLista = (lista: unknown): { items: ItemConteo[] } | { error: string
 
 const unidadesDe = (i: ItemConteo): number => ("cantidad" in i ? i.cantidad : i.lotes.reduce((t, l) => t + l.cantidad, 0));
 
+/** Lo que sube cada producto con un levantamiento y lo que faltó de sus compras: al guardar, eso completa la compra (ver `completarCompras`). */
+interface Subidas {
+  suben: { sku: string; aumento: number }[];
+  faltantes: Map<string, LineaConFaltante[]>;
+}
+
 /**
- * El límite de existencia sobre todo un levantamiento: por producto, lo que sube con lo contado y lo añadido (lo restado no compensa, ver `aumentoDeConteo`). Devuelve el mensaje del primer producto que lo supere
- * sin poder hacerlo, o `null`.
+ * El límite de existencia sobre todo un levantamiento: por producto, lo que sube con lo contado y lo añadido (lo restado no compensa, ver `aumentoDeConteo`). Lo que faltó al recibir sus compras
+ * se suma sin motivo (27 nov 2026). Devuelve el mensaje del primer producto que lo supere sin poder hacerlo, o lo que sube cada uno para completar las compras al guardar.
  */
 async function revisarLimiteDeConteo(
   supabase: ReturnType<typeof createServiceClient>,
   bodegaId: string,
   bodega: BodegaDeInventario,
   d: { contados: ItemConteo[]; sumas: ItemConteo[]; aCargo: boolean; motivo: string },
-): Promise<string | null> {
-  if (!PAISES_CON_LIMITE.includes(bodega.pais ?? "") || (d.aCargo && d.motivo) || (!d.contados.length && !d.sumas.length)) return null;
+): Promise<{ mensaje: string } | Subidas> {
+  const nada: Subidas = { suben: [], faltantes: new Map() };
+  if (!PAISES_CON_LIMITE.includes(bodega.pais ?? "") || (!d.contados.length && !d.sumas.length)) return nada;
   const { data: stock, error } = await traerTodasConError<{ sku_maestro_id: string; fisico: number }>((de, hasta) =>
     supabase.from("wms_stock").select("sku_maestro_id, fisico").eq("bodega_id", bodegaId).order("sku_maestro_id").range(de, hasta),
   );
-  if (error || !stock) return NO_SE_PUDO_COMPROBAR;
+  if (error || !stock) return { mensaje: NO_SE_PUDO_COMPROBAR };
   const enBodega = new Map(stock.map((s) => [s.sku_maestro_id, Number(s.fisico)]));
   const contado = new Map(d.contados.map((i) => [i.sku, unidadesDe(i)]));
   const sumar = new Map(d.sumas.map((i) => [i.sku, unidadesDe(i)]));
   const suben = [...new Set([...contado.keys(), ...sumar.keys()])]
     .map((sku) => ({ sku, aumento: aumentoDeConteo({ enBodega: enBodega.get(sku) ?? 0, contado: contado.get(sku) ?? null, sumar: sumar.get(sku) ?? 0 }) }))
     .filter((x) => x.aumento > 0);
-  if (!suben.length) return null;
-  const primero = suben[0];
+  if (!suben.length) return nada;
+  const faltantes = await faltantesDeCompras(supabase, suben.map((x) => x.sku), bodega.paisId, bodega.pais);
+  if (!faltantes) return { mensaje: NO_SE_PUDO_COMPROBAR };
+  const pasan = suben.filter((x) => x.aumento > margenDe(faltantes, x.sku));
+  if (!pasan.length || (d.aCargo && d.motivo)) return { suben, faltantes };
+  const primero = pasan[0];
   const [existencias, { data: producto }] = await Promise.all([
     existenciasEnPais(supabase, [primero.sku], bodega.paisId),
     supabase.from("skus_maestros").select("codigo").eq("id", primero.sku).maybeSingle(),
   ]);
-  if (!existencias) return NO_SE_PUDO_COMPROBAR;
+  if (!existencias) return { mensaje: NO_SE_PUDO_COMPROBAR };
   const mensaje = revisarLimite({
     pais: bodega.pais,
     existencia: existencias.get(primero.sku) ?? 0,
@@ -57,8 +69,10 @@ async function revisarLimiteDeConteo(
     motivo: d.motivo,
     dondeVaElMotivo: "en «Referencia»",
     producto: (producto?.codigo as string | undefined) ?? undefined,
+    margen: margenDe(faltantes, primero.sku),
   });
-  return mensaje && suben.length > 1 ? `${mensaje} Hay ${suben.length - 1} más en la misma situación.` : mensaje;
+  if (!mensaje) return { suben, faltantes };
+  return { mensaje: pasan.length > 1 ? `${mensaje} Hay ${pasan.length - 1} más en la misma situación.` : mensaje };
 }
 
 const refrescar = () => {
@@ -139,7 +153,7 @@ export async function guardarLevantamiento(
   if (bloqueo) return { error: bloqueo };
   if (porTrasladar.length && alcance !== "total") return { error: SOLO_A_CARGO };
   const limite = await revisarLimiteDeConteo(supabase, bodegaId, bodega, { contados: revisado.items, sumas: porSumar, aCargo: estaACargoDelInventario(usuario), motivo: ref });
-  if (limite) return { error: limite };
+  if ("mensaje" in limite) return { error: limite.mensaje };
 
   // Restar es una salida a mano: donde toda salida va con remisión (Costa Rica), es de un administrador y lleva motivo (la referencia).
   if (porRestar.length) {
@@ -184,6 +198,11 @@ export async function guardarLevantamiento(
     hecho.sumas = true;
     await registrarAuditoria({ accion: "levantamiento_inventario", entidad: "wms_bodegas", entidadId: bodegaId, detalle: `Suma al inventario${ref ? ` «${ref}»` : ""}: ${sumados} productos` });
   }
+
+  // Lo que subió completa primero lo que faltó de sus compras (27 nov 2026): la compra queda al día y no se vuelve a sumar sin motivo.
+  let compras = false;
+  for (const x of limite.suben) if (limite.faltantes.has(x.sku) && (await completarCompras(supabase, limite.faltantes.get(x.sku), x.aumento, "Levantamiento")) > 0) compras = true;
+  if (compras) revalidatePath("/compras", "layout");
 
   let restados = 0;
   if (porRestar.length) {
