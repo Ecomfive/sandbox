@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { alcanceInventario, aumentoDeConteo, bloqueoDeBodega, esBodegaDeDespacho, estaACargoDelInventario, faltanteDeCompras, repartirFaltante, revisarLimite, SOLO_A_CARGO, SOLO_BODEGA_DESPACHO } from "./inventario";
+import { alcanceInventario, aumentoDeConteo, bloqueoDeBodega, esBodegaDeDespacho, estaACargoDelInventario, faltanteDeCompras, margenDeCompras, repartirFaltante, revisarLimite, SOLO_A_CARGO, SOLO_BODEGA_DESPACHO } from "./inventario";
 
 const persona = (modulos: string[], soloLectura: string[] = []) => ({ modulos, modulosSoloLectura: soloLectura });
 
@@ -85,13 +85,28 @@ test("cuánto sube un levantamiento", () => {
 });
 
 test("lo que faltó al recibir la orden de compra se suma sin motivo", () => {
-  // Se pidieron 600, se recibieron 599: la que faltaba entra sin motivo, aunque no esté a cargo.
-  assert.equal(revisarLimite({ pais: "PA", existencia: 599, aumento: 1, aCargo: false, motivo: null, margen: 1 }), null);
+  // Se pidieron 600, se recibieron 599 en Recepción: la que faltaba entra sin motivo, aunque no esté a cargo.
+  const compras = { faltante: 1, ultima: null };
+  assert.equal(revisarLimite({ pais: "PA", existencia: 300, aumento: 1, aCargo: false, motivo: null, compras }), null);
   // Más de lo que faltó sigue pidiendo motivo, y lo dice.
-  const m = revisarLimite({ pais: "PA", existencia: 599, aumento: 3, aCargo: true, motivo: "", margen: 1, dondeVaElMotivo: "en «Referencia»" });
-  assert.match(m ?? "", /De la orden de compra faltaron 1 al recibir: esa se suma sin motivo; lo demás no\./);
+  const m = revisarLimite({ pais: "PA", existencia: 300, aumento: 3, aCargo: true, motivo: "", compras, dondeVaElMotivo: "en «Referencia»" });
+  assert.match(m ?? "", /Al recibir sus compras faltaron 1\. Sin motivo se suman hasta 1; lo demás no\./);
   assert.match(m ?? "", /escribe el motivo en «Referencia»/);
-  assert.equal(revisarLimite({ pais: "PA", existencia: 599, aumento: 3, aCargo: true, motivo: "Conteo", margen: 1 }), null);
+  assert.equal(revisarLimite({ pais: "PA", existencia: 300, aumento: 3, aCargo: true, motivo: "Conteo", compras }), null);
+});
+
+test("hasta el total de la última compra que llegó se sube sin motivo", () => {
+  // El cortaúñas: la compra fue de 600 y quedaron 599 tras un conteo.
+  const compras = { faltante: 0, ultima: { codigo: "ECOM01-0419", pedida: 600 } };
+  assert.equal(revisarLimite({ pais: "PA", existencia: 599, aumento: 1, aCargo: false, motivo: null, compras }), null);
+  const m = revisarLimite({ pais: "PA", existencia: 599, aumento: 2, aCargo: false, motivo: null, compras });
+  assert.match(m ?? "", /La última compra que llegó \(ECOM01-0419\) fue de 600\. Sin motivo se suman hasta 1; lo demás no\./);
+  // Con el total ya alcanzado no queda margen.
+  assert.equal(margenDeCompras(compras, 600), 0);
+  assert.equal(margenDeCompras(compras, 650), 0);
+  // Gana lo mayor entre el total y lo que faltó al recibir.
+  assert.equal(margenDeCompras({ faltante: 5, ultima: { codigo: "C", pedida: 600 } }, 599), 5);
+  assert.equal(margenDeCompras(undefined, 10), 0);
 });
 
 test("cuánto faltó de las compras y cómo se completa", () => {

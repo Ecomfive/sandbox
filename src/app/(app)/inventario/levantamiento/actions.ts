@@ -10,8 +10,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { indexar, parecidos, todasLasCoincidencias } from "@/lib/scraping/cruces";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { revisarCajas } from "@/lib/wms/cajas";
-import { completarCompras, existenciasEnPais, faltantesDeCompras, leerBodega, margenDe, NO_SE_PUDO_COMPROBAR, type BodegaDeInventario } from "@/lib/wms/existencia-servidor";
-import type { LineaConFaltante } from "@/lib/permisos/inventario";
+import { comprasDe, completarCompras, existenciasEnPais, faltantesDeCompras, leerBodega, NO_SE_PUDO_COMPROBAR, ultimasCompras, type BodegaDeInventario } from "@/lib/wms/existencia-servidor";
+import { margenDeCompras, type LineaConFaltante } from "@/lib/permisos/inventario";
 import { pideMotivo, puedeMoverAMano, SOLO_ADMIN_MOVIMIENTO } from "@/lib/wms/recepcion";
 import { numeroTraslado } from "@/lib/wms/traslado";
 import { itemsParaSumar, MAX_LINEAS_IMPORTADAS, revisarConteo, revisarTransferencias, varianteDeLinea, type ItemConteo } from "@/lib/wms/levantamiento";
@@ -51,16 +51,17 @@ async function revisarLimiteDeConteo(
     .map((sku) => ({ sku, aumento: aumentoDeConteo({ enBodega: enBodega.get(sku) ?? 0, contado: contado.get(sku) ?? null, sumar: sumar.get(sku) ?? 0 }) }))
     .filter((x) => x.aumento > 0);
   if (!suben.length) return nada;
-  const faltantes = await faltantesDeCompras(supabase, suben.map((x) => x.sku), bodega.paisId, bodega.pais);
-  if (!faltantes) return { mensaje: NO_SE_PUDO_COMPROBAR };
-  const pasan = suben.filter((x) => x.aumento > margenDe(faltantes, x.sku));
+  const skus = suben.map((x) => x.sku);
+  const [faltantes, ultimas, existencias] = await Promise.all([
+    faltantesDeCompras(supabase, skus, bodega.paisId, bodega.pais),
+    ultimasCompras(supabase, skus, bodega.paisId, bodega.pais),
+    existenciasEnPais(supabase, skus, bodega.paisId),
+  ]);
+  if (!faltantes || !ultimas || !existencias) return { mensaje: NO_SE_PUDO_COMPROBAR };
+  const pasan = suben.filter((x) => x.aumento > margenDeCompras(comprasDe(faltantes, ultimas, x.sku), existencias.get(x.sku) ?? 0));
   if (!pasan.length || (d.aCargo && d.motivo)) return { suben, faltantes };
   const primero = pasan[0];
-  const [existencias, { data: producto }] = await Promise.all([
-    existenciasEnPais(supabase, [primero.sku], bodega.paisId),
-    supabase.from("skus_maestros").select("codigo").eq("id", primero.sku).maybeSingle(),
-  ]);
-  if (!existencias) return { mensaje: NO_SE_PUDO_COMPROBAR };
+  const { data: producto } = await supabase.from("skus_maestros").select("codigo").eq("id", primero.sku).maybeSingle();
   const mensaje = revisarLimite({
     pais: bodega.pais,
     existencia: existencias.get(primero.sku) ?? 0,
@@ -69,7 +70,7 @@ async function revisarLimiteDeConteo(
     motivo: d.motivo,
     dondeVaElMotivo: "en «Referencia»",
     producto: (producto?.codigo as string | undefined) ?? undefined,
-    margen: margenDe(faltantes, primero.sku),
+    compras: comprasDe(faltantes, ultimas, primero.sku),
   });
   if (!mensaje) return { suben, faltantes };
   return { mensaje: pasan.length > 1 ? `${mensaje} Hay ${pasan.length - 1} más en la misma situación.` : mensaje };

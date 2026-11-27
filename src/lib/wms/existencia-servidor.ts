@@ -1,6 +1,6 @@
 // Lo que las acciones de Inventario leen de la base para aplicar los permisos y el límite de existencia (`src/lib/permisos/inventario.ts`). Solo se usa en el servidor.
 import { hoyPanama } from "@/lib/af4/fecha";
-import { faltanteDeCompras, PAISES_CON_LIMITE, repartirFaltante, type LineaConFaltante } from "@/lib/permisos/inventario";
+import { faltanteDeCompras, PAISES_CON_LIMITE, repartirFaltante, type ComprasDelProducto, type LineaConFaltante } from "@/lib/permisos/inventario";
 import type { createServiceClient } from "@/lib/supabase/server";
 
 type Supabase = ReturnType<typeof createServiceClient>;
@@ -74,8 +74,44 @@ export async function faltantesDeCompras(supabase: Supabase, skuIds: string[], p
   return r;
 }
 
-/** Cuánto se puede sumar sin motivo de cada producto: lo que faltó de sus compras. */
-export const margenDe = (faltantes: Map<string, LineaConFaltante[]>, sku: string): number => faltanteDeCompras(faltantes.get(sku) ?? []);
+/** Las etapas en que una compra ya llegó. */
+const LLEGADAS = ["arribo_mercancia", "en_bodega", "completado"];
+
+/**
+ * La última compra que llegó de cada producto en un país (por su fecha de llegada) y cuánto se pidió en ella (27 nov 2026, pedido de Hernán: fijarse en el total de la compra). Cuenta
+ * si está en una etapa de llegada o si ya se recibió en Recepción. Solo en los países con límite. `null` si no se pudo leer.
+ */
+export async function ultimasCompras(supabase: Supabase, skuIds: string[], paisId: string, pais: string | null): Promise<Map<string, { codigo: string; pedida: number }> | null> {
+  const r = new Map<string, { codigo: string; pedida: number; clave: string; id: string }>();
+  if (!PAISES_CON_LIMITE.includes(pais ?? "") || !skuIds.length) return new Map();
+  for (let i = 0; i < skuIds.length; i += 100) {
+    const { data, error } = await supabase
+      .from("wms_compra_items")
+      .select("sku_maestro_id, cantidad_pedida, cantidad_recibida, compra_id, wms_compras!inner(codigo, pais_id, etapa, anulada_en, fecha_llegada, creado_en)")
+      .in("sku_maestro_id", skuIds.slice(i, i + 100))
+      .eq("wms_compras.pais_id", paisId)
+      .is("wms_compras.anulada_en", null)
+      .neq("wms_compras.etapa", "descartado");
+    if (error) return null;
+    for (const f of data ?? []) {
+      const c = uno(f.wms_compras as { codigo: string | null; etapa: string; fecha_llegada: string | null; creado_en: string } | { codigo: string | null; etapa: string; fecha_llegada: string | null; creado_en: string }[] | null);
+      if (!c || (!LLEGADAS.includes(c.etapa) && f.cantidad_recibida === null)) continue;
+      const sku = f.sku_maestro_id as string;
+      const clave = `${c.fecha_llegada ?? ""}|${c.creado_en}`;
+      const antes = r.get(sku);
+      // Un producto puede venir en varias líneas de la misma compra: se suman.
+      if (antes && antes.id === f.compra_id) antes.pedida += Number(f.cantidad_pedida);
+      else if (!antes || clave > antes.clave) r.set(sku, { codigo: c.codigo ?? "Compra", pedida: Number(f.cantidad_pedida), clave, id: f.compra_id as string });
+    }
+  }
+  return new Map([...r].map(([sku, x]) => [sku, { codigo: x.codigo, pedida: x.pedida }]));
+}
+
+/** Lo que dicen las compras de un producto, para el límite (`revisarLimite`). */
+export const comprasDe = (faltantes: Map<string, LineaConFaltante[]>, ultimas: Map<string, { codigo: string; pedida: number }>, sku: string): ComprasDelProducto => ({
+  faltante: faltanteDeCompras(faltantes.get(sku) ?? []),
+  ultima: ultimas.get(sku) ?? null,
+});
 
 /**
  * Completa las compras con lo que acaba de subir la existencia: cada línea pasa a recibida + lo que le toca, con una nota de dónde llegó. Solo cambia la línea si nadie la tocó mientras tanto.

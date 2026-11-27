@@ -61,19 +61,23 @@ export function revisarLimite(p: {
   dondeVaElMotivo?: string;
   /** El producto, cuando se guardan varios a la vez. */
   producto?: string;
-  /**
-   * Lo que faltó al recibir sus compras (lo pedido menos lo recibido en Recepción, ver `faltanteDeCompras`): eso se puede sumar sin motivo, porque la orden de compra ya lo traía (27 nov 2026,
-   * pedido de Hernán: se pidieron 600, Dinora recibió 599 y la que faltaba llegó después).
-   */
-  margen?: number;
+  /** Lo que dicen sus compras (27 nov 2026, pedido de Hernán: guiarse por la orden de compra y por lo que se recibió). Ver `margenDeCompras`. */
+  compras?: ComprasDelProducto;
 }): string | null {
   if (!PAISES_CON_LIMITE.includes(p.pais ?? "") || p.aumento <= 0) return null;
-  const margen = Math.max(0, p.margen ?? 0);
+  const margen = margenDeCompras(p.compras, p.existencia);
   if (p.aumento <= margen) return null;
   if (p.aCargo && (p.motivo ?? "").trim()) return null;
-  const unidades = `${p.existencia.toLocaleString("es-PA")} ${p.existencia === 1 ? "unidad" : "unidades"}`;
-  const deLaOrden = margen ? ` De la orden de compra faltaron ${margen.toLocaleString("es-PA")} al recibir: ${margen === 1 ? "esa se suma" : "esas se suman"} sin motivo; lo demás no.` : "";
-  const base = `${p.producto ? `${p.producto}: ` : ""}La existencia de este producto es de ${unidades}, estás superando el límite.${deLaOrden}`;
+  const n = (x: number) => x.toLocaleString("es-PA");
+  const unidades = `${n(p.existencia)} ${p.existencia === 1 ? "unidad" : "unidades"}`;
+  const ultima = p.compras?.ultima;
+  const faltante = Math.max(0, p.compras?.faltante ?? 0);
+  const deLaCompra = [
+    ultima ? ` La última compra que llegó (${ultima.codigo}) fue de ${n(ultima.pedida)}.` : "",
+    faltante ? ` Al recibir sus compras faltaron ${n(faltante)}.` : "",
+    margen ? ` Sin motivo se suman hasta ${n(margen)}; lo demás no.` : "",
+  ].join("");
+  const base = `${p.producto ? `${p.producto}: ` : ""}La existencia de este producto es de ${unidades}, estás superando el límite.${deLaCompra}`;
   if (p.aCargo) return `${base} Para guardarlo igual, escribe el motivo${p.dondeVaElMotivo ? ` ${p.dondeVaElMotivo}` : ""}.`;
   return `${base} La mercancía nueva entra por Recepción; si el conteo encontró más, pídeselo a la persona a cargo del inventario.`;
 }
@@ -85,6 +89,23 @@ export function revisarLimite(p: {
  */
 export function aumentoDeConteo(p: { enBodega: number; contado: number | null; sumar: number }): number {
   return (p.contado === null ? 0 : p.contado - p.enBodega) + p.sumar;
+}
+
+/** Lo que dicen las compras de un producto en el país. */
+export interface ComprasDelProducto {
+  /** Lo que faltó al recibir en Recepción (lo pedido menos lo recibido, ver `faltanteDeCompras`). */
+  faltante: number;
+  /** La última compra que llegó (por su fecha de llegada) y cuánto se pidió del producto en ella. */
+  ultima: { codigo: string; pedida: number } | null;
+}
+
+/**
+ * Cuánto puede subir la existencia sin motivo (27 nov 2026, pedido de Hernán): hasta el total de la última compra que llegó (se pidieron 600 y hay 599: se suma 1), o lo que faltó al recibir
+ * sus compras, lo que sea mayor. Lo que pase de ahí pide motivo.
+ */
+export function margenDeCompras(c: ComprasDelProducto | undefined, existencia: number): number {
+  if (!c) return 0;
+  return Math.max(0, c.faltante, c.ultima ? c.ultima.pedida - existencia : 0);
 }
 
 /** Una línea de compra ya recibida en Recepción con menos de lo pedido. */

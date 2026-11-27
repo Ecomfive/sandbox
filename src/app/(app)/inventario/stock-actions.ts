@@ -5,7 +5,7 @@ import { revisarCorreccionStock } from "@/lib/wms/correccion-stock";
 import { createServiceClient } from "@/lib/supabase/server";
 import { alcanceInventario, bloqueoDeBodega, estaACargoDelInventario, revisarLimite, SOLO_A_CARGO } from "@/lib/permisos/inventario";
 import { autorizadaParaSalidaManual } from "@/lib/permisos/salida-manual";
-import { completarCompras, existenciasEnPais, faltantesDeCompras, leerBodega, margenDe, NO_SE_PUDO_COMPROBAR } from "@/lib/wms/existencia-servidor";
+import { comprasDe, completarCompras, existenciasEnPais, faltantesDeCompras, leerBodega, NO_SE_PUDO_COMPROBAR, ultimasCompras } from "@/lib/wms/existencia-servidor";
 import { pideMotivo, puedeMoverAMano, SOLO_ADMIN_MOVIMIENTO } from "@/lib/wms/recepcion";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
@@ -274,9 +274,9 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
   const sube = tipo !== "salida" && cantidad > 0;
   const faltantes = sube ? await faltantesDeCompras(supabase, [sku], datosBodega.paisId, datosBodega.pais) : new Map();
   if (sube) {
-    const existencias = await existenciasEnPais(supabase, [sku], datosBodega.paisId);
-    if (!existencias || !faltantes) return { error: NO_SE_PUDO_COMPROBAR };
-    const limite = revisarLimite({ pais: datosBodega.pais, existencia: existencias.get(sku) ?? 0, aumento: cantidad, aCargo: estaACargoDelInventario(usuario), motivo, dondeVaElMotivo: "en «Motivo»", margen: margenDe(faltantes, sku) });
+    const [existencias, ultimas] = await Promise.all([existenciasEnPais(supabase, [sku], datosBodega.paisId), ultimasCompras(supabase, [sku], datosBodega.paisId, datosBodega.pais)]);
+    if (!existencias || !faltantes || !ultimas) return { error: NO_SE_PUDO_COMPROBAR };
+    const limite = revisarLimite({ pais: datosBodega.pais, existencia: existencias.get(sku) ?? 0, aumento: cantidad, aCargo: estaACargoDelInventario(usuario), motivo, dondeVaElMotivo: "en «Motivo»", compras: comprasDe(faltantes, ultimas, sku) });
     if (limite) return { error: limite };
   }
 
@@ -542,9 +542,9 @@ export async function corregirStock(datos: { skuId: unknown; bodegaId: unknown; 
 
   const faltantes = r.diferencia > 0 ? await faltantesDeCompras(supabase, [sku], bodegaFila.paisId, bodegaFila.pais) : new Map();
   if (r.diferencia > 0) {
-    const existencias = await existenciasEnPais(supabase, [sku], bodegaFila.paisId);
-    if (!existencias || !faltantes) return { error: NO_SE_PUDO_COMPROBAR };
-    const limite = revisarLimite({ pais: bodegaFila.pais, existencia: existencias.get(sku) ?? 0, aumento: r.diferencia, aCargo: estaACargoDelInventario(usuario), motivo: r.motivo, margen: margenDe(faltantes, sku) });
+    const [existencias, ultimas] = await Promise.all([existenciasEnPais(supabase, [sku], bodegaFila.paisId), ultimasCompras(supabase, [sku], bodegaFila.paisId, bodegaFila.pais)]);
+    if (!existencias || !faltantes || !ultimas) return { error: NO_SE_PUDO_COMPROBAR };
+    const limite = revisarLimite({ pais: bodegaFila.pais, existencia: existencias.get(sku) ?? 0, aumento: r.diferencia, aCargo: estaACargoDelInventario(usuario), motivo: r.motivo, compras: comprasDe(faltantes, ultimas, sku) });
     if (limite) return { error: limite };
   }
 
