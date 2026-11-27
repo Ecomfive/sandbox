@@ -19,6 +19,7 @@ import { ClasificarGanchos } from "./clasificar-ganchos";
 import { BarraProgreso, InsigniaCerteza, TarjetaMeta } from "./graficas";
 import { AVISO_POCA_DATA, entero, Nivel, porcentaje, Resultado, valorCpa } from "./piezas";
 import { SeccionPlegable } from "./plegable";
+import { VideoDeEjemplo } from "./ver-video-ejemplo";
 import { ColumnaOrdenable } from "./columna-ordenable";
 
 type Seccion = "videos" | "campanas" | "anuncios" | "productos";
@@ -284,6 +285,8 @@ function TarjetaConclusion({ c }: { c: Conclusion }) {
               Cada compra cuesta el <UsoDelTope g={g} firme /> de su CPA tope.
             </p>
           )}
+          {/* Lo que funcionó, con un video de ejemplo que lo tiene (27 nov 2026, pedido de Hernán). */}
+          <VideoDeEjemplo texto={`«${g.nombre}»`} />
           <p className="m-0 mt-auto text-xs tabular-nums text-muted-foreground">
             {g.videos > 0 && c.unidad === "videos" ? `${g.videos} ${g.videos === 1 ? "video" : "videos"}` : `${g.campanas} ${g.campanas === 1 ? "campaña" : "campañas"}`} · {dolaresEnteros(g.r.gasto)} gastados
           </p>
