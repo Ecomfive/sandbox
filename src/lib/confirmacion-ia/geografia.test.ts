@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CORREGIMIENTOS_DISTRITO_PANAMA, geografiaDe, geografiaDePanama, LUGARES_FUERA_DEL_MAPA_PANAMA, LUGARES_SERVIENTREGA_PANAMA, ZONAS_DELIVERY_PANAMA, ZONAS_EN_DISCUSION, ZONAS_PAGO_ADELANTADO_PANAMA } from "./geografia";
+import { CORREGIMIENTOS_DISTRITO_PANAMA, DUDAS_RESUELTAS_PANAMA, geografiaDe, geografiaDePanama, LUGARES_SERVIENTREGA_PANAMA, NOMBRES_QUE_CONFUNDEN, ZONAS_DELIVERY_PANAMA, ZONAS_PAGO_ADELANTADO_PANAMA } from "./geografia";
 import { normalizarTexto } from "./zonas";
 
-test("la geografía de Panamá trae las provincias, el distrito de Panamá y lo que se deja como dudoso", () => {
+test("la geografía de Panamá trae las provincias y el distrito de Panamá", () => {
   const g = geografiaDePanama();
   for (const lugar of ["Panamá Oeste", "Colón", "Chiriquí", "Bella Vista", "San Francisco", "Tocumen", "San Miguelito"]) assert.ok(g.includes(lugar), lugar);
   assert.match(g, /responde «no_se»/);
@@ -27,29 +27,34 @@ test("las 6 zonas de delivery, la lista de Servientrega y el pago por adelantado
   assert.equal(ZONAS_DELIVERY_PANAMA.length, 6);
   assert.deepEqual(ZONAS_DELIVERY_PANAMA.map((z) => z.zona), [1, 2, 3, 4, 5, 6]);
   for (const z of ZONAS_DELIVERY_PANAMA) assert.ok(g.includes(`Zona ${z.zona} (`));
-  for (const lugar of ["Costa del Este", "Villa Lucre", "Condado del Rey", "Punta Pacífica", "Tocumen", "Pacora"]) assert.ok(g.includes(lugar), lugar);
+  for (const lugar of ["Costa del Este", "Villa Lucre", "Condado del Rey", "Punta Pacífica", "Tocumen", "Pacora", "Praderas de San Lorenzo"]) assert.ok(g.includes(lugar), lugar);
   for (const lugar of LUGARES_SERVIENTREGA_PANAMA) assert.ok(g.includes(lugar), lugar);
   for (const lugar of ZONAS_PAGO_ADELANTADO_PANAMA) assert.ok(g.includes(lugar), lugar);
   assert.match(g, /responde «adelantado»/);
   assert.match(g, /homónimos/);
 });
 
-test("lo que está en Servientrega no se repite en el delivery, y lo que está en discusión sale en el delivery o es de los corregimientos que las tiendas etiquetan CIUDAD", () => {
-  const delivery = new Set(ZONAS_DELIVERY_PANAMA.flatMap((z) => z.lugares.map(normalizarTexto)));
-  for (const lugar of LUGARES_SERVIENTREGA_PANAMA) assert.ok(!delivery.has(normalizarTexto(lugar)), `${lugar} sale en el delivery y en Servientrega sin estar en discusión`);
-  const extras = new Set(["Ernesto Córdoba Campos", "Cabra"].map(normalizarTexto));
-  for (const lugar of ZONAS_EN_DISCUSION) assert.ok(delivery.has(normalizarTexto(lugar)) || extras.has(normalizarTexto(lugar)), `${lugar} no está en ninguna zona de delivery`);
-  assert.equal(new Set(ZONAS_EN_DISCUSION.map(normalizarTexto)).size, ZONAS_EN_DISCUSION.length);
+test("los mapas de despacho (27 nov 2026): los tres colores son ciudad, lo de afuera es Servientrega y no hay tendencia por tienda", () => {
+  const g = geografiaDePanama();
+  assert.match(g, /MAPAS DE DESPACHO/);
+  for (const color of ["NARANJA", "ROJO", "MORADO"]) assert.ok(g.includes(color), color);
+  assert.match(g, /No hay tendencia por tienda/);
+  assert.doesNotMatch(g, /TENDENCIA HISTÓRICA|Kenku|Nuvo|Oferfy/);
+  assert.match(g, /ORDEN PARA DECIDIR LA ZONA/);
 });
 
-test("el mapa del equipo: lo de dentro es ciudad, lo de fuera es interior, y el orden para decidir está dicho", () => {
+test("las 13 dudas que se le hicieron a despacho tienen respuesta y salen en la geografía", () => {
   const g = geografiaDePanama();
-  assert.match(g, /MAPA DEL EQUIPO/);
-  assert.match(g, /Isla Naos, Isla Flamenco/);
-  for (const lugar of LUGARES_FUERA_DEL_MAPA_PANAMA) assert.ok(g.includes(lugar), lugar);
-  assert.match(g, /ORDEN PARA DECIDIR LA ZONA/);
-  assert.match(g, /Las zonas 5 y 6 .* también son CIUDAD/);
-  // Nada de lo que el mapa deja afuera está en una zona de delivery.
+  assert.equal(DUDAS_RESUELTAS_PANAMA.length, 13);
+  for (const d of DUDAS_RESUELTAS_PANAMA) {
+    assert.ok(d.respuesta.length > 10, d.lugar);
+    assert.ok(g.includes(d.lugar), d.lugar);
+  }
+  for (const n of NOMBRES_QUE_CONFUNDEN) assert.ok(g.includes(n), n);
+});
+
+test("lo que va por Servientrega no está en las zonas de delivery", () => {
   const delivery = new Set(ZONAS_DELIVERY_PANAMA.flatMap((z) => z.lugares.map(normalizarTexto)));
-  for (const lugar of LUGARES_FUERA_DEL_MAPA_PANAMA) assert.ok(!delivery.has(normalizarTexto(lugar)), `${lugar} está en el delivery y fuera del mapa`);
+  for (const lugar of ["Chilibre", "Las Garzas", "Panamá Pacífico", "Cerro Azul", "San Martín de Pacora", "Calzada Larga", "Cocolí"]) assert.ok(!delivery.has(normalizarTexto(lugar)), lugar);
+  for (const lugar of ["Praderas de San Lorenzo", "Ernesto Córdoba Campos", "Colinas de Las Cumbres", "Las Mañanitas", "Alcalde Díaz", "Villa Grecia"]) assert.ok(delivery.has(normalizarTexto(lugar)), lugar);
 });
