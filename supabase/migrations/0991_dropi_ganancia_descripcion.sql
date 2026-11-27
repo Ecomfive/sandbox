@@ -6,6 +6,11 @@
 -- `fin_dropi_es_ganancia` (es también lo que Estado del sistema revisa para saber si la 0991 se corrió: la de
 -- sincronizar existe desde la 0938). Al final la corre una vez para rellenar `fin_dropi_mensual` (la tarea
 -- «dropi-finanzas» la sigue corriendo cada día). Se puede correr dos veces.
+--
+-- México: Dropi México cobra y paga en pesos, pero la 0938 lo guardaba como «USD» y su saldo de billetera entraba a
+-- `fin_cartera` como dólares. Ahora queda en «MXN» y, como Costa Rica, fuera de la cartera y de las sumas en dólares
+-- (Tiendas y proveeduría, «Hoy» y Ventas por tienda solo suman USD). Se quita el documento «Billetera Dropi MX» que la
+-- 0938 había creado, si nadie lo editó ni tiene abonos.
 
 create or replace function fin_dropi_es_ganancia(p_tipo text, p_descripcion text)
 returns boolean
@@ -53,7 +58,7 @@ begin
            full join r on r.periodo = coalesce(o.periodo, g.periodo) and r.pais_id = coalesce(o.pais_id, g.pais_id)
   ), ins as (
     insert into fin_dropi_mensual (periodo, pais_id, moneda, pedidos, entregados, ventas_entregadas, ganancias, retiros, origen_clave, actualizado_en)
-    select t.periodo, t.pais_id, case when pa.codigo = 'CR' then 'CRC' else 'USD' end, t.pedidos, t.entregados, t.ventas, t.ganancias, t.retiros,
+    select t.periodo, t.pais_id, case pa.codigo when 'CR' then 'CRC' when 'MX' then 'MXN' else 'USD' end, t.pedidos, t.entregados, t.ventas, t.ganancias, t.retiros,
            'dropi|' || pa.codigo || '|' || to_char(t.periodo, 'YYYY-MM'), now()
     from todo t join paises pa on pa.id = t.pais_id
     where t.periodo is not null
@@ -65,9 +70,9 @@ begin
   select count(*) into v_meses from ins;
 
   -- Por cobrar a Dropi en cada país: el último saldo de billetera registrado o, si no hay, ganancias − retiros.
-  -- Solo en dólares (la cartera es en USD): Costa Rica queda en `fin_dropi_mensual`.
+  -- Solo en dólares (la cartera es en USD): Costa Rica y México quedan en `fin_dropi_mensual`.
   select id into v_unidad from fin_unidades where nombre = 'CORPORATIVO' limit 1;
-  for p in select pa.id, pa.codigo from paises pa where pa.codigo <> 'CR' and exists (select 1 from fin_dropi_mensual m where m.pais_id = pa.id) loop
+  for p in select pa.id, pa.codigo from paises pa where pa.codigo not in ('CR', 'MX') and exists (select 1 from fin_dropi_mensual m where m.pais_id = pa.id) loop
     v_paises := v_paises + 1;
     select sw.monto into v_saldo from saldos_wallet sw
       join plataformas pl on pl.id = sw.plataforma_id
@@ -94,6 +99,11 @@ $$;
 revoke all on function fin_sincronizar_dropi() from public, anon, authenticated;
 
 select * from fin_sincronizar_dropi();
+
+-- El saldo en pesos de México que la 0938 había dejado como dólares por cobrar.
+delete from fin_cartera c
+where c.origen_clave = 'dropi-wallet|MX' and c.editado_a_mano = false
+  and not exists (select 1 from fin_cartera_abonos a where a.documento_id = c.id);
 
 -- Revisión: ganancia por mes y país después de la corrección.
 select m.periodo, p.codigo, m.moneda, m.entregados, m.ventas_entregadas, m.ganancias
