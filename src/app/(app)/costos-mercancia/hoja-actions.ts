@@ -145,6 +145,8 @@ export async function crearCostoManual(formData: FormData): Promise<{ error?: st
     if (!referencia) return { error: "Escribe la referencia (código de la compra, factura o motivo)." };
     const llegada = String(formData.get("fecha_llegada") ?? "").trim();
     if (!FECHA.test(llegada)) return { error: "Elige la fecha de llegada." };
+    const cierre = await bloqueoPorCierre(llegada, acceso.usuario);
+    if (cierre) return { error: cierre.replace("Esta compra llegó", "Esa fecha de llegada cae") };
     const cantidad = Math.round(Number(formData.get("cantidad")));
     if (!(cantidad > 0 && cantidad < 10_000_000)) return { error: "Escribe las unidades (mayor que cero)." };
     const unitario = leerMontoAsociado(formData.get("costo_unitario"), 6);
@@ -199,6 +201,8 @@ export async function eliminarCostoManual(id: string): Promise<{ error?: string 
     const f = await filaDeHoja(id);
     if ("error" in f) return { error: f.error };
     if (f.fila.origen !== "manual") return { error: "Solo se quitan las filas cargadas a mano. Las de Compras salen solas si la compra deja de estar En Bodega o Completado." };
+    const cierre = await bloqueoPorCierre(f.fila.fecha_llegada, acceso.usuario);
+    if (cierre) return { error: cierre };
     const { error } = await createServiceClient().from("fin_costos_lotes").delete().eq("id", id).eq("origen", "manual");
     if (error) return { error: error.message };
     await registrarAuditoria({ accion: "eliminar_costo_producto", entidad: "fin_costos_lotes", entidadId: id, detalle: `${String(f.fila.producto)} · ${String(f.fila.linea)}` });
@@ -293,8 +297,10 @@ export interface MovimientoLibro {
  * bancarias y de cambio del pago al proveedor se proponen para no buscarlas a mano. Solo lectura.
  */
 export async function buscarMovimientosCompra(codigo: string): Promise<{ error: string } | { movimientos: MovimientoLibro[] }> {
-  const acceso = await exigirAcceso({ modulo: MODULO });
+  // Lee el Libro de movimientos: hace falta editar la hoja y poder abrir el Libro.
+  const acceso = await exigirAcceso({ modulo: MODULO, escritura: true });
   if (!acceso.usuario) return { error: acceso.error ?? "Sin acceso." };
+  if (!acceso.usuario.modulos.includes("libro-movimientos")) return { error: "Para buscar en el Libro de movimientos necesitas acceso a ese módulo." };
   const limpio = String(codigo ?? "").trim().toUpperCase();
   if (!/^[A-Z0-9][A-Z0-9-]{3,30}$/.test(limpio)) return { movimientos: [] };
   const supabase = createServiceClient();

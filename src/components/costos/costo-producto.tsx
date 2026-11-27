@@ -10,24 +10,42 @@ import { dinero, entero } from "@/lib/af4/formato";
 import { claseCifra } from "@/components/af4/estilos-af4";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { obtenerCostoProducto, type CostoDeProducto } from "@/lib/finanzas/costo-producto-actions";
+import { Seccion } from "@/components/ui/seccion-ficha";
 import { GastoIcon } from "@/lib/nav-icons";
 
 const usd = (v: number) => dinero(v, "USD", { decimales: 2, decimalesMax: 4 });
 const FUENTE = { componentes: "suma de sus componentes", principal: "del producto principal" } as const;
 
-export function CostoProductoBloque({ skuId }: { skuId: string }) {
-  const [datos, setDatos] = useState<CostoDeProducto | "error" | null>(null);
+/**
+ * La sección «Costo» de la ficha. Solo se dibuja para quien abre Costos de producto; si además el servidor dice que no
+ * (tiendas limitadas), desaparece entera, título incluido.
+ */
+export function SeccionCostoProducto({ skuId }: { skuId: string }) {
   const puedeAbrir = usePuedeAbrir("costos-mercancia");
+  if (!puedeAbrir) return null;
+  return <CostoProductoCarga key={skuId} skuId={skuId} />;
+}
+
+function CostoProductoCarga({ skuId }: { skuId: string }) {
+  const [datos, setDatos] = useState<CostoDeProducto | "error" | "oculto" | null>(null);
   useEffect(() => {
     let vivo = true;
     obtenerCostoProducto(skuId)
-      .then((r) => vivo && setDatos("error" in r ? "error" : r))
+      .then((r) => vivo && setDatos("error" in r ? (r.error === "sin_permiso" ? "oculto" : "error") : r))
       .catch(() => vivo && setDatos("error"));
     return () => {
       vivo = false;
     };
   }, [skuId]);
+  if (datos === "oculto") return null;
+  return (
+    <Seccion icono={GastoIcon} titulo="Costo">
+      <CostoProductoBloque datos={datos} />
+    </Seccion>
+  );
+}
 
+function CostoProductoBloque({ datos }: { datos: CostoDeProducto | "error" | null }) {
   if (datos === null) return <p className="text-sm text-muted-foreground">Cargando el costo…</p>;
   if (datos === "error") return <p className="text-sm text-muted-foreground">No se pudo leer el costo.</p>;
   if (!datos.aplica) return <p className="text-sm text-muted-foreground">El costo se lleva solo para Panamá (en la barra está {datos.pais}).</p>;
@@ -49,11 +67,9 @@ export function CostoProductoBloque({ skuId }: { skuId: string }) {
             </span>
           )}
         </span>
-        {puedeAbrir && (
-          <Link href="/costos-mercancia" className="text-xs text-primario underline-offset-2 hover:underline">
-            Ver en Costos de producto
-          </Link>
-        )}
+        <Link href="/costos-mercancia" className="text-xs text-primario underline-offset-2 hover:underline">
+          Ver en Costos de producto
+        </Link>
       </div>
       {datos.compras.length > 0 && (
         <ul className="divide-y divide-border rounded-md border border-border">

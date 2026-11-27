@@ -16,6 +16,7 @@ import { fieldClass, anilloFoco } from "@/components/ui/field";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
+import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { useToast } from "@/components/ui/toast";
 import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { fechaCorta } from "@/lib/af4/fecha";
@@ -363,6 +364,7 @@ function VentanaCompra({ filas, soloLectura, alCerrar, alGuardar }: { filas: Fil
   const [pendiente, start] = useTransition();
   const [movs, setMovs] = useState<MovimientoLibro[] | null | undefined>(undefined);
   const { mostrarToast } = useToast();
+  const verLibro = usePuedeAbrir("libro-movimientos") && !soloLectura;
   const pesos = filas.map(pesoDeFila);
   const total = (c: CampoAsociado) => {
     const n = Number(String(textos[c] ?? "").replace(/,/g, ""));
@@ -429,6 +431,7 @@ function VentanaCompra({ filas, soloLectura, alCerrar, alGuardar }: { filas: Fil
             </table>
           </div>
         )}
+        {verLibro && (
         <section aria-labelledby="libro-compra" className="rounded-md border border-border">
           <h3 id="libro-compra" className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 text-sm font-semibold">
             En el Libro de movimientos con «{codigo}»
@@ -474,6 +477,7 @@ function VentanaCompra({ filas, soloLectura, alCerrar, alGuardar }: { filas: Fil
             </ul>
           )}
         </section>
+        )}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         {!soloLectura && (
           <div className="flex justify-end">

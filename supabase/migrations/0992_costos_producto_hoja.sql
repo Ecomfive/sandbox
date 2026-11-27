@@ -848,14 +848,14 @@ select 'costos_sin_compra', to_jsonb(array_agg(numero order by numero)) from (va
   (177, 'TRUE/FEM/BALANCE')) as s(numero, sku)
 on conflict (clave) do update set valor = excluded.valor;
 
--- Quienes llenan la hoja (María José y Francis) pueden modificar Costos de producto, como permiso propio (si ya lo tenían de
--- solo lectura, pasa a edición). Si su nombre no coincide, se les da en Usuarios y roles.
+-- Quienes llenan la hoja (María José Aponte y Francis Aponte) pueden modificar Costos de producto, como permiso propio (si
+-- ya lo tenían de solo lectura, pasa a edición). Por el nombre completo exacto (sin acentos ni mayúsculas), no por el
+-- comienzo: la migración se puede correr dos veces y una persona nueva que se llame parecido («Francisco») no debe entrar.
+-- Si su nombre no coincide, se les da en Usuarios y roles.
 insert into permisos_persona (perfil_id, modulo, nivel)
 select p.id, 'costos-mercancia', 'edicion' from perfiles p
-where p.activo and (
-  translate(lower(coalesce(p.nombre, '')), 'áéíóú', 'aeiou') like 'maria jose%'
-  or lower(coalesce(p.nombre, '')) like 'francis%'
-)
+where p.activo
+  and btrim(regexp_replace(translate(lower(coalesce(p.nombre, '')), 'áéíóú', 'aeiou'), '\s+', ' ', 'g')) in ('maria jose aponte', 'francis aponte')
 on conflict (perfil_id, modulo) do update set nivel = 'edicion';
 
 -- Para revisar: lo que quedó en la hoja y lo que del Excel no se encontró (código único o compra).
