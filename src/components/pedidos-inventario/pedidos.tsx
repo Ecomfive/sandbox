@@ -261,8 +261,9 @@ function EditarPedido({ p, opciones, stock }: { p: PedidoInventario; opciones: O
           <ProveedorSkusMaestros opciones={opciones}>
             <div className="flex flex-col gap-2">
               {lineas.map((l, i) => (
-                <div key={l.clave} className="flex flex-wrap items-end gap-2">
-                  <div className="flex min-w-[220px] flex-[3_1_280px] flex-col gap-1">
+                <div key={l.clave} className={`flex flex-wrap items-end gap-2 ${i > 0 ? "border-t border-border pt-2" : ""}`}>
+                  {/* Nombre arriba a todo el ancho; nota, cantidad y quitar en la fila de abajo (27 nov 2026, pedido de Hernán: se veía enredado). */}
+                  <div className="flex basis-full flex-col gap-1">
                     {i === 0 && <span className="font-medium">Producto</span>}
                     {l.id ? (
                       <span className="flex min-h-9 items-center font-medium">{l.nombre}</span>
@@ -270,15 +271,15 @@ function EditarPedido({ p, opciones, stock }: { p: PedidoInventario; opciones: O
                       <CampoSkuMaestro valor={l.skuId} alCambiar={(o) => cambiar(l.clave, { sku: o, skuId: o?.id ?? null, nombre: o?.nombre ?? "" })} etiquetaAria={`Producto nuevo ${i + 1}`} placeholder="Escribe parte del nombre, el SKU o el N.º" claseContenedor="w-full" />
                     )}
                   </div>
-                  <label className="flex w-28 flex-col gap-1">
-                    <span className={i === 0 ? "font-medium" : "sr-only"}>Cantidad</span>
-                    <input type="number" inputMode="numeric" min={1} step={1} value={l.cantidad} onChange={(e) => cambiar(l.clave, { cantidad: e.target.value })} className={fieldClass} />
-                  </label>
-                  <label className="flex min-w-[180px] flex-[2_1_220px] flex-col gap-1">
+                  <label className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className={i === 0 ? "font-medium" : "sr-only"}>
                       Nota <span className="font-normal text-muted-foreground">(opcional)</span>
                     </span>
                     <input type="text" maxLength={300} value={l.nota} onChange={(e) => cambiar(l.clave, { nota: e.target.value })} className={fieldClass} />
+                  </label>
+                  <label className="flex w-28 flex-col gap-1">
+                    <span className={i === 0 ? "font-medium" : "sr-only"}>Cantidad</span>
+                    <input type="number" inputMode="numeric" min={1} step={1} value={l.cantidad} onChange={(e) => cambiar(l.clave, { cantidad: e.target.value })} className={fieldClass} />
                   </label>
                   <button type="button" aria-label={`Quitar ${l.nombre || `el producto ${i + 1}`} del pedido`} onClick={() => setLineas((ls) => ls.filter((x) => x.clave !== l.clave))} className={`${SECUNDARIO} min-w-9 px-0 text-muted-foreground`}>
                     ×
