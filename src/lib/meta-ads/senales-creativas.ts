@@ -5,6 +5,8 @@
 import { CERCA_DEL_TOPE, zonaDe } from "./limite";
 import { nombreDeAngulo } from "./angulo-detalle";
 import { esAnguloTactico } from "./video-angulo";
+import { mejorVideoDeAngulo, type VideoEjemplo } from "./video-ejemplo";
+import type { AvisoRentabilidad } from "./rentabilidad";
 import type { BaseDias } from "./analisis-pedido";
 import { senalesModulosParaIA, type SenalModulo } from "./senales-modulos";
 import { cpa, ctr, hookRate, sinResultados, sumar, type Resultados } from "./metricas";
@@ -62,12 +64,15 @@ export interface SenalesCreativas {
   nuevos14: { videos: number; gasto: number; cpa: number | null };
   viejos14: { gasto: number; cpa: number | null };
   videos: VideoSenal[];
-  mejorAngulo: { angulo: string; cpa: number; gasto: number; compras: number } | null;
+  /** `video`: el video de este producto con ese ángulo que mejor funcionó en 60 días (27 nov 2026), para verlo de ejemplo. Lo guardado antes no lo trae. */
+  mejorAngulo: { angulo: string; cpa: number; gasto: number; compras: number; video?: VideoEjemplo | null } | null;
   causas: CausaCreativa[];
   /** El CPA de los últimos 14 días (para compararlo con el de su test). */
   cpa14?: number | null;
   /** Lo que pasó con el producto en otros módulos (inventario, precio, competencia, test): se llena aparte, cada día. */
   otras?: SenalModulo[];
+  /** Cuánto deja cada venta entregada con su CPA de 14 días (27 nov 2026): se agrega al mostrarlo, no se guarda. */
+  rentabilidad?: AvisoRentabilidad;
 }
 
 const sumarDias = (fecha: string, n: number) => new Date(Date.parse(`${fecha}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
@@ -92,6 +97,7 @@ export function senalesDeProducto(base: BaseDias, producto: string, hoy: string)
   const prev7 = new Map<string, Resultados>();
   const ult14 = new Map<string, Resultados>();
   const angulos60 = new Map<string, Resultados>();
+  const videos60 = new Map<string, Resultados>();
   // Dentro de una táctica general, cuántas compras trajo cada detalle (para decir cuál).
   const detalles60 = new Map<string, Map<string, number>>();
   const hace60 = sumarDias(hoy, -59);
@@ -108,6 +114,7 @@ export function senalesDeProducto(base: BaseDias, producto: string, hoy: string)
     if (f.fecha >= hace60) {
       const a = base.videos.get(v)?.angulo;
       if (a) angulos60.set(a, sumar(angulos60.get(a) ?? sinResultados(), f.r));
+      videos60.set(v, sumar(videos60.get(v) ?? sinResultados(), f.r));
       const d = base.videos.get(v)?.detalle?.trim();
       if (a && d && esAnguloTactico(a)) {
         const suyos = detalles60.get(a) ?? new Map<string, number>();
@@ -152,7 +159,8 @@ export function senalesDeProducto(base: BaseDias, producto: string, hoy: string)
   // El ángulo que mejor ha funcionado en 60 días con este producto (con gasto y compras suficientes), para recomendarlo al renovar.
   const mejor = [...angulos60].filter(([, r]) => r.gasto >= U.gastoAngulo && r.compras >= 2 && cpa(r) !== null).sort((a, b) => cpa(a[1])! - cpa(b[1])!)[0];
   const sobreTodo = mejor ? [...(detalles60.get(mejor[0]) ?? [])].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([d]) => d.charAt(0).toLowerCase() + d.slice(1)) : [];
-  const mejorAngulo = mejor ? { angulo: sobreTodo.length ? `${mejor[0]} (sobre todo ${sobreTodo.join(" y ")})` : mejor[0], cpa: Math.round(cpa(mejor[1])! * 100) / 100, gasto: Math.round(mejor[1].gasto), compras: mejor[1].compras } : null;
+  const ejemplo = mejor ? mejorVideoDeAngulo([...videos60].map(([id, r]) => ({ id, nombre: base.videos.get(id)?.nombre ?? `Video …${id.slice(-5)}`, angulo: base.videos.get(id)?.angulo ?? null, r })), mejor[0]) : null;
+  const mejorAngulo = mejor ? { angulo: sobreTodo.length ? `${mejor[0]} (sobre todo ${sobreTodo.join(" y ")})` : mejor[0], cpa: Math.round(cpa(mejor[1])! * 100) / 100, gasto: Math.round(mejor[1].gasto), compras: mejor[1].compras, video: ejemplo } : null;
   const sugerencia = mejorAngulo ? `El ángulo que mejor ha funcionado con este producto en 60 días es «${mejorAngulo.angulo}» (CPA ${usd(mejorAngulo.cpa)} con ${mejorAngulo.compras} compras): empieza por ahí.` : "Todavía ningún ángulo tiene datos suficientes con este producto: prueba 2 o 3 ángulos distintos.";
 
   const causas: CausaCreativa[] = [];

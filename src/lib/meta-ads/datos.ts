@@ -8,6 +8,8 @@ import { agrupar, copyLimpio, landingLimpia, type Elemento } from "./agrupar";
 import { anguloDominante, composicionDeAngulos, gruposDeVideos, type GruposDeVideo } from "./atributos-video";
 import { guiaDeTope, textoDeGuia, zonaDe, type GuiaDeTope } from "./limite";
 import { calculadorDeTopes } from "./limite-datos";
+import { claveDeCostos, revisarCostos, sumarPedidos, tasasDe, COSTOS_DE_LA_HOJA } from "./costos-operacion";
+import { avisoRentabilidad, limitesDeProductos } from "./rentabilidad";
 import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
 import { nombreDeAngulo, temasDe } from "./angulo-detalle";
 import { calcularEnMarcha, campanaEnMarcha, enLaVista, hallazgosEnVista, productoEnMarcha, type EnMarcha, type VistaActividad } from "./en-marcha";
@@ -187,19 +189,38 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     supabase.from("meta_topes").select("producto_clave, producto, cpa_tope"),
     supabase.from("meta_decisiones").select("clave, estado, vigente_hasta"),
     // El análisis del historial y su interpretación con IA los prepara el sistema solo y se guardan aquí (sin la migración 0347 no hay nada y todo sigue como antes).
-    supabase.from("meta_ajustes").select("clave, valor").in("clave", [claveDeAnalisis(o.paisId), claveDeInterpretacion(o.paisId), claveDeResultados(o.paisId), claveDeSenales(o.paisId), claveDeRasgos(o.paisId), claveDePaginasMedidas(o.paisId)]),
+    supabase.from("meta_ajustes").select("clave, valor").in("clave", [claveDeAnalisis(o.paisId), claveDeInterpretacion(o.paisId), claveDeResultados(o.paisId), claveDeSenales(o.paisId), claveDeRasgos(o.paisId), claveDePaginasMedidas(o.paisId), claveDeCostos(o.paisId)]),
   ]);
   const valorDe = (clave: string) => (ajustesF ?? []).find((a) => a.clave === clave)?.valor ?? null;
   const analisisGuardado = valorDe(claveDeAnalisis(o.paisId)) as Partial<AnalisisGuardado> | null;
   const hallazgosGuardados = analisisGuardado && typeof analisisGuardado.generadoEn === "string" && analisisGuardado.analisis && Array.isArray(analisisGuardado.analisis.hallazgos) ? (analisisGuardado as AnalisisGuardado) : null;
   const interpretacion = leerValorInterpretacion(valorDe(claveDeInterpretacion(o.paisId)));
   const rasgos = leerValorRasgos(valorDe(claveDeRasgos(o.paisId)))?.items ?? [];
-  const senales = leerValorSenales(valorDe(claveDeSenales(o.paisId)))?.items ?? [];
+  const senalesGuardadas = leerValorSenales(valorDe(claveDeSenales(o.paisId)))?.items ?? [];
   const vigilancias = ordenarVigilancias(leerValorResultados(valorDe(claveDeResultados(o.paisId)))?.resultados ?? []);
   const topes: TopeVista[] = (topesF ?? []).map((t) => ({ clave: t.producto_clave as string, producto: t.producto as string, tope: num(t.cpa_tope) }));
   const topePorClave = new Map(topes.map((t) => [t.clave, t.tope]));
   // El tope de cada producto: el escrito a mano o el general, que baja si el producto envía o entrega peor que la tienda (la entrega sale del último análisis).
   const topeDe = calculadorDeTopes(topePorClave, hallazgosGuardados?.analisis);
+  // La rentabilidad de cada producto (27 nov 2026): venta y costo del último análisis, con su envío y entrega (o los de la tienda) y los costos de la calculadora. Solo informa.
+  const costosGuardados = revisarCostos(valorDe(claveDeCostos(o.paisId)));
+  const analisisRent = hallazgosGuardados?.analisis;
+  const pedidosRent = new Map((analisisRent?.entrega ?? []).map((f) => [f.clave, f]));
+  const tasasTienda = tasasDe(analisisRent?.pedidosDeLaTienda ?? (analisisRent?.entrega?.length ? sumarPedidos(analisisRent.entrega) : null));
+  const rentabilidad = limitesDeProductos(
+    analisisRent?.economia ?? [],
+    (clave) => {
+      const t = tasasDe(pedidosRent.get(clave));
+      return { envio: t.envio ?? tasasTienda.envio, entrega: t.entrega ?? tasasTienda.entrega };
+    },
+    "costos" in costosGuardados ? costosGuardados.costos : COSTOS_DE_LA_HOJA,
+  );
+  // «Por qué empeora»: cada producto con su aviso de rentabilidad, con su CPA de 14 días.
+  const senales = senalesGuardadas.map((x) => {
+    const clave = claveDeProducto(x.producto);
+    const l = rentabilidad.get(clave);
+    return l && x.cpa14 != null ? { ...x, rentabilidad: avisoRentabilidad(x.cpa14, topeDe(clave).tope, l, "14 días") } : x;
+  });
   const decisiones: DecisionGuardada[] = (decisionesF ?? []).map((d) => ({ clave: d.clave as string, estado: d.estado as DecisionGuardada["estado"], vigenteHasta: d.vigente_hasta as string }));
   const ocultas = decisiones.filter((d) => d.vigenteHasta >= o.hoy).map((d) => d.clave);
   if (!ids.length) return { ...base, cuentas, cuentaId, desde, hasta: o.hoy, topes, ocultas };
@@ -416,7 +437,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     const fecha = [...dias.keys()].sort().pop();
     return fecha ? (dias.get(fecha) ?? sinResultados()) : sinResultados();
   };
-  const anunciosSugerencia = anuncios.map((a) => ({ id: a.id, campanaId: a.campanaId, nombre: a.nombre, numero: a.numero, activo: a.activo, angulo: a.angulo, r: porAnuncio30.get(a.id) ?? sinResultados(), r7: porAnuncio7.get(a.id) ?? sinResultados(), ultimos2: porAnuncio2.get(a.id) ?? sinResultados(), ultimoDia: ultimoDiaDe(a.id), frecuencia: a.frecuencia }));
+  const anunciosSugerencia = anuncios.map((a) => ({ id: a.id, campanaId: a.campanaId, nombre: a.nombre, numero: a.numero, activo: a.activo, angulo: a.angulo, videoId: a.videoId, miniatura: a.miniatura, r: porAnuncio30.get(a.id) ?? sinResultados(), r7: porAnuncio7.get(a.id) ?? sinResultados(), ultimos2: porAnuncio2.get(a.id) ?? sinResultados(), ultimoDia: ultimoDiaDe(a.id), frecuencia: a.frecuencia }));
   const decisionesAnuncio = decisionesDeAnuncios(anunciosSugerencia, campanas);
   const semanaDe = new Map(campanas7.map((c) => [c.id, c]));
   for (const a of anuncios) {
@@ -442,7 +463,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   // En las sugerencias el ángulo va con su detalle, para que «antes y después» diga cuál.
   const videosEnMarcha = videos30.filter((v) => productoEnMarcha(enMarcha, v.producto)).map((v) => ({ ...v, angulo: nombreDeAngulo(v.angulo, v.analisis?.anguloDetalle) }));
   const delHistorial = hallazgosEnVista(hallazgosGuardados?.analisis.hallazgos ?? [], enMarcha, "activos");
-  const todas = [...sugerir({ campanas: campanas7, anuncios: anunciosSugerencia, serie, videos: videosEnMarcha, hoy: o.hoy, paginasPorCampana }), ...sugerenciasDeHallazgos([...delHistorial, ...vigilancias.map(hallazgoDeVigilancia).filter((h): h is NonNullable<typeof h> => h !== null)])];
+  const todas = [...sugerir({ campanas: campanas7, anuncios: anunciosSugerencia, serie, videos: videosEnMarcha, hoy: o.hoy, paginasPorCampana, rentabilidad }), ...sugerenciasDeHallazgos([...delHistorial, ...vigilancias.map(hallazgoDeVigilancia).filter((h): h is NonNullable<typeof h> => h !== null)])];
   const sugerencias = pendientes(todas, decisiones, o.hoy);
   // La misma prioridad en cada lista (25 nov 2026): lo más urgente de cada campaña, video y producto.
   const dePorCampana = pendientesPorCampana(sugerencias);

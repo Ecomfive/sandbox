@@ -116,3 +116,80 @@ export function rentabilidadDe(e: EconomiaProducto | null | undefined, envio: nu
     pierde: ganancia !== null && ganancia < 0,
   };
 }
+
+// ───────────────────────── La rentabilidad en las recomendaciones (27 nov 2026, pedido de Hernán) ─────────────────────────
+// Con la venta, el costo del producto, los envíos y la entrega de cada producto, las sugerencias, «Por qué empeora» y las fichas avisan cuándo hay que tener más cuidado. Solo informa: el tope y lo que se recomienda
+// apagar no cambian.
+
+/** Lo que hace falta de un producto para saber cuánto deja una venta con cualquier CPA. */
+export interface LimiteProducto {
+  venta: number;
+  producto: number;
+  /** Lo que queda para anuncios por venta entregada (venta − producto − envíos − operativo). */
+  paraAnuncios: number;
+  envio: number;
+  entrega: number;
+  cpaParaNoPerder: number;
+  fuente: FuenteCosto | null;
+  /** Unidades por pedido (un 2x1 cuenta 2). */
+  unidades: number | null;
+}
+
+/** Desde esta parte del límite para no perder, el margen es fino. */
+export const MARGEN_FINO = 0.85;
+
+/** El límite de cada producto (por la llave de su nombre), con sus porcentajes o, si tiene pocos pedidos, los de la tienda. Solo los que tienen venta, costo y porcentajes. */
+export function limitesDeProductos(
+  economia: readonly EconomiaProducto[],
+  tasasDe: (clave: string) => { envio: number | null; entrega: number | null },
+  c: CostosOperacion,
+): Map<string, LimiteProducto> {
+  const salida = new Map<string, LimiteProducto>();
+  for (const e of economia) {
+    const t = tasasDe(e.clave);
+    const r = rentabilidadDe(e, t.envio, t.entrega, c, null);
+    if (!r || t.envio === null || t.entrega === null) continue;
+    salida.set(e.clave, { venta: r.venta, producto: r.producto, paraAnuncios: r.paraAnuncios, envio: t.envio, entrega: t.entrega, cpaParaNoPerder: r.cpaParaNoPerder, fuente: e.fuente, unidades: e.unidades });
+  }
+  return salida;
+}
+
+/** Cuánto deja (o pierde, si es negativo) cada venta entregada con ese CPA de Meta. */
+export const dejaCon = (l: LimiteProducto, cpaMeta: number) => redondear(l.paraAnuncios - cpaMeta / (l.envio * l.entrega));
+
+export type EstadoRentable = "pierde" | "margen_fino" | "sobre_tope_rentable" | "bien";
+
+export const NOMBRE_ESTADO_RENTABLE: Record<EstadoRentable, string> = { pierde: "Pierde", margen_fino: "Margen fino", sobre_tope_rentable: "Sobre el tope, rentable", bien: "Bien" };
+
+/** Cómo va un CPA frente al límite para no perder y al tope. */
+export function estadoRentable(cpaMeta: number, tope: number, l: LimiteProducto): EstadoRentable {
+  if (cpaMeta > l.cpaParaNoPerder) return "pierde";
+  if (cpaMeta > tope) return "sobre_tope_rentable";
+  if (l.cpaParaNoPerder > 0 && cpaMeta >= l.cpaParaNoPerder * MARGEN_FINO) return "margen_fino";
+  return "bien";
+}
+
+export interface AvisoRentabilidad {
+  estado: EstadoRentable;
+  /** «alerta» si pierde; «info» lo demás. */
+  tono: "alerta" | "info";
+  titulo: string;
+  texto: string;
+}
+
+const usd = (n: number) => `$${Math.abs(n).toFixed(2)}`;
+const pct = (n: number) => `${Math.round(n * 100)} %`;
+
+/** El aviso de rentabilidad de algo con ese CPA de Meta (`periodo`: «7 días», «14 días»…). */
+export function avisoRentabilidad(cpaMeta: number, tope: number, l: LimiteProducto, periodo = "7 días"): AvisoRentabilidad {
+  const estado = estadoRentable(cpaMeta, tope, l);
+  const deja = dejaCon(l, cpaMeta);
+  const base = `venta ${usd(l.venta)} · producto ${usd(l.producto)}${l.fuente === "matriz" ? " (Matriz)" : ""} · envía ${pct(l.envio)} · entrega ${pct(l.entrega)}`;
+  if (estado === "pierde")
+    return { estado, tono: "alerta", titulo: "Pierde:", texto: `con el CPA de ${periodo} (${usd(cpaMeta)}) cada venta entregada pierde ${usd(deja)}. El límite para no perder es ${usd(l.cpaParaNoPerder)}${l.cpaParaNoPerder < tope ? ", más bajo que el tope" : ""} (${base}).` };
+  if (estado === "sobre_tope_rentable")
+    return { estado, tono: "info", titulo: "Ojo con la rentabilidad:", texto: `aunque pasa del tope, cada venta entregada todavía deja ${usd(deja)} (no pierde hasta un CPA de ${usd(l.cpaParaNoPerder)}; ${base}). La regla del tope sigue; antes de cortar, mira si conviene rescatar lo que vende.` };
+  if (estado === "margen_fino")
+    return { estado, tono: "info", titulo: "Margen fino:", texto: `cada venta entregada deja solo ${usd(deja)}: ya va en el ${pct(cpaMeta / l.cpaParaNoPerder)} del límite para no perder (${usd(l.cpaParaNoPerder)}; ${base}).` };
+  return { estado, tono: "info", titulo: "Rentabilidad:", texto: `con el CPA de ${periodo} cada venta entregada deja ${usd(deja)}. No pierde hasta un CPA de ${usd(l.cpaParaNoPerder)} (${base}).` };
+}

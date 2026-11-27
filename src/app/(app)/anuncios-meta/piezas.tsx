@@ -8,6 +8,8 @@ import { GASTO_MINIMO_CONFIABLE, METRICAS_CAMPANA, conSigno, confiable, cpa, cpm
 import { NOMBRE_PRIORIDAD, type Pendiente } from "@/lib/meta-ads/prioridad";
 import type { CifraSugerencia, Prioridad } from "@/lib/meta-ads/sugerencias";
 import { NOMBRE_ETAPA, NOMBRE_PUJA, type Estructura, type Etapa, type Puja } from "@/lib/meta-ads/nombre";
+import { VerVideoEjemplo } from "./ver-video-ejemplo";
+import { AvisoRentable } from "./aviso-rentable";
 
 export const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
 export const porcentaje = (n: number | null, decimales = 1) => (n === null ? "—" : `${n.toFixed(decimales)} %`);
@@ -41,7 +43,9 @@ export function QueHacer({ pendiente }: { pendiente: Pendiente }) {
         <InsigniaPrioridad pendiente={{ ...pendiente, cuantas: 1 }} />
       </div>
       {pendiente.cifras && pendiente.cifras.length > 0 && <CifrasEnLinea cifras={pendiente.cifras} />}
+      <AvisoRentable aviso={pendiente.rentabilidad} />
       <p className="m-0 text-sm">{pendiente.accion}</p>
+      <VerVideoEjemplo video={pendiente.video} />
       {pendiente.guia && <GuiaEnLinea guia={pendiente.guia} />}
       {pendiente.clave && <BotonesDecidir clave={pendiente.clave} titulo={pendiente.titulo} accion={pendiente.accion} />}
     </section>

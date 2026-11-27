@@ -8,6 +8,8 @@ import { ChevronRightIcon } from "@/lib/nav-icons";
 import { GuiaEnLinea } from "./aviso-tope";
 import { BotonesDecidir } from "./decidir";
 import { CifrasEnLinea } from "./piezas";
+import { VerVideoEjemplo } from "./ver-video-ejemplo";
+import { AvisoRentable } from "./aviso-rentable";
 
 const TEXTO_SEVERIDAD = { alta: "Urgente", media: "Importante", info: "Para mirar" } as const;
 
@@ -83,6 +85,8 @@ function Tarjeta({ s }: { s: Sugerencia }) {
             <span className="font-medium">Qué hacer: </span>
             {s.accion}
           </p>
+          <AvisoRentable aviso={s.rentabilidad} className="mt-1.5" />
+          <VerVideoEjemplo video={s.video} className="mt-1" />
           {s.guia && <GuiaEnLinea guia={s.guia} className="mt-1.5" />}
           {s.anuncios && s.anuncios.length > 0 && <AnunciosPasados anuncios={s.anuncios} />}
         </div>

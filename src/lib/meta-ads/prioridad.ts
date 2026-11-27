@@ -3,6 +3,8 @@
 
 import type { GuiaDeTope } from "./limite";
 import { PRIORIDADES, type CifraSugerencia, type Prioridad, type Severidad, type Sugerencia } from "./sugerencias";
+import type { VideoEjemplo } from "./video-ejemplo";
+import type { AvisoRentabilidad } from "./rentabilidad";
 
 /** Lo más urgente que tiene una fila de una lista. */
 export interface Pendiente {
@@ -16,6 +18,10 @@ export interface Pendiente {
   guia?: GuiaDeTope;
   /** Cuántas cosas (o campañas, en un producto) piden lo mismo. */
   cuantas: number;
+  /** El video de ejemplo de la sugerencia, para verlo ahí mismo. */
+  video?: VideoEjemplo;
+  /** Cuánto deja cada venta entregada y si hay que cuidarla. */
+  rentabilidad?: AvisoRentabilidad;
 }
 
 export const NOMBRE_PRIORIDAD: Record<Prioridad, string> = { apagar: "Apagar", actuar: "Actuar hoy", oportunidad: "Oportunidad", observar: "En observación", historial: "Del historial" };
@@ -32,7 +38,7 @@ function agrupar(pares: readonly [string, Sugerencia][]): Map<string, Pendiente>
   const salida = new Map<string, Pendiente>();
   for (const [id, lista] of porId) {
     const s = [...lista].sort((a, b) => urgencia(a) - urgencia(b) || b.gasto - a.gasto)[0];
-    salida.set(id, { clave: s.clave, prioridad: s.prioridad, titulo: s.titulo, accion: s.accion, cifras: s.cifras, guia: s.guia, cuantas: lista.filter((x) => x.prioridad === s.prioridad).length });
+    salida.set(id, { clave: s.clave, prioridad: s.prioridad, titulo: s.titulo, accion: s.accion, cifras: s.cifras, guia: s.guia, cuantas: lista.filter((x) => x.prioridad === s.prioridad).length, ...(s.video ? { video: s.video } : {}), ...(s.rentabilidad ? { rentabilidad: s.rentabilidad } : {}) });
   }
   return salida;
 }

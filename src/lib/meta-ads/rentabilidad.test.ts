@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { economiaDe, rentabilidadDe, unidadesPorNombre, type PedidoEconomia } from "./rentabilidad";
+import { avisoRentabilidad, dejaCon, economiaDe, estadoRentable, limitesDeProductos, rentabilidadDe, unidadesPorNombre, type PedidoEconomia } from "./rentabilidad";
 import { costoPorVenta } from "./costos-operacion";
 
 const C = { envio: 6.27, cod: 0, operativo: 2.25 };
@@ -53,4 +53,25 @@ test("sin datos suficientes no se calcula", () => {
   assert.equal(rentabilidadDe(e, null, 0.75, C, null), null);
   assert.equal(rentabilidadDe(null, 0.8, 0.75, C, null), null);
   assert.equal(rentabilidadDe(e, 0.8, 0.75, C, null)!.ganancia, null);
+});
+
+test("el aviso de rentabilidad: pierde, margen fino, sobre el tope y bien", () => {
+  const l = limitesDeProductos(
+    [{ clave: "X", pedidos: 40, venta: 39.99, unidades: 1, costoUnitario: 6, costoProducto: 6, costeados: 40, fuente: "compras_pais" }],
+    () => ({ envio: 0.8, entrega: 0.75 }),
+    C,
+  ).get("X")!;
+  assert.equal(l.cpaParaNoPerder, 14.34);
+  assert.equal(dejaCon(l, 10), 7.23);
+  assert.equal(estadoRentable(15, 10, l), "pierde");
+  assert.equal(estadoRentable(12, 10, l), "sobre_tope_rentable");
+  // Con un tope alto, 13 ya es el 91 % del límite.
+  assert.equal(estadoRentable(13, 16, l), "margen_fino");
+  assert.equal(estadoRentable(8, 10, l), "bien");
+  const a = avisoRentabilidad(15, 10, l);
+  assert.equal(a.tono, "alerta");
+  assert.match(a.texto, /pierde \$1\.10/);
+  assert.match(avisoRentabilidad(8, 10, l).texto, /deja \$10\.57/);
+  // Sin venta o sin porcentajes no hay límite.
+  assert.equal(limitesDeProductos([{ clave: "Y", pedidos: 2, venta: 30, unidades: 1, costoUnitario: 5, costoProducto: 5, costeados: 2, fuente: "compras_pais" }], () => ({ envio: 0.8, entrega: 0.75 }), C).size, 0);
 });

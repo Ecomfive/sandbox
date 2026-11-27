@@ -9,7 +9,7 @@ import { horaDeMeta } from "@/lib/meta-ads/hora";
 import { guiaDeTope, topeDeProducto, type TopeProducto } from "@/lib/meta-ads/limite";
 import { dolares } from "@/lib/meta-ads/metricas";
 import { ordenarPor, type CriterioOrden, type Orden } from "@/lib/meta-ads/orden";
-import { MIN_PEDIDOS_RENTABILIDAD, NOMBRE_FUENTE } from "@/lib/meta-ads/rentabilidad";
+import { MARGEN_FINO, MIN_PEDIDOS_RENTABILIDAD, NOMBRE_FUENTE, NOMBRE_ESTADO_RENTABLE, type EstadoRentable } from "@/lib/meta-ads/rentabilidad";
 import type { ProductoVista } from "@/lib/meta-ads/vistas";
 import { guardarCostosMeta } from "./actions";
 import { ColumnaOrdenable } from "./columna-ordenable";
@@ -54,6 +54,28 @@ const origenDe = (f: FilaCosto) =>
   f.economia
     ? `${f.economia.pedidos} pedidos entregados de solo este producto: se cobra ${plata(f.economia.venta)} por pedido, con ${f.economia.unidades ?? "—"} unidades en promedio (un 2x1 cuenta 2).${f.economia.fuente ? ` Costo: ${NOMBRE_FUENTE[f.economia.fuente]}${f.economia.costoUnitario !== null ? `, ${dolares(f.economia.costoUnitario)} por unidad` : ""}.` : " Sin costo en Compras ni en la Matriz."}`
     : "Sin pedidos entregados de solo este producto en los últimos 180 días.";
+
+/** Cómo va un producto: pierde, margen fino, sobre el tope pero rentable o bien (27 nov 2026). */
+function estadoDeFila(f: FilaCosto, tope: number | null): EstadoRentable | null {
+  const r = f.rentabilidad;
+  if (!r || f.cpa === null) return null;
+  if (f.cpa > r.cpaParaNoPerder) return "pierde";
+  if (tope !== null && f.cpa > tope) return "sobre_tope_rentable";
+  if (r.cpaParaNoPerder > 0 && f.cpa >= r.cpaParaNoPerder * MARGEN_FINO) return "margen_fino";
+  return "bien";
+}
+
+const CLASE_ESTADO: Record<EstadoRentable, string> = {
+  pierde: "bg-destructive-soft text-destructive",
+  margen_fino: "bg-warning-soft text-warning",
+  sobre_tope_rentable: "bg-primario-suave text-primario",
+  bien: "bg-success-soft text-success",
+};
+
+function Cuidado({ estado }: { estado: EstadoRentable | null }) {
+  if (!estado) return <span className="text-muted-foreground">—</span>;
+  return <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${CLASE_ESTADO[estado]}`}>{NOMBRE_ESTADO_RENTABLE[estado]}</span>;
+}
 
 /** La ganancia de una venta entregada; «Sin costo» o «—» si falta el costo o la venta. */
 function Rentable({ f }: { f: FilaCosto }) {
@@ -224,12 +246,13 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
                     <p className="m-0 flex flex-wrap items-baseline gap-1.5">
                       <span className="text-muted-foreground">CPA tope</span>
                       <TopeEnTabla t={topeDe(f.clave)} />
+                      <Cuidado estado={estadoDeFila(f, topeDe(f.clave)?.tope ?? null)} />
                     </p>
                   </li>
                 ))}
               </ul>
               <div className="hidden overflow-x-auto md:block">
-                <table className="tabla-datos w-full min-w-[84rem] border-collapse text-sm">
+                <table className="tabla-datos w-full min-w-[92rem] border-collapse text-sm">
                   <caption className="sr-only">Costo de cada venta entregada por producto, en el periodo elegido</caption>
                   <thead>
                     <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -246,7 +269,8 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
                       <th scope="col" className="px-3 py-2 text-right font-medium">Producto</th>
                       {columna("ganancia", "Ganancia por venta entregada", "px-3 py-2 text-right")}
                       {columna("noPerder", "CPA para no perder", "px-3 py-2 text-right")}
-                      <th scope="col" className="px-4 py-2 text-right font-medium">CPA tope</th>
+                      <th scope="col" className="px-3 py-2 text-right font-medium">CPA tope</th>
+                      <th scope="col" className="px-4 py-2 text-left font-medium">Cuidado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -297,8 +321,11 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
                         <td className="px-3 py-2.5 text-right">
                           {f.rentabilidad ? <span className={`font-semibold ${f.cpa !== null && f.cpa > f.rentabilidad.cpaParaNoPerder ? "text-destructive" : ""}`}>{dolares(f.rentabilidad.cpaParaNoPerder)}</span> : "—"}
                         </td>
-                        <td className="px-4 py-2.5 text-right">
+                        <td className="px-3 py-2.5 text-right">
                           <TopeEnTabla t={topeDe(f.clave)} />
+                        </td>
+                        <td className="px-4 py-2.5 text-left">
+                          <Cuidado estado={estadoDeFila(f, topeDe(f.clave)?.tope ?? null)} />
                         </td>
                       </tr>
                     ))}
@@ -326,6 +353,7 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
               <li>Venta: lo que se cobra por pedido, con los pedidos entregados de solo ese producto de los últimos 180 días (hacen falta al menos 5). Producto: costo por unidad × unidades del pedido; un 2x1 o un «PACK 2» cuenta como 2 unidades. El costo es el promedio de Compras (primero el del país); si no hay, el de la Matriz, que puede estar desactualizado. Sin flete ni IVA.</li>
               <li>Ganancia por venta entregada = venta − producto − costo por venta entregada. En rojo y con «pierde»: con el CPA de ahora se pierde plata en cada venta.</li>
               <li>CPA para no perder = (venta − producto − envíos − operativo) × % de envío × % de entrega: el CPA de Meta más alto con el que una venta entregada todavía no pierde. Por ahora solo informa: no cambia el CPA tope ni lo que el sistema recomienda apagar.</li>
+              <li>Cuidado: «Pierde» = con el CPA de ahora cada venta entregada pierde plata; «Margen fino» = el CPA ya va en el 85 % o más del límite para no perder; «Sobre el tope, rentable» = pasa del tope pero todavía deja ganancia. Los mismos avisos salen en las sugerencias, las fichas, «Por qué empeora» y el chat de Hallazgos.</li>
               <li>CPA tope: el general ($10) baja como mucho a $9 en el producto al que le llegan menos ventas que a la tienda (% de envío × % de entrega): $1 si le llegan un 25 % menos o peor, y en proporción si es menos. Nunca sube, uno escrito en Cuentas se usa tal cual y los costos de arriba no lo cambian. Con ese tope el sistema decide qué apagar y qué no tocar.</li>
             </ul>
           </details>
