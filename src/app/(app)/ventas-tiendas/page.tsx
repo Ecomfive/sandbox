@@ -174,7 +174,17 @@ export default async function VentasTiendasPage({
           subtexto={`${entero(t.devueltas)} devueltas · ${entero(t.en_transito + t.pendientes)} sin cerrar${upp !== null ? ` · ${upp.toFixed(2)} unidades por pedido` : ""}`}
           href={ordenes("entregada")}
         />
+        {dropi && (
+          <KpiAF4
+            titulo="Proveeduría (Dropi)"
+            valor={dineroKpi(dropi.ganancias)}
+            subtexto={`Ganancia acreditada · ${entero(dropi.entregados)} entregados de ${entero(dropi.pedidos)} · vendido ${dinero(dropi.vendidoCliente)}`}
+            href="/panel-financiero/canales"
+          />
+        )}
       </FilaKpiAF4>
+
+      {dropi && <BloqueDropi r={dropi} mes={mes} ventasTiendas={t.ventas_entregadas} />}
 
       {proyeccion && <BloqueProyeccion p={proyeccion} mes={mes} anioAnterior={pasado ? pasado.ventas_entregadas : null} />}
 
@@ -200,7 +210,6 @@ export default async function VentasTiendasPage({
       </section>
 
       {deposito && <BloqueDeposito d={deposito} mes={mes} />}
-      {dropi && <BloqueDropi r={dropi} mes={mes} ventasTiendas={t.ventas_entregadas} />}
       {patron && extras.semana && <BloquePatron patron={patron} desde={extras.semana.desde} hasta={extras.semana.hasta} contexto={contexto} />}
     </Pagina>
   );

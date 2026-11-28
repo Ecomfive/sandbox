@@ -1,0 +1,111 @@
+-- Portal AF4 360°: la ganancia de Dropi salía en $0 en Ventas por tienda y en Tiendas y proveeduría.
+--
+-- `fin_sincronizar_dropi()` (0938) buscaba «GANANCIA» en `historial_cartera.tipo`, pero la cartera de Dropi trae el tipo
+-- del movimiento (ENTRADA, SALIDA…) y «ENTRADA POR GANANCIA» va en la descripción: es lo que ya usan Pedidos Dropi
+-- (0037) y `src/lib/pedidos/resumen.ts`. Ahora mira las dos columnas. Solo cambia ese filtro, que pasa a la función
+-- `fin_dropi_es_ganancia` (es también lo que Estado del sistema revisa para saber si la 0991 se corrió: la de
+-- sincronizar existe desde la 0938). Al final la corre una vez para rellenar `fin_dropi_mensual` (la tarea
+-- «dropi-finanzas» la sigue corriendo cada día). Se puede correr dos veces.
+--
+-- México: Dropi México cobra y paga en pesos, pero la 0938 lo guardaba como «USD» y su saldo de billetera entraba a
+-- `fin_cartera` como dólares. Ahora queda en «MXN» y, como Costa Rica, fuera de la cartera y de las sumas en dólares
+-- (Tiendas y proveeduría, «Hoy» y Ventas por tienda solo suman USD). Se quita el documento «Billetera Dropi MX» que la
+-- 0938 había creado, si nadie lo editó ni tiene abonos.
+
+create or replace function fin_dropi_es_ganancia(p_tipo text, p_descripcion text)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select (coalesce(p_tipo, '') || ' ' || coalesce(p_descripcion, '')) ilike '%ganancia%';
+$$;
+
+revoke all on function fin_dropi_es_ganancia(text, text) from public, anon, authenticated;
+
+create or replace function fin_sincronizar_dropi()
+returns table (meses integer, paises integer, documentos integer)
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_meses integer := 0;
+  v_paises integer := 0;
+  v_docs integer := 0;
+  p record;
+  v_saldo numeric(14, 2);
+  v_unidad uuid;
+begin
+  with o as (
+    select date_trunc('month', fecha)::date as periodo, pais_id,
+           count(*) as pedidos,
+           count(*) filter (where upper(estado) = 'ENTREGADO') as entregados,
+           coalesce(sum(monto) filter (where upper(estado) = 'ENTREGADO'), 0) as ventas
+    from ordenes group by 1, 2
+  ), g as (
+    select date_trunc('month', fecha)::date as periodo, pais_id, coalesce(sum(monto), 0) as ganancias
+    from historial_cartera
+    where fin_dropi_es_ganancia(tipo, descripcion) and monto > 0 group by 1, 2
+  ), r as (
+    select date_trunc('month', fecha)::date as periodo, pais_id, coalesce(sum(monto), 0) as retiros
+    from retiros where estado_dropi = 'aprobado' group by 1, 2
+  ), todo as (
+    select coalesce(o.periodo, g.periodo, r.periodo) as periodo, coalesce(o.pais_id, g.pais_id, r.pais_id) as pais_id,
+           coalesce(o.pedidos, 0) as pedidos, coalesce(o.entregados, 0) as entregados, coalesce(o.ventas, 0) as ventas,
+           coalesce(g.ganancias, 0) as ganancias, coalesce(r.retiros, 0) as retiros
+    from o full join g on g.periodo = o.periodo and g.pais_id = o.pais_id
+           full join r on r.periodo = coalesce(o.periodo, g.periodo) and r.pais_id = coalesce(o.pais_id, g.pais_id)
+  ), ins as (
+    insert into fin_dropi_mensual (periodo, pais_id, moneda, pedidos, entregados, ventas_entregadas, ganancias, retiros, origen_clave, actualizado_en)
+    select t.periodo, t.pais_id, case pa.codigo when 'CR' then 'CRC' when 'MX' then 'MXN' else 'USD' end, t.pedidos, t.entregados, t.ventas, t.ganancias, t.retiros,
+           'dropi|' || pa.codigo || '|' || to_char(t.periodo, 'YYYY-MM'), now()
+    from todo t join paises pa on pa.id = t.pais_id
+    where t.periodo is not null
+    on conflict (origen_clave) do update set
+      pedidos = excluded.pedidos, entregados = excluded.entregados, ventas_entregadas = excluded.ventas_entregadas,
+      ganancias = excluded.ganancias, retiros = excluded.retiros, moneda = excluded.moneda, actualizado_en = now()
+    returning 1
+  )
+  select count(*) into v_meses from ins;
+
+  -- Por cobrar a Dropi en cada país: el último saldo de billetera registrado o, si no hay, ganancias − retiros.
+  -- Solo en dólares (la cartera es en USD): Costa Rica y México quedan en `fin_dropi_mensual`.
+  select id into v_unidad from fin_unidades where nombre = 'CORPORATIVO' limit 1;
+  for p in select pa.id, pa.codigo from paises pa where pa.codigo not in ('CR', 'MX') and exists (select 1 from fin_dropi_mensual m where m.pais_id = pa.id) loop
+    v_paises := v_paises + 1;
+    select sw.monto into v_saldo from saldos_wallet sw
+      join plataformas pl on pl.id = sw.plataforma_id
+      where sw.pais_id = p.id and pl.nombre ilike 'dropi%' order by sw.fecha desc limit 1;
+    if v_saldo is null then
+      select coalesce(sum(ganancias), 0) - coalesce(sum(retiros), 0) into v_saldo from fin_dropi_mensual where pais_id = p.id;
+    end if;
+    if v_saldo > 0 then
+      insert into fin_cartera (clase, contraparte, unidad_id, documento, fecha, motivo, monto, origen, origen_clave)
+      values ('cobrar', 'Dropi', v_unidad, 'Billetera Dropi ' || p.codigo, current_date, 'Saldo de la billetera de Dropi por retirar', v_saldo, 'dropi', 'dropi-wallet|' || p.codigo)
+      on conflict (origen_clave) do update set monto = excluded.monto, fecha = excluded.fecha, actualizado_en = now()
+        where fin_cartera.editado_a_mano = false;
+      v_docs := v_docs + 1;
+    else
+      delete from fin_cartera c where c.origen_clave = 'dropi-wallet|' || p.codigo and c.editado_a_mano = false
+        and not exists (select 1 from fin_cartera_abonos a where a.documento_id = c.id);
+    end if;
+    v_saldo := null;
+  end loop;
+  return query select v_meses, v_paises, v_docs;
+end;
+$$;
+
+revoke all on function fin_sincronizar_dropi() from public, anon, authenticated;
+
+select * from fin_sincronizar_dropi();
+
+-- El saldo en pesos de México que la 0938 había dejado como dólares por cobrar.
+delete from fin_cartera c
+where c.origen_clave = 'dropi-wallet|MX' and c.editado_a_mano = false
+  and not exists (select 1 from fin_cartera_abonos a where a.documento_id = c.id);
+
+-- Revisión: ganancia por mes y país después de la corrección.
+select m.periodo, p.codigo, m.moneda, m.entregados, m.ventas_entregadas, m.ganancias
+from fin_dropi_mensual m join paises p on p.id = m.pais_id
+order by m.periodo desc, p.codigo limit 12;
