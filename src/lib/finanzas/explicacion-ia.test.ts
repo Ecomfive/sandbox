@@ -42,3 +42,10 @@ test("la respuesta se lee de los bloques de texto", () => {
   assert.equal(textoDeRespuesta({ content: [] }), null);
   assert.equal(textoDeRespuesta(null), null);
 });
+
+test("explicación: tope alto, esfuerzo bajo y solo el texto (sin los bloques de pensamiento)", () => {
+  const c = cuerpoPedido(snap, "m") as { max_tokens: number; output_config: unknown };
+  assert.ok(c.max_tokens >= 4000);
+  assert.deepEqual(c.output_config, { effort: "low" });
+  assert.equal(textoDeRespuesta({ content: [{ type: "thinking", thinking: "…" }, { type: "text", text: "Hola" }] }), "Hola");
+});

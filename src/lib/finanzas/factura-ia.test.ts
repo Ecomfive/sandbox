@@ -36,3 +36,9 @@ test("avisa el DV que no coincide y rechaza lo que no es JSON", () => {
   assert.ok("error" in leerRespuestaFactura({ content: [{ type: "text", text: "no puedo leerla" }] }));
   assert.ok("error" in leerRespuestaFactura(null));
 });
+
+test("factura: tope alto y esfuerzo bajo (lo que piensa el modelo cuenta en max_tokens)", () => {
+  const p = pedidoFactura({ tipo: "pdf" }, "x") as { max_tokens: number; output_config: unknown };
+  assert.ok(p.max_tokens >= 4000);
+  assert.deepEqual(p.output_config, { effort: "low" });
+});
