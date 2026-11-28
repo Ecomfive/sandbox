@@ -201,6 +201,9 @@ export const MIGRACIONES_CLAVE: { migracion: string; que: string; prueba: Prueba
   { migracion: "0990", que: "Inventario contable: provisión por obsoleto, consignación y ajustes de conteo con aprobación", prueba: { tipo: "tabla", nombre: "fin_ajustes_inventario" } },
   { migracion: "0991", que: "Dropi: la ganancia acreditada se lee de la descripción de la billetera (salía en $0)", prueba: { tipo: "funcion", nombre: "fin_dropi_es_ganancia" } },
   { migracion: "0992", que: "Costos de producto: hoja única de Panamá por compra, costos asociados y costo por fecha del pedido", prueba: { tipo: "funcion", nombre: "fin_costo_hoja_en" } },
+  // 0993 solo cambia el cuerpo de una función que existe desde la 0237 (y da un permiso propio): esta prueba no distingue si se corrió;
+  // está para que la lista tenga todos los archivos. Su propia consulta final dice si quedó.
+  { migracion: "0993", que: "Inventario: corregir lo recibido en una remisión sin autorización (permiso propio corregir-remision)", prueba: { tipo: "funcion", nombre: "wms_resolver_correccion_remision" } },
 ];
 
 /** Lo que se muestra de una prueba («Falta …»). */
